@@ -16,13 +16,15 @@ Hệ thống điểm danh tự động sử dụng định vị GPS thời gian 
 
 ```
 gps-attendance/
-├── server/                  # Backend API (NestJS)
-└── client/
-    ├── admin-dashboard/     # Web dashboard cho giảng viên/quản trị (React + Vite)
-    └── mobile-client/        # Ứng dụng di động cho sinh viên (Expo / React Native)
+├── server/                       # Backend API (NestJS)
+├── client/
+│   ├── admin-dashboard/          # Web dashboard cho giảng viên/quản trị (React + Vite)
+│   └── mobile-client/            # Ứng dụng di động cho sinh viên (Expo / React Native)
+└── packages/
+    └── shared-types/             # Type/DTO dùng chung giữa server, admin, mobile
 ```
 
-Đây là monorepo — mỗi thư mục con là một project độc lập, có `package.json`, dependencies và lệnh chạy riêng.
+Đây là **pnpm workspace monorepo** — 3 project (`server`, `admin-dashboard`, `mobile-client`) và `shared-types` được quản lý cùng nhau qua **1** `pnpm-lock.yaml` duy nhất ở root, không cài dependency riêng lẻ từng thư mục.
 
 ## Công nghệ sử dụng
 
@@ -31,53 +33,67 @@ gps-attendance/
 | Backend | NestJS |
 | Admin Dashboard | React + Vite + TypeScript |
 | Mobile Client | Expo SDK 54 (React Native) |
-| Package manager | pnpm |
+| Package manager | pnpm workspace |
 
 ## Yêu cầu môi trường
 
 - **Node.js** >= 20.x (khuyến nghị dùng qua [nvm](https://github.com/nvm-sh/nvm))
-- **pnpm** (cài qua `npm install -g pnpm` hoặc dùng corepack)
+- **pnpm** — bật qua corepack (đã có sẵn từ Node 16.13+):
+  ```bash
+  corepack enable
+  ```
+  Repo đã pin sẵn version pnpm trong `package.json` (`packageManager`), corepack sẽ tự dùng đúng version, không cần cài thủ công.
 - App **Expo Go** trên điện thoại (Android/iOS) để chạy thử `mobile-client` mà không cần build native
   > Dự án đang dùng **Expo SDK 54** để đảm bảo tương thích với bản Expo Go hiện có trên CH Play/App Store. Nếu bản Expo Go trên máy bạn không khớp SDK, vào store cập nhật Expo Go lên bản mới nhất hoặc kiểm tra lại version SDK của project trong `client/mobile-client/package.json`.
 - (Tuỳ chọn, cho giai đoạn sau) Docker — dùng khi cần chạy database hoặc chuẩn bị deploy
 
 ## Cài đặt
 
-Clone repo và cài dependencies cho từng project:
+Chỉ cài đặt **1 lần duy nhất ở root**, không `cd` vào từng project để `pnpm install` riêng (sẽ phá vỡ liên kết workspace).
 
 ```bash
 git clone <repo-url>
 cd gps-attendance
+pnpm install
 ```
+
+Lệnh này tự động:
+- Cài dependency cho cả 3 project cùng lúc
+- Build sẵn package `shared-types` (qua hook `postinstall`)
+
+Sau khi cài xong, chạy từng project bằng script ở root:
 
 ### 1. Server (NestJS)
 
 ```bash
-cd server
-pnpm install
-pnpm run start:dev
+pnpm dev:server
 ```
 Mặc định chạy tại `http://localhost:3000`.
 
 ### 2. Admin Dashboard (React)
 
 ```bash
-cd client/admin-dashboard
-pnpm install
-pnpm run dev
+pnpm dev:admin
 ```
 Mặc định chạy tại `http://localhost:5173`.
 
 ### 3. Mobile Client (Expo)
 
 ```bash
-cd client/mobile-client
-pnpm install
-pnpm start
+pnpm dev:mobile
 ```
 Quét mã QR hiện trên terminal bằng app **Expo Go** để chạy thử trên điện thoại thật (khuyến nghị dùng thiết bị thật thay vì emulator, vì tính năng GPS/anti-spoofing cần thiết bị thật để hoạt động và kiểm thử chính xác).
 
-> Nếu điện thoại và máy tính không cùng mạng WiFi, dùng `pnpm start --tunnel`, hoặc kết nối qua USB bằng `adb reverse tcp:8081 tcp:8081`.
+> Nếu điện thoại và máy tính không cùng mạng WiFi, dùng `pnpm --filter mobile-client start --tunnel`, hoặc kết nối qua USB bằng `adb reverse tcp:8081 tcp:8081`.
+
+### Lưu ý khi sửa `packages/shared-types`
+
+Server dùng bản đã build sẵn (`dist/`) của `shared-types`, không đọc trực tiếp file `.ts` nguồn. Sau khi sửa code trong `packages/shared-types/src`, cần build lại để server thấy thay đổi:
+
+```bash
+pnpm build:shared
+```
+(Admin dashboard và mobile không cần bước này — 2 project đó dùng bundler nên đọc thẳng file `.ts` nguồn, thay đổi có hiệu lực ngay khi lưu file.)
 
 ## Cách hoạt động (tổng quan)
 
