@@ -9,3 +9,5 @@ build/
 .claude/
 AGENTS.md
 CLAUDE.md
+
+*.tsbuildinfo
