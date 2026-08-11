@@ -7,15 +7,29 @@
     "node": ">=20"
   },
   "scripts": {
-    "postinstall": "pnpm --filter @gps-attendance/shared-types build",
-    "dev:server": "pnpm --filter server start:dev",
-    "dev:admin": "pnpm --filter admin-dashboard dev",
-    "dev:mobile": "pnpm --filter mobile-client start",
-    "build:server": "pnpm --filter server build",
-    "build:admin": "pnpm --filter admin-dashboard build",
-    "build:shared": "pnpm --filter \"./packages/**\" build"
+    "predev:server": "pnpm build:shared",
+    "dev:server": "pnpm --filter @gps-attendance/server dev",
+
+    "predev:admin": "pnpm build:shared",
+    "dev:admin": "pnpm --filter @gps-attendance/admin-dashboard dev",
+
+    "predev:mobile": "pnpm build:shared",
+    "dev:mobile": "pnpm --filter @gps-attendance/mobile-client dev",
+
+    "dev:shared": "pnpm --filter @gps-attendance/shared-types build -- --watch",
+
+    "build:shared": "pnpm --filter @gps-attendance/shared-types build",
+    "build:server": "pnpm build:shared && pnpm --filter @gps-attendance/server build",
+    "build:admin": "pnpm build:shared && pnpm --filter @gps-attendance/admin-dashboard build",
+    "build": "pnpm build:shared && pnpm --filter @gps-attendance/server build && pnpm --filter @gps-attendance/admin-dashboard build",
+
+    "clean:shared": "pnpm --filter @gps-attendance/shared-types clean",
+    "clean:server": "pnpm --filter @gps-attendance/server clean",
+    "clean:admin": "pnpm --filter @gps-attendance/admin-dashboard clean",
+    "clean:mobile": "pnpm --filter @gps-attendance/mobile-client clean",
+    "clean": "pnpm -r run clean"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "rimraf": "^6.1.3"
   }
 }

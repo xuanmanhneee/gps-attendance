@@ -1,5 +1,5 @@
 {
-  "name": "mobile-client",
+  "name": "@gps-attendance/mobile-client",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
@@ -33,15 +33,17 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "rimraf": "^6.1.3",
     "typescript": "~5.9.2"
   },
   "scripts": {
-    "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
+    "dev": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "clean": "rimraf node_modules/.cache",
+    "lint": "expo lint",
+    "reset-project": "node ./scripts/reset-project.js"
   },
   "private": true
 }

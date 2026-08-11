@@ -19,4 +19,9 @@ config.resolver.nodeModulesPaths = [
 // 3. Force Metro to resolve (sub)dependencies only from the `nodeModulesPaths`
 config.resolver.disableHierarchicalLookup = false;
 
+// 4. Trỏ thẳng shared-types vào source (không qua dist đã build)
+config.resolver.extraNodeModules = {
+  "@gps-attendance/shared-types": path.resolve(workspaceRoot, "packages/shared-types/src"),
+};
+
 module.exports = config;

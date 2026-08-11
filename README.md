@@ -55,11 +55,8 @@ Chỉ cài đặt **1 lần duy nhất ở root**, không `cd` vào từng proje
 git clone <repo-url>
 cd gps-attendance
 pnpm install
+pnpm build:shared
 ```
-
-Lệnh này tự động:
-- Cài dependency cho cả 3 project cùng lúc
-- Build sẵn package `shared-types` (qua hook `postinstall`)
 
 Sau khi cài xong, chạy từng project bằng script ở root:
 
@@ -68,7 +65,7 @@ Sau khi cài xong, chạy từng project bằng script ở root:
 ```bash
 pnpm dev:server
 ```
-Mặc định chạy tại `http://localhost:3000`.
+Mặc định chạy tại `http://localhost:3000`. Lệnh này tự build `shared-types` trước khi khởi động.
 
 ### 2. Admin Dashboard (React)
 
@@ -84,16 +81,22 @@ pnpm dev:mobile
 ```
 Quét mã QR hiện trên terminal bằng app **Expo Go** để chạy thử trên điện thoại thật (khuyến nghị dùng thiết bị thật thay vì emulator, vì tính năng GPS/anti-spoofing cần thiết bị thật để hoạt động và kiểm thử chính xác).
 
-> Nếu điện thoại và máy tính không cùng mạng WiFi, dùng `pnpm --filter mobile-client start --tunnel`, hoặc kết nối qua USB bằng `adb reverse tcp:8081 tcp:8081`.
+> Nếu điện thoại và máy tính không cùng mạng WiFi, dùng `expo start --tunnel` (chạy trong `client/mobile-client`), hoặc kết nối qua USB bằng `adb reverse tcp:8081 tcp:8081`.
+
+## Build & dọn cache
+
+```bash
+pnpm build          # build shared-types, server, admin-dashboard
+pnpm clean           # dọn cache/output khi gặp lỗi build lạ
+```
 
 ### Lưu ý khi sửa `packages/shared-types`
 
-Server dùng bản đã build sẵn (`dist/`) của `shared-types`, không đọc trực tiếp file `.ts` nguồn. Sau khi sửa code trong `packages/shared-types/src`, cần build lại để server thấy thay đổi:
-
+Server dùng bản đã build sẵn (`dist/`) của `shared-types`, không đọc trực tiếp file `.ts` nguồn. Nếu sửa `shared-types` trong lúc `server` đang chạy dev, mở thêm terminal chạy:
 ```bash
-pnpm build:shared
+pnpm dev:shared
 ```
-(Admin dashboard và mobile không cần bước này — 2 project đó dùng bundler nên đọc thẳng file `.ts` nguồn, thay đổi có hiệu lực ngay khi lưu file.)
+để tự động build lại mỗi khi lưu file. (Admin dashboard và mobile không cần bước này — 2 project đó dùng bundler nên đọc thẳng file `.ts` nguồn, thay đổi có hiệu lực ngay khi lưu.)
 
 ## Cách hoạt động (tổng quan)
 
