@@ -72,7 +72,7 @@ export type AttendanceValidationReason =
 
 export interface CheckInRequestPayload {
   /** Phiên điểm danh */
-  sessionId: string;
+  sessionId: number;
 
   location: LocationPayload;
   device: DevicePayload;

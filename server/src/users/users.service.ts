@@ -7,7 +7,7 @@ export class UsersService {
   // Sau này tách thành 2 bảng (account, user) như schema thật.
   private readonly users: User[] = [
     { id: 1, username: 'admin', password: '123456', role: 'admin', fullname: 'Quản trị viên' },
-    { id: 2, username: 'student1', password: 'abcdef', role: 'student', fullname: 'Nguyễn Văn A' },
+    { id: 2, username: 'student', password: 'abcdef', role: 'student', fullname: 'Nguyễn Văn A' },
   ];
 
   async findByUsername(username: string): Promise<User | undefined> {

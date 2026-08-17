@@ -3,11 +3,20 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
-import { AttendanceSessionsModule } from './attendance-sessions/attendance-sessions.module';
 import { GeoModule } from './geo/geo.module';
+import { AttendanceSessionsModule } from './attendance-sessions/attendance-sessions.module';
+import { AttendanceValidationModule } from './attendance-validation/attendance-validation.module';
+import { AttendanceCheckInModule } from './attendance-check-in/attendance-check-in.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, AttendanceSessionsModule, GeoModule],
+  imports: [
+    AuthModule,
+    UsersModule,
+    AttendanceSessionsModule,
+    GeoModule,
+    AttendanceValidationModule,
+    AttendanceCheckInModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
