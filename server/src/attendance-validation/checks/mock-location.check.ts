@@ -1,5 +1,5 @@
 // mock-location.check.ts
-import { LocationPayload } from '@gps-attendance/shared-types';
+import { LocationPayload } from '@gps-attendance/shared';
 
 import { MockLocationCheckResult } from '../attendance-validation.types';
 

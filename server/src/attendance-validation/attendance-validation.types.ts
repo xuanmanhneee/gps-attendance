@@ -4,7 +4,7 @@ import {
   DeviceIntegrityPayload,
   AttendanceValidationStatus,
   AttendanceValidationReason,
-} from '@gps-attendance/shared-types';
+} from '@gps-attendance/shared';
 
 import { AttendanceSession } from '../attendance-sessions/attendance-session.model';
 

@@ -1,20 +1,31 @@
-import { Injectable } from '@nestjs/common';
-import { User } from './user.model';
+import { Inject, Injectable } from '@nestjs/common';
+
+import type { User } from './user.model';
+import type { IUserRepository } from './user.repository';
+import { USER_REPOSITORY } from './user.repository.token';
 
 @Injectable()
 export class UsersService {
-  // Giả lập bảng account + user gộp lại cho đơn giản.
-  // Sau này tách thành 2 bảng (account, user) như schema thật.
-  private readonly users: User[] = [
-    { id: 1, username: 'admin', password: '123456', role: 'admin', fullname: 'Quản trị viên' },
-    { id: 2, username: 'student', password: 'abcdef', role: 'student', fullname: 'Nguyễn Văn A' },
-  ];
-
-  async findByUsername(username: string): Promise<User | undefined> {
-    return this.users.find((u) => u.username === username);
-  }
+  constructor(
+    @Inject(USER_REPOSITORY)
+    private readonly userRepository: IUserRepository,
+  ) {}
 
   async findById(id: number): Promise<User | undefined> {
-    return this.users.find((u) => u.id === id);
+    return this.userRepository.findById(id);
+  }
+
+  async findByCode(code: string): Promise<User | undefined> {
+    return this.userRepository.findByCode(code);
+  }
+
+  async findByAccountId(
+    accountId: number,
+  ): Promise<User | undefined> {
+    return this.userRepository.findByAccountId(accountId);
+  }
+
+  async findAll(): Promise<User[]> {
+    return this.userRepository.findAll();
   }
 }

@@ -21,9 +21,9 @@
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
-      "@gps-attendance/shared-types": ["../packages/shared-types/dist"]
+      "@gps-attendance/shared": ["../packages/shared/dist"]
     }
   },
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../packages/shared-types" }]
+  "references": [{ "path": "../packages/shared" }]
 }

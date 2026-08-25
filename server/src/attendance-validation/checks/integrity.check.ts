@@ -1,7 +1,7 @@
 // integrity.check.ts
 import {
   DeviceIntegrityPayload,
-} from '@gps-attendance/shared-types';
+} from '@gps-attendance/shared';
 
 import { IntegrityCheckResult } from '../attendance-validation.types';
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { LocationPayload } from '@gps-attendance/shared-types';
+import { LocationPayload } from '@gps-attendance/shared';
 import { AttendanceSession } from '../../attendance-sessions/attendance-session.model';
 import { GeoService } from '../../geo/geo.service';
 import { LocationCheckResult } from '../attendance-validation.types';

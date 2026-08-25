@@ -1,4 +1,4 @@
-import { CreateAttendanceSessionPayload } from '@gps-attendance/shared-types';
+import { CreateAttendanceSessionPayload } from '@gps-attendance/shared';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsDateString,

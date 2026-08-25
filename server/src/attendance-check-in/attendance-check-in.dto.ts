@@ -16,7 +16,7 @@ import {
   LocationPayload,
   DevicePayload,
   DeviceIntegrityPayload,
-} from '@gps-attendance/shared-types';
+} from '@gps-attendance/shared';
 
 // -----------------------------------------------------------------------------
 // Location

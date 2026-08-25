@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   AttendanceValidationReason,
   AttendanceValidationStatus,
-} from '@gps-attendance/shared-types';
+} from '@gps-attendance/shared';
 
 import {
   AttendanceValidationInput,
