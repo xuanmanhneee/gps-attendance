@@ -9,9 +9,10 @@
     "clean": "rimraf dist node_modules/.vite"
   },
   "dependencies": {
-    "@gps-attendance/shared-types": "workspace:*",
+    "@gps-attendance/shared": "workspace:*",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
