@@ -1,7 +1,7 @@
 import {
     CheckInRequestPayload,
     CheckInResponsePayload,
-} from '@gps-attendance/shared-types';
+} from '@gps-attendance/shared';
 
 import { http } from './api';
 

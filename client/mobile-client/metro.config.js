@@ -21,7 +21,7 @@ config.resolver.disableHierarchicalLookup = false;
 
 // 4. Trỏ thẳng shared-types vào source (không qua dist đã build)
 config.resolver.extraNodeModules = {
-  "@gps-attendance/shared-types": path.resolve(workspaceRoot, "packages/shared-types/src"),
+  "@gps-attendance/shared": path.resolve(workspaceRoot, "packages/shared/src"),
 };
 
 module.exports = config;
