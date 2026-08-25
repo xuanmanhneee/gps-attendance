@@ -1,5 +1,5 @@
 {
-  "name": "@gps-attendance/server",
+  "name": "@gps-attendance/attendance",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -21,6 +21,7 @@
   "dependencies": {
     "@gps-attendance/shared": "workspace:*",
     "@nestjs/common": "^11.0.1",
+    "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
