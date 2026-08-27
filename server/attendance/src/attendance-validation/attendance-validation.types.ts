@@ -8,13 +8,11 @@ import {
 
 import { AttendanceSession } from '../attendance-sessions/attendance-session.model';
 
-
 // -----------------------------------------------------------------------------
 // Common
 // -----------------------------------------------------------------------------
 
 export type Coefficient = number;
-
 
 // -----------------------------------------------------------------------------
 // Validation input
@@ -33,7 +31,6 @@ export interface AttendanceValidationInput {
   integrity: DeviceIntegrityPayload;
 }
 
-
 // -----------------------------------------------------------------------------
 // Check results
 // -----------------------------------------------------------------------------
@@ -50,7 +47,6 @@ export interface LocationCheckResult {
   coefficient: Coefficient;
   distance: number;
 }
-
 
 // -----------------------------------------------------------------------------
 // Validation result

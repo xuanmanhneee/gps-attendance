@@ -1,13 +1,33 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+
 import { AttendanceSession, SessionStatus } from './attendance-session.model';
 import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
+import { UserFilterService } from '../users/user-filter.service';
+
+import { LOGGER_FACTORY } from '../common/logging/logger.token';
+import { ILogger } from '../common/logging/logger.interface';
+import { ILoggerFactory } from '../common/logging/logger.factory';
+import { IAttendanceRecordStore } from '../attendance-record/attendance-record.store';
+import { ATTENDANCE_RECORD_STORE } from '../attendance-record/attendance-record.token';
 
 @Injectable()
 export class AttendanceSessionsService {
+  private readonly logger: ILogger;
+
   private sessions: AttendanceSession[] = [];
   private nextId = 1;
 
-  constructor(){
+  constructor(
+    private readonly userFilterService: UserFilterService,
+
+    @Inject(ATTENDANCE_RECORD_STORE)
+    private readonly attendanceRecordStore: IAttendanceRecordStore,
+
+    @Inject(LOGGER_FACTORY)
+    loggerFactory: ILoggerFactory,
+  ) {
+    this.logger = loggerFactory.create(AttendanceSessionsService.name);
+
     this.create(
       {
         title: 'Test Attendance Session',
@@ -16,13 +36,26 @@ export class AttendanceSessionsService {
         radius: 100,
         openAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
         closeAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+
+        participantCriteria: {
+          codeFilter: {
+            addCodes: ['2312686', '2312716', '2312718'],
+          },
+        },
       },
       1,
     );
   }
 
-  create(dto: CreateAttendanceSessionDto, createdBy: number): AttendanceSession {
+  async create(
+    dto: CreateAttendanceSessionDto,
+    createdBy: number,
+  ): Promise<AttendanceSession> {
     const now = new Date();
+
+    const userIds = this.userFilterService.resolveUserIds(
+      dto.participantCriteria,
+    );
 
     const session: AttendanceSession = {
       id: this.nextId++,
@@ -39,6 +72,29 @@ export class AttendanceSessionsService {
     };
 
     this.sessions.push(session);
+
+    this.logger.log(
+      `Session ${session.id} participants: ${userIds.join(', ')}`,
+    );
+
+    for (const userId of userIds) {
+      await this.attendanceRecordStore.upsertRecord({
+        sessionId: session.id,
+        userId,
+        status: 'absent',
+        deviceId: null,
+        checkedInAt: null,
+        latitude: null,
+        longitude: null,
+        accuracy: null,
+        distanceMeters: null,
+      });
+
+      this.logger.log(
+        `Attendance record created: session=${session.id}, user=${userId}, status=absent`,
+      );
+    }
+
     return this.withComputedStatus(session);
   }
 

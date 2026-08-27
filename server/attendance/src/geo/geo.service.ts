@@ -13,7 +13,12 @@ export class GeoService {
    * Công thức này tính khoảng cách theo đường thẳng trên bề mặt cầu (great-circle distance),
    * đủ chính xác cho khoảng cách nhỏ (vài km) như bài toán điểm danh GPS.
    */
-  getDistanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  getDistanceInMeters(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
     const dLat = this.toRadians(lat2 - lat1);
     const dLon = this.toRadians(lon2 - lon1);
 
@@ -40,6 +45,9 @@ export class GeoService {
     pointLon: number,
     radiusMeters: number,
   ): boolean {
-    return this.getDistanceInMeters(centerLat, centerLon, pointLat, pointLon) <= radiusMeters;
+    return (
+      this.getDistanceInMeters(centerLat, centerLon, pointLat, pointLon) <=
+      radiusMeters
+    );
   }
 }

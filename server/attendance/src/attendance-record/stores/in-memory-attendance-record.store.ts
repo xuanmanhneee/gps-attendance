@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { AttendanceRecord } from '../attendance-record.model';
 import { IAttendanceRecordStore } from '../attendance-record.store';
 
-
 @Injectable()
 export class InMemoryAttendanceRecordStore implements IAttendanceRecordStore {
   private records = new Map<string, AttendanceRecord>();
@@ -12,11 +11,16 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordStore {
     return `${sessionId}:${userId}`;
   }
 
-  async getRecord(sessionId: number, userId: number): Promise<AttendanceRecord | null> {
+  async getRecord(
+    sessionId: number,
+    userId: number,
+  ): Promise<AttendanceRecord | null> {
     return this.records.get(this.key(sessionId, userId)) ?? null;
   }
 
-  async upsertRecord(record: Omit<AttendanceRecord, 'updatedAt'>): Promise<void> {
+  async upsertRecord(
+    record: Omit<AttendanceRecord, 'updatedAt'>,
+  ): Promise<void> {
     const k = this.key(record.sessionId, record.userId);
     this.records.set(k, { ...record, updatedAt: new Date() });
   }

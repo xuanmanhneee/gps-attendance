@@ -4,12 +4,9 @@ import { AttendanceSession } from '../../attendance-sessions/attendance-session.
 import { GeoService } from '../../geo/geo.service';
 import { LocationCheckResult } from '../attendance-validation.types';
 
-
 @Injectable()
 export class LocationCheck {
-  constructor(
-    private readonly geoService: GeoService,
-  ) {}
+  constructor(private readonly geoService: GeoService) {}
 
   evaluate(
     location: LocationPayload,
@@ -22,8 +19,7 @@ export class LocationCheck {
       location.longitude,
     );
 
-    const isValid =
-      distance + location.accuracy <= session.radius;
+    const isValid = distance + location.accuracy <= session.radius;
 
     return {
       coefficient: isValid ? 1 : 0,

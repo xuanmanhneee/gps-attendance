@@ -25,9 +25,7 @@ export class AttendanceValidationService {
     private readonly locationCheck: LocationCheck,
   ) {}
 
-  validate(
-    input: AttendanceValidationInput,
-  ): AttendanceValidationResult {
+  validate(input: AttendanceValidationInput): AttendanceValidationResult {
     const reasons: AttendanceValidationReason[] = [];
 
     // -------------------------------------------------------------------------
@@ -41,8 +39,7 @@ export class AttendanceValidationService {
       };
     }
 
-    const mockLocationResult =
-      this.mockLocationCheck.evaluate(input.location);
+    const mockLocationResult = this.mockLocationCheck.evaluate(input.location);
 
     if (mockLocationResult.coefficient === 0) {
       return {
@@ -57,26 +54,18 @@ export class AttendanceValidationService {
 
     let score = 0;
 
-    const integrityResult =
-      this.integrityCheck.evaluate(input.integrity);
+    const integrityResult = this.integrityCheck.evaluate(input.integrity);
 
-    score +=
-      integrityResult.coefficient *
-      this.INTEGRITY_WEIGHT;
+    score += integrityResult.coefficient * this.INTEGRITY_WEIGHT;
 
-    const locationResult =
-      this.locationCheck.evaluate(
-        input.location,
-        input.session,
-      );
+    const locationResult = this.locationCheck.evaluate(
+      input.location,
+      input.session,
+    );
 
-    score +=
-      mockLocationResult.coefficient *
-      this.MOCK_LOCATION_WEIGHT;
+    score += mockLocationResult.coefficient * this.MOCK_LOCATION_WEIGHT;
 
-    score +=
-      locationResult.coefficient *
-      this.LOCATION_WEIGHT;
+    score += locationResult.coefficient * this.LOCATION_WEIGHT;
 
     if (locationResult.coefficient === 0) {
       reasons.push('OUT_OF_RANGE');

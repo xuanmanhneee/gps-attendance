@@ -1,7 +1,10 @@
-import { AttendanceRecord } from "./attendance-record.model";
+import { AttendanceRecord } from './attendance-record.model';
 
 export interface IAttendanceRecordStore {
-  getRecord(sessionId: number, userId: number): Promise<AttendanceRecord | null>;
+  getRecord(
+    sessionId: number,
+    userId: number,
+  ): Promise<AttendanceRecord | null>;
   upsertRecord(record: Omit<AttendanceRecord, 'updatedAt'>): Promise<void>;
 
   // Đếm số lần thử checkin — chỉ dùng để chặn spam, không persist vào AttendanceRecord.

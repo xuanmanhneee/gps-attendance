@@ -1,5 +1,3 @@
-import { CreateAttendanceSessionPayload } from '@gps-attendance/shared';
-import { ApiProperty } from '@nestjs/swagger';
 import {
   IsDateString,
   IsLatitude,
@@ -9,6 +7,8 @@ import {
   IsPositive,
   IsString,
 } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { CreateAttendanceSessionPayload } from '@gps-attendance/shared';
 
 export class CreateAttendanceSessionDto implements CreateAttendanceSessionPayload {
   @ApiProperty({ example: 'Điểm danh buổi sáng - Lớp CNTT K20' })
@@ -36,4 +36,13 @@ export class CreateAttendanceSessionDto implements CreateAttendanceSessionPayloa
   @ApiProperty({ example: '2026-08-16T07:15:00.000Z' })
   @IsDateString()
   closeAt!: string;
+
+  @ApiProperty({
+    example: {
+      codeFilter: {
+        addCodes: ['2312686', '2312682', '2312716'],
+      },
+    },
+  })
+  participantCriteria!: CreateAttendanceSessionPayload['participantCriteria'];
 }

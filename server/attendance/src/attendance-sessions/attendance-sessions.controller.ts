@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AttendanceSessionsService } from './attendance-sessions.service';
 import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
@@ -20,9 +28,12 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Tạo session điểm danh mới (chỉ admin)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'lecturer')
   @Post()
-  create(@Body() dto: CreateAttendanceSessionDto, @CurrentUser() user: { userId: number }) {
+  create(
+    @Body() dto: CreateAttendanceSessionDto,
+    @CurrentUser() user: { userId: number },
+  ) {
     return this.sessionsService.create(dto, user.userId);
   }
 
@@ -42,10 +53,15 @@ export class AttendanceSessionsController {
 
   // Route tạm để test logic GPS độc lập, TRƯỚC KHI có AttendanceRecordModule thật.
   // Sau này bỏ route này đi, logic tương tự sẽ nằm trong AttendanceRecordService.checkIn().
-  @ApiOperation({ summary: '[TẠM] Test khoảng cách GPS tới session, chưa ghi record' })
+  @ApiOperation({
+    summary: '[TẠM] Test khoảng cách GPS tới session, chưa ghi record',
+  })
   @UseGuards(JwtAuthGuard)
   @Post(':id/check-location')
-  checkLocation(@Param('id', ParseIntPipe) id: number, @Body() dto: CheckLocationDto) {
+  checkLocation(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CheckLocationDto,
+  ) {
     const session = this.sessionsService.findById(id);
 
     const distance = this.geoService.getDistanceInMeters(

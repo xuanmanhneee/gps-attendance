@@ -1,10 +1,10 @@
-import {
-  Body,
-  Controller,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { AttendanceCheckInService } from './attendance-check-in.service';
 import { CheckInRequestDto } from './attendance-check-in.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('attendance')
 export class AttendanceCheckInController {
@@ -12,11 +12,13 @@ export class AttendanceCheckInController {
     private readonly attendanceCheckInService: AttendanceCheckInService,
   ) {}
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @Post('check-in')
-  checkIn(@Body() dto: CheckInRequestDto) {
-    // TODO: Replace with authenticated user ID.
-    const userId = 1;
-
-    return this.attendanceCheckInService.checkIn(dto, userId);
+  async checkIn(
+    @Body() dto: CheckInRequestDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.attendanceCheckInService.checkIn(dto, user.userId);
   }
 }
