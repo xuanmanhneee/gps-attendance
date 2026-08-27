@@ -8,10 +8,7 @@ export default function DashboardPage() {
       <header className="dashboard-header">
         <h1>Dashboard</h1>
 
-        <button
-          className="logout-button"
-          onClick={() => navigate('/login')}
-        >
+        <button className="logout-button" onClick={() => navigate('/login')}>
           Logout
         </button>
       </header>
