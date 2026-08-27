@@ -1,7 +1,13 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SymbolView, SymbolViewProps, SymbolWeight } from 'expo-symbols';
 import { ComponentProps } from 'react';
-import { OpaqueColorValue, Platform, StyleProp, TextStyle, ViewStyle } from 'react-native';
+import {
+  OpaqueColorValue,
+  Platform,
+  StyleProp,
+  TextStyle,
+  ViewStyle,
+} from 'react-native';
 
 type Props = {
   ios: SymbolViewProps['name']; // ép đúng kiểu SFSymbols7_0 mà SymbolView yêu cầu
@@ -12,7 +18,14 @@ type Props = {
   style?: StyleProp<ViewStyle & TextStyle>;
 };
 
-export function IconSymbol({ ios, android, size = 24, color, weight, style }: Props) {
+export function IconSymbol({
+  ios,
+  android,
+  size = 24,
+  color,
+  weight,
+  style,
+}: Props) {
   if (Platform.OS === 'ios') {
     return (
       <SymbolView
@@ -25,6 +38,11 @@ export function IconSymbol({ ios, android, size = 24, color, weight, style }: Pr
     );
   }
   return (
-    <MaterialIcons name={android} size={size} color={color} style={style as StyleProp<TextStyle>} />
+    <MaterialIcons
+      name={android}
+      size={size}
+      color={color}
+      style={style as StyleProp<TextStyle>}
+    />
   );
 }

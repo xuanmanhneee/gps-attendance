@@ -99,13 +99,7 @@
 
 import * as Location from 'expo-location';
 import { useState } from 'react';
-import {
-  Button,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Button, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { api } from '@/api';
 
@@ -114,8 +108,7 @@ export default function Index() {
 
   const handleGetLocation = async () => {
     try {
-      const { status } =
-        await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status !== 'granted') {
         setResult('Quyền vị trí bị từ chối.');
@@ -134,8 +127,7 @@ export default function Index() {
 
   const handleCheckIn = async () => {
     try {
-      const { status } =
-        await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status !== 'granted') {
         setResult('Quyền vị trí bị từ chối.');
@@ -170,26 +162,17 @@ export default function Index() {
 
       setResult(JSON.stringify(result, null, 2));
     } catch (error: any) {
-      setResult(
-        'Điểm danh thất bại: ' +
-          (error?.message ?? String(error)),
-      );
+      setResult('Điểm danh thất bại: ' + (error?.message ?? String(error)));
     }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View>
-        <Button
-          title="Lấy vị trí"
-          onPress={handleGetLocation}
-        />
+        <Button title="Lấy vị trí" onPress={handleGetLocation} />
 
         <View style={styles.button}>
-          <Button
-            title="Điểm danh"
-            onPress={handleCheckIn}
-          />
+          <Button title="Điểm danh" onPress={handleCheckIn} />
         </View>
 
         <View style={styles.resultBox}>

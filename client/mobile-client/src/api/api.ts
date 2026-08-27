@@ -1,9 +1,6 @@
 export const BASE_URL = process.env.EXPO_PUBLIC_API_URL!;
 
-async function request<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -27,20 +24,14 @@ export const http = {
     });
   },
 
-  post<T>(
-    path: string,
-    body: unknown,
-  ): Promise<T> {
+  post<T>(path: string, body: unknown): Promise<T> {
     return request<T>(path, {
       method: 'POST',
       body: JSON.stringify(body),
     });
   },
 
-  put<T>(
-    path: string,
-    body: unknown,
-  ): Promise<T> {
+  put<T>(path: string, body: unknown): Promise<T> {
     return request<T>(path, {
       method: 'PUT',
       body: JSON.stringify(body),
