@@ -2,11 +2,13 @@ import { ConfigService } from '@nestjs/config';
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { AuthenticatedUser } from '../types/authenticated-user.type';
+import { Role } from '@gps-attendance/shared';
 
 export interface JwtPayload {
   sub: number;
   username: string;
-  role: string;
+  role: Role;
 }
 
 @Injectable()
@@ -19,8 +21,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: JwtPayload) {
-    // Trả về gì ở đây sẽ được gắn vào request.user
-    return { userId: payload.sub, username: payload.username, role: payload.role };
+  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
+    return {
+      userId: payload.sub,
+      username: payload.username,
+      role: payload.role,
+    };
   }
 }
