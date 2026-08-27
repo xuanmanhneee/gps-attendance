@@ -2,17 +2,20 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { ApiExceptionFilter } from './common/filters/api-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.useGlobalFilters(new ApiExceptionFilter());
+
   app.enableCors();
-  
+
   app.useGlobalPipes(
-    new ValidationPipe({ 
+    new ValidationPipe({
       whitelist: true,
-      transform: true
-    })
+      transform: true,
+    }),
   );
 
   const config = new DocumentBuilder()
