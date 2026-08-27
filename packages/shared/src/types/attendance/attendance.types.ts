@@ -28,7 +28,7 @@ export interface DevicePayload {
   deviceId: string;
 
   /** Nền tảng thiết bị */
-  platform: "android" | "ios";
+  platform: 'android' | 'ios';
 
   /** Tên model thiết bị */
   model: string;
@@ -47,28 +47,27 @@ export interface DeviceIntegrityPayload {
 // Attendance
 // -----------------------------------------------------------------------------
 
-export interface CreateAttendanceSessionPayload {
-  title: string;
+// export interface CreateAttendanceSessionPayload {
+//   title: string;
 
-  latitude: number;
-  longitude: number;
-  radius: number;
+//   latitude: number;
+//   longitude: number;
+//   radius: number;
 
-  /** ISO 8601 date string */
-  openAt: string;
-  closeAt: string;
-}
+//   /** ISO 8601 date string */
+//   openAt: string;
+//   closeAt: string;
 
-export type AttendanceValidationStatus =
-  | "VALID"
-  | "REVIEW"
-  | "REJECTED";
+//   participantCodes: string[];
+// }
+
+export type AttendanceValidationStatus = 'VALID' | 'REVIEW' | 'REJECTED';
 
 export type AttendanceValidationReason =
-  | "LOW_LOCATION_ACCURACY"
-  | "MOCK_LOCATION"
-  | "DUPLICATE_DEVICE"
-  | "OUT_OF_RANGE";
+  | 'LOW_LOCATION_ACCURACY'
+  | 'MOCK_LOCATION'
+  | 'DUPLICATE_DEVICE'
+  | 'OUT_OF_RANGE';
 
 export interface CheckInRequestPayload {
   /** Phiên điểm danh */

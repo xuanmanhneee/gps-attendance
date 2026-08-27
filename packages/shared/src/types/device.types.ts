@@ -10,16 +10,13 @@ export interface DeviceIdentityPayload {
   platform: DevicePlatform;
 }
 
-export type DevicePlatform = "android" | "ios";
+export type DevicePlatform = 'android' | 'ios';
 
 // -----------------------------------------------------------------------------
 // Device Credential
 // -----------------------------------------------------------------------------
 
-export type DeviceCredentialScheme =
-  | "ec256"
-  | "rsa2048"
-  | "ed25519";
+export type DeviceCredentialScheme = 'ec256' | 'rsa2048' | 'ed25519';
 
 export interface DeviceCredentialRegistrationPayload {
   /** Thuật toán của key pair */
@@ -74,12 +71,12 @@ export interface DeviceProofPayload {
 
 export type DeviceAttestationPayload =
   | {
-      platform: "android";
+      platform: 'android';
       /** Play Integrity token */
       token: string | null;
     }
   | {
-      platform: "ios";
+      platform: 'ios';
       /** App Attest data/token */
       token: string | null;
     };
@@ -97,4 +94,4 @@ export interface DeviceVerificationPayload {
 
   /** Bằng chứng integrity của platform */
   attestation: DeviceAttestationPayload;
-};
+}

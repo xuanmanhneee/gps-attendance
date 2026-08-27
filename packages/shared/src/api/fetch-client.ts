@@ -29,10 +29,7 @@ export class FetchHttpClient implements HttpClient {
     });
   }
 
-  private async request<T>(
-    path: string,
-    options: RequestInit,
-  ): Promise<T> {
+  private async request<T>(path: string, options: RequestInit): Promise<T> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       ...options,
       headers: {
@@ -40,10 +37,6 @@ export class FetchHttpClient implements HttpClient {
         ...options.headers,
       },
     });
-
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
-    }
 
     return response.json() as Promise<T>;
   }

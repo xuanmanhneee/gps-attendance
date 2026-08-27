@@ -1,3 +1,3 @@
-export * from './attendance.types';
+export * from './attendance';
 export * from './device.types';
-export * from './auth.types';
+export * from './users';
