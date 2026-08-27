@@ -11,7 +11,7 @@ export const authApi = {
     request: LoginRequest,
   ): Promise<ApiResponse<LoginResponse>> {
     return http.post<ApiResponse<LoginResponse>>(
-      '/api/v0/admin/auth/login',
+      '/v0/admin/auth/login',
       request,
     );
   },
@@ -20,7 +20,7 @@ export const authApi = {
     request: LoginRequest,
   ): Promise<ApiResponse<LoginResponse>> {
     return http.post<ApiResponse<LoginResponse>>(
-      '/api/v0/user/auth/login',
+      '/v0/user/auth/login',
       request,
     );
   },

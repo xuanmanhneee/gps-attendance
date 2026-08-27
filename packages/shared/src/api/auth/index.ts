@@ -1,2 +1,2 @@
 export * from './auth.types';
-export * from './auth-error-code'
+export * from '../response/error_codes/auth-error.codes'

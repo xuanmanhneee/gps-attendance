@@ -34,7 +34,7 @@ export class UserAuthController {
   @ApiBody({ type: LoginDto })
   async login(
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<ApiResponse<LoginResponse, AuthErrorCode>> {
+  ): Promise<ApiResponse<LoginResponse>> {
     if (user.role !== 'student') {
       throw new UnauthorizedException({
         code: AuthErrorCode.ROLE_NOT_ALLOWED,

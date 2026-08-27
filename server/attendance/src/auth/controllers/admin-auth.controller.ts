@@ -8,11 +8,7 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import {
-  ApiResponse,
-  AuthErrorCode,
-  LoginResponse,
-} from '@gps-attendance/shared';
+import type { ApiResponse, LoginResponse } from '@gps-attendance/shared';
 
 import { AuthService } from '../auth.service';
 import { CurrentUser } from '../decorators/current-user.decorator';
@@ -34,10 +30,10 @@ export class AdminAuthController {
   @ApiBody({ type: LoginDto })
   async login(
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<ApiResponse<LoginResponse, AuthErrorCode>> {
+  ): Promise<ApiResponse<LoginResponse>> {
     if (user.role !== 'admin' && user.role !== 'lecturer') {
       throw new UnauthorizedException({
-        code: AuthErrorCode.ROLE_NOT_ALLOWED,
+        code: 'AUTH_ROLE_NOT_ALLOWED',
         message: 'Tài khoản không được phép đăng nhập bằng admin endpoint',
       });
     }

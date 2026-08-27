@@ -30,55 +30,35 @@ export class AttendanceSessionsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'lecturer')
   @Post()
-  create(
+  async create(
     @Body() dto: CreateAttendanceSessionDto,
     @CurrentUser() user: { userId: number },
   ) {
-    return this.sessionsService.create(dto, user.userId);
+    return {
+      success: true,
+      data: {
+        session: await this.sessionsService.create(dto, user.userId),
+      },
+    };
   }
 
   @ApiOperation({ summary: 'Danh sách session' })
   @UseGuards(JwtAuthGuard)
   @Get()
   findAll() {
-    return this.sessionsService.findAll();
+    return {
+      success: true,
+      data: this.sessionsService.findAll(),
+    };
   }
 
   @ApiOperation({ summary: 'Chi tiết 1 session' })
   @UseGuards(JwtAuthGuard)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.sessionsService.findById(id);
-  }
-
-  // Route tạm để test logic GPS độc lập, TRƯỚC KHI có AttendanceRecordModule thật.
-  // Sau này bỏ route này đi, logic tương tự sẽ nằm trong AttendanceRecordService.checkIn().
-  @ApiOperation({
-    summary: '[TẠM] Test khoảng cách GPS tới session, chưa ghi record',
-  })
-  @UseGuards(JwtAuthGuard)
-  @Post(':id/check-location')
-  checkLocation(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: CheckLocationDto,
-  ) {
-    const session = this.sessionsService.findById(id);
-
-    const distance = this.geoService.getDistanceInMeters(
-      session.latitude,
-      session.longitude,
-      dto.latitude,
-      dto.longitude,
-    );
-
-    const withinRadius = distance <= session.radius;
-
     return {
-      sessionId: session.id,
-      sessionStatus: session.status,
-      distanceMeters: Math.round(distance),
-      allowedRadiusMeters: session.radius,
-      withinRadius,
+      success: true,
+      data: this.sessionsService.findById(id),
     };
   }
 }

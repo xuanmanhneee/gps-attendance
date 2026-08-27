@@ -27,7 +27,7 @@ export class AttendanceSessionsService {
     loggerFactory: ILoggerFactory,
   ) {
     this.logger = loggerFactory.create(AttendanceSessionsService.name);
-
+    
     this.create(
       {
         title: 'Test Attendance Session',
@@ -37,7 +37,7 @@ export class AttendanceSessionsService {
         openAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
         closeAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
 
-        participantCriteria: {
+        userFilter: {
           codeFilter: {
             addCodes: ['2312686', '2312716', '2312718'],
           },
@@ -54,7 +54,7 @@ export class AttendanceSessionsService {
     const now = new Date();
 
     const userIds = this.userFilterService.resolveUserIds(
-      dto.participantCriteria,
+      dto.userFilter,
     );
 
     const session: AttendanceSession = {
@@ -99,23 +99,37 @@ export class AttendanceSessionsService {
   }
 
   findAll(): AttendanceSession[] {
-    return this.sessions.map((s) => this.withComputedStatus(s));
+    return this.sessions.map((session) =>
+      this.withComputedStatus(session),
+    );
   }
 
   findById(id: number): AttendanceSession {
-    const session = this.sessions.find((s) => s.id === id);
+    const session = this.sessions.find(
+      (session) => session.id === id,
+    );
+
     if (!session) {
-      throw new NotFoundException(`Không tìm thấy session id=${id}`);
+      throw new NotFoundException(
+        `Không tìm thấy session id=${id}`,
+      );
     }
+
     return this.withComputedStatus(session);
   }
 
   /**
-   * status thực tế tính động theo thời gian hiện tại so với openAt/closeAt,
-   * không lưu cứng trong data — tránh phải chạy cron job cập nhật status định kỳ.
+   * Status thực tế được tính động theo thời gian hiện tại
+   * so với openAt/closeAt.
+   *
+   * Không lưu cứng status trong data để tránh phải
+   * chạy cron job cập nhật status định kỳ.
    */
-  private withComputedStatus(session: AttendanceSession): AttendanceSession {
+  private withComputedStatus(
+    session: AttendanceSession,
+  ): AttendanceSession {
     const now = new Date();
+
     let status: SessionStatus = 'pending';
 
     if (now >= session.openAt && now <= session.closeAt) {
@@ -124,6 +138,9 @@ export class AttendanceSessionsService {
       status = 'closed';
     }
 
-    return { ...session, status };
+    return {
+      ...session,
+      status,
+    };
   }
 }
