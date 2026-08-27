@@ -14,12 +14,8 @@ export class MockUserRepository implements IUserRepository {
     return MOCK_USERS.find((user) => user.code === code);
   }
 
-  async findByAccountId(
-    accountId: number,
-  ): Promise<User | undefined> {
-    return MOCK_USERS.find(
-      (user) => user.accountId === accountId,
-    );
+  async findByAccountId(accountId: number): Promise<User | undefined> {
+    return MOCK_USERS.find((user) => user.accountId === accountId);
   }
 
   async findAll(): Promise<User[]> {

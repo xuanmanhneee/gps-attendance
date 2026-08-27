@@ -19,9 +19,7 @@ export class UsersService {
     return this.userRepository.findByCode(code);
   }
 
-  async findByAccountId(
-    accountId: number,
-  ): Promise<User | undefined> {
+  async findByAccountId(accountId: number): Promise<User | undefined> {
     return this.userRepository.findByAccountId(accountId);
   }
 

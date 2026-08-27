@@ -1,9 +1,9 @@
-import type { Role } from "@gps-attendance/shared";
+import type { Role } from '@gps-attendance/shared';
 
 export interface User {
   id: number;
   accountId: number;
   code: string;
-  role: Role
-  fullname: string;
+  role: Role;
+  name: string;
 }
