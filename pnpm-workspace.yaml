@@ -1,7 +1,7 @@
 packages:
-  - "server/*"
-  - "client/*"
-  - "packages/*"
+  - 'server/*'
+  - 'client/*'
+  - 'packages/*'
 
 overrides:
   typescript: 5.9.3
