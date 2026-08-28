@@ -27,7 +27,7 @@ export class AttendanceSessionsService {
     loggerFactory: ILoggerFactory,
   ) {
     this.logger = loggerFactory.create(AttendanceSessionsService.name);
-    
+
     this.create(
       {
         title: 'Test Attendance Session',
@@ -53,9 +53,7 @@ export class AttendanceSessionsService {
   ): Promise<AttendanceSession> {
     const now = new Date();
 
-    const userIds = this.userFilterService.resolveUserIds(
-      dto.userFilter,
-    );
+    const userIds = this.userFilterService.resolveUserIds(dto.userFilter);
 
     const session: AttendanceSession = {
       id: this.nextId++,
@@ -73,10 +71,6 @@ export class AttendanceSessionsService {
 
     this.sessions.push(session);
 
-    this.logger.log(
-      `Session ${session.id} participants: ${userIds.join(', ')}`,
-    );
-
     for (const userId of userIds) {
       await this.attendanceRecordStore.upsertRecord({
         sessionId: session.id,
@@ -89,30 +83,20 @@ export class AttendanceSessionsService {
         accuracy: null,
         distanceMeters: null,
       });
-
-      this.logger.log(
-        `Attendance record created: session=${session.id}, user=${userId}, status=absent`,
-      );
     }
 
     return this.withComputedStatus(session);
   }
 
   findAll(): AttendanceSession[] {
-    return this.sessions.map((session) =>
-      this.withComputedStatus(session),
-    );
+    return this.sessions.map((session) => this.withComputedStatus(session));
   }
 
   findById(id: number): AttendanceSession {
-    const session = this.sessions.find(
-      (session) => session.id === id,
-    );
+    const session = this.sessions.find((session) => session.id === id);
 
     if (!session) {
-      throw new NotFoundException(
-        `Không tìm thấy session id=${id}`,
-      );
+      throw new NotFoundException(`Không tìm thấy session id=${id}`);
     }
 
     return this.withComputedStatus(session);
@@ -125,9 +109,7 @@ export class AttendanceSessionsService {
    * Không lưu cứng status trong data để tránh phải
    * chạy cron job cập nhật status định kỳ.
    */
-  private withComputedStatus(
-    session: AttendanceSession,
-  ): AttendanceSession {
+  private withComputedStatus(session: AttendanceSession): AttendanceSession {
     const now = new Date();
 
     let status: SessionStatus = 'pending';

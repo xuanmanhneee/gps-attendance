@@ -94,7 +94,7 @@ pnpm clean           # dọn cache/output khi gặp lỗi build lạ
 
 Server dùng bản đã build sẵn (`dist/`) của `shared-types`, không đọc trực tiếp file `.ts` nguồn. Nếu sửa `shared-types` trong lúc `server` đang chạy dev, mở thêm terminal chạy:
 ```bash
-pnpm dev:shared
+pnpm dev:attendance
 ```
 để tự động build lại mỗi khi lưu file. (Admin dashboard và mobile không cần bước này — 2 project đó dùng bundler nên đọc thẳng file `.ts` nguồn, thay đổi có hiệu lực ngay khi lưu.)
 
