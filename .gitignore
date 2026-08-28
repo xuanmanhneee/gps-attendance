@@ -8,9 +8,5 @@ build/
 .expo-shared/
 *.log
 
-.claude/
-AGENTS.md
-CLAUDE.md
-
 *.tsbuildinfo
 *.code-workspace
