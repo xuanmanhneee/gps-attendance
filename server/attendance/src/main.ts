@@ -7,11 +7,11 @@ import { AppBootstrapLogger } from './common/logging/app-bootstrap.logger';
 
 function printBanner(url: string, docsUrl: string) {
   const lines = [
-    `🚀  Server is running`,
+    `🚀  Server is running (Ctrl + C to stop)`,
     ``,
     `   Local:   ${url}`,
-    `   Docs :    ${docsUrl}`,
-    `   Env:     ${process.env.NODE_ENV ?? 'development'}`,
+    `   Docs :   ${docsUrl}`,
+    `   Env  :   ${process.env.NODE_ENV ?? 'development'}`,
   ];
 
   const width = Math.max(...lines.map((l) => l.length)) + 4;
