@@ -1,0 +1,29 @@
+import { Inject, Injectable } from '@nestjs/common';
+
+import type { User } from './user.model';
+import type { IUserRepository } from './user.repository';
+import { USER_REPOSITORY } from './user.repository.token';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @Inject(USER_REPOSITORY)
+    private readonly userRepository: IUserRepository,
+  ) {}
+
+  async findById(id: number): Promise<User | undefined> {
+    return this.userRepository.findById(id);
+  }
+
+  async findByCode(code: string): Promise<User | undefined> {
+    return this.userRepository.findByCode(code);
+  }
+
+  async findByAccountId(accountId: number): Promise<User | undefined> {
+    return this.userRepository.findByAccountId(accountId);
+  }
+
+  async findAll(): Promise<User[]> {
+    return this.userRepository.findAll();
+  }
+}

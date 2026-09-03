@@ -1,0 +1,33 @@
+{
+  "name": "gps-attendance",
+  "private": true,
+  "version": "0.0.1",
+  "packageManager": "pnpm@11.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "predev:attendance": "pnpm build:shared",
+    "dev:attendance": "pnpm --filter @gps-attendance/attendance dev",
+    "predev:admin": "pnpm build:shared",
+    "dev:admin": "pnpm --filter @gps-attendance/admin-dashboard dev",
+    "predev:mobile": "pnpm build:shared",
+    "dev:mobile": "pnpm --filter @gps-attendance/mobile-client dev",
+    "dev:mobile:clear": "pnpm dev:mobile -- --clear",
+    "dev:mobile:offline": "pnpm --filter @gps-attendance/mobile-client exec expo start --offline --clear",
+    "dev:shared": "pnpm --filter @gps-attendance/shared build -- --watch",
+    "build:shared": "pnpm --filter @gps-attendance/shared build",
+    "build:attendance": "pnpm build:shared && pnpm --filter @gps-attendance/attendance build",
+    "build:admin": "pnpm build:shared && pnpm --filter @gps-attendance/admin-dashboard build",
+    "build": "pnpm build:shared && pnpm --filter @gps-attendance/attendance build && pnpm --filter @gps-attendance/admin-dashboard build",
+    "clean:shared": "pnpm --filter @gps-attendance/shared clean",
+    "clean:attendance": "pnpm --filter @gps-attendance/attendance clean",
+    "clean:admin": "pnpm --filter @gps-attendance/admin-dashboard clean",
+    "clean:mobile": "pnpm --filter @gps-attendance/mobile-client clean",
+    "clean": "pnpm -r run clean"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6",
+    "rimraf": "^6.1.3"
+  }
+}
