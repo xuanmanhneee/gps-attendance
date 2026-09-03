@@ -1,6 +1,11 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Role } from '@gps-attendance/shared';
+import { Role, AuthErrorCode } from '@gps-attendance/shared';
 
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import type { AuthenticatedUser } from '../types/authenticated-user.type';
@@ -25,6 +30,17 @@ export class RolesGuard implements CanActivate {
 
     const user = request.user;
 
-    return !!user && requiredRoles.includes(user.role);
+    if (!user) {
+      return false;
+    }
+
+    if (!requiredRoles.includes(user.role)) {
+      throw new ForbiddenException({
+        code: AuthErrorCode.ROLE_NOT_ALLOWED,
+        message: 'Tài khoản không có quyền thực hiện thao tác này',
+      });
+    }
+
+    return true;
   }
 }

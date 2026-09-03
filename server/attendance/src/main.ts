@@ -2,8 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { ApiExceptionFilter } from './common/filters/api-exception.filter';
+import { AllExceptionsFilter } from './common/filters/all-exception.filter';
 import { AppBootstrapLogger } from './common/logging/app-bootstrap.logger';
+import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 
 function printBanner(url: string, docsUrl: string) {
   const lines = [
@@ -34,8 +35,8 @@ async function bootstrap() {
     logger: new AppBootstrapLogger(),
   });
 
-  app.useGlobalFilters(new ApiExceptionFilter());
-
+  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalInterceptors(new ResponseInterceptor());
   app.enableCors();
 
   app.useGlobalPipes(

@@ -22,7 +22,6 @@ export interface AttendanceValidationInput {
   // Server-resolved data
   session: AttendanceSession;
   userId: number;
-  existingRecordCount: number;
   checkedInAt: Date;
 
   // Client payload
@@ -52,7 +51,21 @@ export interface LocationCheckResult {
 // Validation result
 // -----------------------------------------------------------------------------
 
-export interface AttendanceValidationResult {
-  status: AttendanceValidationStatus;
-  reasons: AttendanceValidationReason[];
+export interface AttendanceValidationValid {
+  status: 'VALID';
 }
+
+export interface AttendanceValidationReview {
+  status: 'REVIEW';
+  reasons: [AttendanceValidationReason, ...AttendanceValidationReason[]]; // ít nhất 1 phần tử
+}
+
+export interface AttendanceValidationRejected {
+  status: 'REJECTED';
+  reasons: [AttendanceValidationReason, ...AttendanceValidationReason[]];
+}
+
+export type AttendanceValidationResult =
+  | AttendanceValidationValid
+  | AttendanceValidationReview
+  | AttendanceValidationRejected;

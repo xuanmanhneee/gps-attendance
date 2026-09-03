@@ -64,10 +64,7 @@ export interface DeviceIntegrityPayload {
 export type AttendanceValidationStatus = 'VALID' | 'REVIEW' | 'REJECTED';
 
 export type AttendanceValidationReason =
-  | 'LOW_LOCATION_ACCURACY'
-  | 'MOCK_LOCATION'
-  | 'DUPLICATE_DEVICE'
-  | 'OUT_OF_RANGE';
+  'LOW_CONFIDENCE_SCORE' | 'MOCK_LOCATION' | 'OUT_OF_RANGE';
 
 export interface CheckInRequestPayload {
   /** Phiên điểm danh */

@@ -13,3 +13,15 @@ export interface AttendanceSession {
   createdAt: Date;
   updatedAt: Date;
 }
+
+export interface CreateAttendanceSessionRecord {
+  title: string;
+  latitude: number;
+  longitude: number;
+  radius: number;
+  openAt: Date;
+  closeAt: Date;
+  createdBy: number;
+  createdAt: Date;
+  updatedAt: Date;
+}

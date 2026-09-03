@@ -30,7 +30,7 @@ export class AdminAuthController {
   @ApiBody({ type: LoginDto })
   async login(
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<ApiResponse<LoginResponse>> {
+  ): Promise<LoginResponse> {
     if (user.role !== 'admin' && user.role !== 'lecturer') {
       throw new UnauthorizedException({
         code: 'AUTH_ROLE_NOT_ALLOWED',
@@ -38,9 +38,6 @@ export class AdminAuthController {
       });
     }
 
-    return {
-      success: true,
-      data: this.authService.login(user),
-    };
+    return await this.authService.login(user)
   }
 }
