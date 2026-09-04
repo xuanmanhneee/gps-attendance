@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 body {
   margin: 0;
   font-family: sans-serif;
@@ -6,27 +8,6 @@ body {
 main {
   min-height: 100vh;
   box-sizing: border-box;
-}
-
-/* Login */
-
-.login-page {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: 300px;
-}
-
-.login-form div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
 }
 
 /* Dashboard */

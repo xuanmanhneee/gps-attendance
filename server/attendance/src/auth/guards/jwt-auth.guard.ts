@@ -29,14 +29,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         message: 'Access token không hợp lệ',
       });
     }
-
-    console.log('HANDLE REQUEST', {
-      err,
-      user,
-      info,
-      status,
-    });
-
     return user;
   }
 }
