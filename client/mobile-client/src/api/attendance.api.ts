@@ -15,7 +15,7 @@ export const AttendanceAPI = {
    * Lấy danh sách các buổi học hiện có
    */
   async getSessions(token: string): Promise<ApiResponse<AttendanceSession[]>> {
-    return http.get<ApiResponse<AttendanceSession[]>>('/v0/attendance-sessions', token);
+    return http.get<ApiResponse<AttendanceSession[]>>('/attendance-sessions', token);
   },
 
   /**
@@ -26,7 +26,7 @@ export const AttendanceAPI = {
     token: string,
   ): Promise<ApiResponse<AttendanceSession>> {
     return http.get<ApiResponse<AttendanceSession>>(
-      `/v0/attendance-sessions/${sessionId}`,
+      `/attendance-sessions/${sessionId}`,
       token,
     );
   },
@@ -39,7 +39,7 @@ export const AttendanceAPI = {
     payload: CheckInRequest,
     token: string,
   ): Promise<ApiResponse<ValidationResult>> {
-    return http.post<ApiResponse<ValidationResult>>('/v0/attendance/check-in', payload, token);
+    return http.post<ApiResponse<ValidationResult>>('/attendance/check-in', payload, token);
   },
 
   /**

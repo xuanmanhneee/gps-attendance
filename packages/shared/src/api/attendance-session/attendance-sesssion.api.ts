@@ -11,14 +11,14 @@ export const attendanceSessionApi = {
     request: CreateAttendanceSessionRequest,
   ): Promise<ApiResponse<CreateAttendanceSessionResponse>> {
     return http.post<ApiResponse<CreateAttendanceSessionResponse>>(
-      '/v0/attendance-sessions',
+      '/attendance-sessions',
       request,
     );
   },
 
   getAll(): Promise<ApiResponse<AttendanceSessionPayload[]>> {
     return http.get<ApiResponse<AttendanceSessionPayload[]>>(
-      '/v0/attendance-sessions',
+      '/attendance-sessions',
     );
   },
 
@@ -26,7 +26,7 @@ export const attendanceSessionApi = {
     id: number,
   ): Promise<ApiResponse<AttendanceSessionPayload>> {
     return http.get<ApiResponse<AttendanceSessionPayload>>(
-      `/v0/attendance-sessions/${id}`,
+      `/attendance-sessions/${id}`,
     );
   },
 };

@@ -19,6 +19,9 @@ export class AttendanceCheckInController {
     @Body() dto: CheckInRequestDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.attendanceCheckInService.checkIn(dto, user.userId);
+    return {
+      success: true,
+      data: await this.attendanceCheckInService.checkIn(dto, user.userId),
+    };
   }
 }

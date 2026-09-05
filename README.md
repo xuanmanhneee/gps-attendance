@@ -70,6 +70,14 @@ pnpm install
 pnpm build:shared
 ```
 
+Tạo file `server/attendance/.env` từ file mẫu trước khi chạy backend:
+
+```bash
+copy server\attendance\.env.example server\attendance\.env
+```
+
+Đảm bảo `JWT_SECRET` có giá trị đủ dài và ngẫu nhiên. Giá trị trong file mẫu chỉ là placeholder, không dùng cho production.
+
 Sau khi cài xong, chạy từng project bằng script ở root:
 
 ### 1. Server (NestJS)
