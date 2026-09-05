@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
-import { CreateSessionModal } from '../components/createSessionModal';
+import { CreateSessionModal } from '../components/CreateSessionModal';
 
 //mock data
 // const sessions = [
@@ -24,18 +23,6 @@ import { CreateSessionModal } from '../components/createSessionModal';
 //     status: "closed",
 //   },
 // ];
-
-const statusBadge: Record<string, string> = {
-  active: 'bg-green-100 text-green-600',
-  upcoming: 'bg-gray-100 text-gray-500',
-  closed: 'bg-gray-100 text-gray-400',
-};
-
-const statusLabel: Record<string, string> = {
-  active: 'Đang diễn ra',
-  upcoming: 'Sắp diễn ra',
-  closed: 'Đã kết thúc',
-};
 
 const NavItem = ({ label, active }: { label: string; active?: boolean }) => {
   return (

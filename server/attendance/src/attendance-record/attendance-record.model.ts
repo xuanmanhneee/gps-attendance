@@ -12,3 +12,12 @@ export interface AttendanceRecord {
   distanceMeters: number | null;
   updatedAt: Date;
 }
+
+export interface MarkPresentInput {
+  sessionId: number;
+  userId: number;
+  checkedInAt: Date;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+}

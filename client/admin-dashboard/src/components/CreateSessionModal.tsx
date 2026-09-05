@@ -124,7 +124,7 @@ export const CreateSessionModal = ({
         raw: false,
       });
       const codes = rows
-        .map((row) => String(row[0] ?? '').trim())
+        .map((row: (string | number)[]) => String(row[0] ?? '').trim())
         .filter(Boolean);
       const firstValue = codes[0]?.toLowerCase() ?? '';
       const studentCodes =

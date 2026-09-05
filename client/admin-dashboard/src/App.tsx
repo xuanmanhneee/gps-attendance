@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import LoginPage from './pages/loginPage';
-import DashboardPage from './pages/dashboardPage';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 function App() {

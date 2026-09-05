@@ -38,10 +38,12 @@ export class AttendanceRecordsService {
         sessionId,
         userId,
         status: 'absent',
+        deviceId: null,
         checkedInAt: null,
         latitude: null,
         longitude: null,
         accuracy: null,
+        distanceMeters: null,
       });
     }
   }
@@ -51,10 +53,12 @@ export class AttendanceRecordsService {
       sessionId: input.sessionId,
       userId: input.userId,
       status: 'present',
+      deviceId: null,
       checkedInAt: input.checkedInAt,
       latitude: input.latitude,
       longitude: input.longitude,
       accuracy: input.accuracy,
+      distanceMeters: null,
     });
 
     return this.attendanceRecordRepository.getRecord(
