@@ -1,34 +1,17 @@
 import { Module } from '@nestjs/common';
-import { InMemoryAttendanceRecordStore } from './infra/in-memory-attendance-record.repository';
-import {
-  ATTEMPT_REPOSITORY,
-  ATTENDANCE_RECORD_REPOSITORY,
-  DEVICE_USAGE_REPOSITORY,
-} from './attendance-record.token';
-import { AttendanceRecordsService } from './attendance-records.service';
+import { ATTENDANCE_RECORD_STORE } from './attendance-record.token';
+import { InMemoryAttendanceRecordStore } from './stores/in-memory-attendance-record.store';
 
 @Module({
   imports: [],
 
   providers: [
-    InMemoryAttendanceRecordStore,
-    AttendanceRecordsService,
     {
-      provide: ATTENDANCE_RECORD_REPOSITORY,
+      provide: ATTENDANCE_RECORD_STORE,
       useClass: InMemoryAttendanceRecordStore,
-    },
-
-    {
-      provide: ATTEMPT_REPOSITORY,
-      useExisting: InMemoryAttendanceRecordStore,
-    },
-
-    {
-      provide: DEVICE_USAGE_REPOSITORY,
-      useExisting: InMemoryAttendanceRecordStore,
     },
   ],
 
-  exports: [AttendanceRecordsService],
+  exports: [ATTENDANCE_RECORD_STORE],
 })
 export class AttendanceRecordModule {}

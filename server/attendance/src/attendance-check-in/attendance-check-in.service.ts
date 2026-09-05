@@ -1,139 +1,59 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-
+import { Injectable, BadRequestException, Inject } from '@nestjs/common';
 import { AttendanceSessionsService } from '../attendance-sessions/attendance-sessions.service';
 import { AttendanceValidationService } from '../attendance-validation/attendance-validation.service';
-import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
-
 import { CheckInRequestDto } from './attendance-check-in.dto';
-
-import {
-  AttendanceSessionErrorCode,
-  AttendanceCheckInResult,
-} from '@gps-attendance/shared';
-import { AttemptCheck } from './checks/attempt.check';
-import { DeviceCheck } from './checks/device.check';
+import { ATTENDANCE_RECORD_STORE } from '../attendance-record/attendance-record.token';
+import { IAttendanceRecordStore } from '../attendance-record/attendance-record.store';
 
 @Injectable()
 export class AttendanceCheckInService {
-  private readonly MAX_ATTEMPTS = 5;
-
   constructor(
     private readonly attendanceSessionsService: AttendanceSessionsService,
     private readonly attendanceValidationService: AttendanceValidationService,
-    private readonly attendanceRecordsService: AttendanceRecordsService,
 
-    private readonly attemptCheck: AttemptCheck,
-    private readonly deviceCheck: DeviceCheck,
+    @Inject(ATTENDANCE_RECORD_STORE)
+    private readonly attendanceRecordStore: IAttendanceRecordStore,
   ) {}
 
-  async checkIn(
-    dto: CheckInRequestDto,
-    userId: number,
-  ): Promise<AttendanceCheckInResult> {
-    // --- Guard layer ---
-    const session = await this.attendanceSessionsService.getById(dto.sessionId);
+  async checkIn(dto: CheckInRequestDto, userId: number) {
+    // -------------------------------------------------------------------------
+    // 1. Resolve session
+    // -------------------------------------------------------------------------
 
-    if (!session) {
-      throw new NotFoundException({
-        code: AttendanceSessionErrorCode.NOT_FOUND,
-        message: 'Session không tồn tại',
-      });
-    }
+    const session = this.attendanceSessionsService.findById(dto.sessionId);
 
     if (session.status !== 'open') {
-      throw new BadRequestException({
-        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
-        message: 'Phiên điểm danh hiện không mở',
-      });
+      throw new BadRequestException('Phiên điểm danh hiện không mở');
     }
 
-    const record = await this.attendanceRecordsService.getBySessionAndUser(
+    const existingRecord = await this.attendanceRecordStore.getRecord(
       dto.sessionId,
       userId,
     );
 
-    if (!record) {
-      throw new BadRequestException({
-        code: 'USER_NOT_IN_SESSION',
-        message: 'User không thuộc session này',
-      });
-    }
+    // -------------------------------------------------------------------------
+    // 2. Resolve server-side data
+    // -------------------------------------------------------------------------
 
-    if (record.status === 'present') {
-      throw new ConflictException({
-        code: 'ALREADY_CHECKED_IN',
-        message: 'Đã điểm danh rồi',
-      });
-    }
+    // TODO: Lấy từ DB khi có AttendanceRecord.
+    const existingRecordCount = 0;
 
-    // --- Check-in layer ---
-    const attempt = await this.attemptCheck.evaluate({
-      sessionId: dto.sessionId,
-      userId,
-    });
-
-    if (attempt.isTooMany) {
-      return {
-        status: 'REJECTED',
-        reasons: ['TOO_MANY_ATTEMPTS'],
-      };
-    }
-
-    const device = await this.deviceCheck.evaluate({
-      sessionId: dto.sessionId,
-      deviceId: dto.device.deviceId,
-    });
-
-    if (device.isDuplicate) {
-      return {
-        status: 'REJECTED',
-        reasons: ['DUPLICATE_DEVICE'],
-      };
-    }
-
-    // --- Validation layer ---
+    // Không tin timestamp từ client cho thời điểm check-in.
     const checkedInAt = new Date();
 
-    const validation = await this.attendanceValidationService.validate({
+    // -------------------------------------------------------------------------
+    // 3. Validate
+    // -------------------------------------------------------------------------
+
+    return this.attendanceValidationService.validate({
       session,
       userId,
+      existingRecordCount,
       checkedInAt,
+
       location: dto.location,
       device: dto.device,
       integrity: dto.integrity,
     });
-
-    if (validation.status === 'REJECTED') {
-      return {
-        status: 'REJECTED',
-        reasons: validation.reasons,
-      };
-    }
-
-    await this.attendanceRecordsService.markPresent({
-      sessionId: dto.sessionId,
-      userId,
-      checkedInAt,
-      latitude: dto.location.latitude,
-      longitude: dto.location.longitude,
-      accuracy: dto.location.accuracy,
-    });
-
-    if (validation.status === 'VALID') {
-      return {
-        status: 'VALID',
-      };
-    }
-
-    return {
-      status: 'REVIEW',
-      reasons: validation.reasons,
-    };
   }
 }

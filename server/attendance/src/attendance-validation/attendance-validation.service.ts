@@ -26,53 +26,68 @@ export class AttendanceValidationService {
   ) {}
 
   validate(input: AttendanceValidationInput): AttendanceValidationResult {
+    const reasons: AttendanceValidationReason[] = [];
+
+    // -------------------------------------------------------------------------
+    // Hard-block
+    // -------------------------------------------------------------------------
+
+    if (input.existingRecordCount > 0) {
+      return {
+        status: 'REJECTED',
+        reasons: ['DUPLICATE_DEVICE'],
+      };
+    }
+
     const mockLocationResult = this.mockLocationCheck.evaluate(input.location);
 
     if (mockLocationResult.coefficient === 0) {
-      return { status: 'REJECTED', reasons: ['MOCK_LOCATION'] };
+      return {
+        status: 'REJECTED',
+        reasons: ['MOCK_LOCATION'],
+      };
     }
 
-    let score = 0;
-    const reasons: AttendanceValidationReason[] = [];
+    // -------------------------------------------------------------------------
+    // Risk scoring
+    // -------------------------------------------------------------------------
 
-    score +=
-      this.integrityCheck.evaluate(input.integrity).coefficient *
-      this.INTEGRITY_WEIGHT;
+    let score = 0;
+
+    const integrityResult = this.integrityCheck.evaluate(input.integrity);
+
+    score += integrityResult.coefficient * this.INTEGRITY_WEIGHT;
 
     const locationResult = this.locationCheck.evaluate(
       input.location,
       input.session,
     );
+
     score += mockLocationResult.coefficient * this.MOCK_LOCATION_WEIGHT;
+
     score += locationResult.coefficient * this.LOCATION_WEIGHT;
 
     if (locationResult.coefficient === 0) {
       reasons.push('OUT_OF_RANGE');
     }
 
+    // -------------------------------------------------------------------------
+    // Result
+    // -------------------------------------------------------------------------
+
+    let status: AttendanceValidationStatus;
+
     if (score >= 80) {
-      return { status: 'VALID' };
-      // ↑ không thể kèm reasons — compiler chặn nếu bạn lỡ tay thêm vào
+      status = 'VALID';
+    } else if (score >= 60) {
+      status = 'REVIEW';
+    } else {
+      status = 'REJECTED';
     }
 
-    if (score >= 60) {
-      reasons.push('LOW_CONFIDENCE_SCORE');
-      return {
-        status: 'REVIEW',
-        reasons: reasons as [
-          AttendanceValidationReason,
-          ...AttendanceValidationReason[],
-        ],
-      };
-    }
-
-    if (reasons.length === 0) reasons.push('LOW_CONFIDENCE_SCORE'); // fallback nếu REJECTED mà chưa có reason cụ thể nào
     return {
-      status: 'REJECTED',
-      reasons: reasons as [
-        AttendanceValidationReason,
-        ...AttendanceValidationReason[],
-      ],
+      status,
+      reasons,
     };
   }
 }
