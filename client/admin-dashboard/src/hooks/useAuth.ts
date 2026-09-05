@@ -1,7 +1,9 @@
 import { useState } from 'react';
 
-import { authApi } from '@gps-attendance/shared';
 import type { LoginRequest } from '@gps-attendance/shared';
+
+import { authApi } from '../api/auth.api';
+import { tokenService } from '../services/token.service';
 
 export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -10,11 +12,8 @@ export const useAuth = () => {
     setIsLoading(true);
 
     try {
-      const response = await authApi.adminLogin(request);
-
-      if (response.success) {
-        localStorage.setItem('token', response.data.accessToken);
-      }
+      const response = await authApi.login(request);
+      tokenService.set(response.accessToken);
 
       return response;
     } finally {
@@ -23,7 +22,7 @@ export const useAuth = () => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    tokenService.remove();
   };
 
   return {

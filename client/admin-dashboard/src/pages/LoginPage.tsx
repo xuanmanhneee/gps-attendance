@@ -8,7 +8,7 @@ import { FaRegEye } from 'react-icons/fa6';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
 
-import { AuthErrorCode } from '@gps-attendance/shared';
+import { ApiError, AuthErrorCode } from '@gps-attendance/shared';
 import type { LoginRequest } from '@gps-attendance/shared';
 import { useAuth } from '../hooks/useAuth';
 
@@ -26,29 +26,28 @@ const LoginPage = () => {
 
   const handleLogin = async (data: LoginRequest) => {
     try {
-      const res = await login(data);
+      await login(data);
 
-      if (!res.success) {
-        switch (res.code) {
+      toast.success('Đăng nhập thành công!');
+
+      navigate('/dashboard', { replace: true });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        switch (error.code) {
           case AuthErrorCode.INVALID_CREDENTIALS:
             toast.error('Sai username hoặc password');
             break;
-
           case AuthErrorCode.ACCOUNT_NOT_LINKED:
             toast.error('Tài khoản chưa được liên kết');
             break;
-
           case AuthErrorCode.ROLE_NOT_ALLOWED:
             toast.error('Bạn không có quyền truy cập');
             break;
+          default:
+            toast.error(error.message);
         }
-
         return;
       }
-
-      toast.success('Đăng nhập thành công!');
-      navigate('/dashboard', { replace: true });
-    } catch {
       toast.error('Đăng nhập thất bại');
     }
   };

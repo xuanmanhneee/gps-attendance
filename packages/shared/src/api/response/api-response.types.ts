@@ -1,3 +1,5 @@
+import type { ApiErrorCode } from './codes';
+
 export interface ApiSuccessResponse<T> {
   success: true;
   data: T;
@@ -5,7 +7,7 @@ export interface ApiSuccessResponse<T> {
 
 export interface ApiErrorResponse {
   success: false;
-  code: string;
+  code: ApiErrorCode;
   message: string;
 }
 

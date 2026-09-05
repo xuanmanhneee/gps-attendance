@@ -33,7 +33,7 @@ export class AttendanceSessionsService {
   ): Promise<AttendanceSession> {
     const now = new Date();
 
-    const userIds = this.filterService.resolveUserIds(dto.userFilter);
+    const userIds = this.filterService.resolveUserIds(dto.participantCriteria);
 
     const session = await this.sessionRepo.create({
       title: dto.title,

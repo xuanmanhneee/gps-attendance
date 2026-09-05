@@ -18,7 +18,7 @@ export class AttendanceSessionSeeder implements OnModuleInit {
         openAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
         closeAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
 
-        userFilter: {
+        participantCriteria: {
           codeFilter: {
             addCodes: ['2312686', '2312716', '2312718'],
           },
