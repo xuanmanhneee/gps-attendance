@@ -6,4 +6,6 @@ export interface IAttendanceSessionRepository {
 
   getAll(): Promise<AttendanceSession[]>;
   getById(id: number): Promise<AttendanceSession | null>;
+  getByIds(ids: number[]): Promise<AttendanceSession[]>;
+  findByCreator(createdBy: number): Promise<AttendanceSession[]>;
 }

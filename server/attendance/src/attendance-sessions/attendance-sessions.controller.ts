@@ -21,9 +21,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @ApiBearerAuth()
 @Controller('attendance-sessions')
 export class AttendanceSessionsController {
-  constructor(
-    private readonly sessionsService: AttendanceSessionsService,
-  ) {}
+  constructor(private readonly attendanceSessionsService: AttendanceSessionsService) {}
 
   @ApiOperation({ summary: 'Tạo session điểm danh mới (chỉ admin)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -33,7 +31,7 @@ export class AttendanceSessionsController {
     @Body() dto: CreateAttendanceSessionDto,
     @CurrentUser() user: { userId: number },
   ) {
-    const session = await this.sessionsService.create(dto, user.userId);
+    const session = await this.attendanceSessionsService.create(dto, user.userId);
 
     return { session };
   }
@@ -42,13 +40,18 @@ export class AttendanceSessionsController {
   @UseGuards(JwtAuthGuard)
   @Get()
   async findAll() {
-    return this.sessionsService.getAll();
+    return this.attendanceSessionsService.getAll();
   }
 
   @ApiOperation({ summary: 'Chi tiết 1 session' })
   @UseGuards(JwtAuthGuard)
   @Get(':id')
   async findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.sessionsService.getById(id);
+    return this.attendanceSessionsService.getById(id);
+  }
+
+  @Get('by-user/:userId')
+  async findByUser(@Param('userId', ParseIntPipe) userId: number) {
+    return await this.attendanceSessionsService.findByUser(userId);
   }
 }

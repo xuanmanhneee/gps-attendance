@@ -5,5 +5,5 @@ export interface User {
   accountId: number;
   code: string;
   role: Role;
-  name: string;
+  fullname: string;
 }

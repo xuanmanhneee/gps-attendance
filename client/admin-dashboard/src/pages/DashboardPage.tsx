@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
-import { CreateSessionModal } from '../components/createSessionModal';
+import { CreateSessionModal } from '../components/CreateSessionModal';
+import { useAuth } from '../hooks/useAuth';
 
 //mock data
 // const sessions = [
@@ -25,17 +25,17 @@ import { CreateSessionModal } from '../components/createSessionModal';
 //   },
 // ];
 
-const statusBadge: Record<string, string> = {
-  active: 'bg-green-100 text-green-600',
-  upcoming: 'bg-gray-100 text-gray-500',
-  closed: 'bg-gray-100 text-gray-400',
-};
+// const statusBadge: Record<string, string> = {
+//   active: 'bg-green-100 text-green-600',
+//   upcoming: 'bg-gray-100 text-gray-500',
+//   closed: 'bg-gray-100 text-gray-400',
+// };
 
-const statusLabel: Record<string, string> = {
-  active: 'Đang diễn ra',
-  upcoming: 'Sắp diễn ra',
-  closed: 'Đã kết thúc',
-};
+// const statusLabel: Record<string, string> = {
+//   active: 'Đang diễn ra',
+//   upcoming: 'Sắp diễn ra',
+//   closed: 'Đã kết thúc',
+// };
 
 const NavItem = ({ label, active }: { label: string; active?: boolean }) => {
   return (
@@ -70,6 +70,7 @@ const NavItem = ({ label, active }: { label: string; active?: boolean }) => {
 
 const DashboardPage = () => {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   useEffect(() => {
@@ -90,7 +91,7 @@ const DashboardPage = () => {
   if (loading) return <div>Đang tải...</div>;
 
   const handleLogout = () => {
-    // thêm logic xóa token khi đăng xuất vào đây
+    logout();
     navigate('/login', { replace: true });
   };
   return (
@@ -111,9 +112,15 @@ const DashboardPage = () => {
         <div className="mt-auto pt-4 border-t border-gray-700 text-sm flex flex-col gap-3">
           <div className="flex items-center gap-2 px-1">
             <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-[11px] font-semibold text-white">
-              NA
+              {user?.fullname?.charAt(0).toUpperCase()}
             </div>
-            Nguyễn Văn A (GV)
+
+            <div>
+              <div>{user?.fullname}</div>
+              <div className="text-xs text-gray-500">
+                {user?.role === 'admin' ? 'Quản trị viên' : 'Giảng viên'}
+              </div>
+            </div>
           </div>
 
           <button
@@ -121,7 +128,7 @@ const DashboardPage = () => {
             className="w-full rounded-lg bg-red-500/10 px-3 py-2 text-sm font-medium text-red-300 transition-colors hover:bg-red-500 hover:text-white"
             onClick={handleLogout}
           >
-          Đăng xuất
+            Đăng xuất
           </button>
         </div>
       </aside>

@@ -14,12 +14,12 @@ import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
 @Injectable()
 export class AttendanceSessionsService {
   private readonly logger: ILogger;
-  
+
   constructor(
     @Inject(ATTENDANCE_SESSION_REPOSITORY)
-    private readonly sessionRepo: IAttendanceSessionRepository,
-    private readonly filterService: UserFilterService,
-    private readonly recordService: AttendanceRecordsService,
+    private readonly attendanceSessionRepository: IAttendanceSessionRepository,
+    private readonly userFilterService: UserFilterService,
+    private readonly attendanceRecordsService: AttendanceRecordsService,
 
     @Inject(LOGGER_FACTORY)
     loggerFactory: ILoggerFactory,
@@ -33,9 +33,11 @@ export class AttendanceSessionsService {
   ): Promise<AttendanceSession> {
     const now = new Date();
 
-    const userIds = this.filterService.resolveUserIds(dto.participantCriteria);
+    const userIds = this.userFilterService.resolveUserIds(
+      dto.participantCriteria,
+    );
 
-    const session = await this.sessionRepo.create({
+    const session = await this.attendanceSessionRepository.create({
       title: dto.title,
       latitude: dto.latitude,
       longitude: dto.longitude,
@@ -47,25 +49,47 @@ export class AttendanceSessionsService {
       updatedAt: now,
     });
 
-    await this.recordService.initializeForSession(session.id, userIds);
+    await this.attendanceRecordsService.initializeForSession(
+      session.id,
+      userIds,
+    );
 
     return this.withComputedStatus(session);
   }
 
   async getAll(): Promise<AttendanceSession[]> {
-    const sessions = await this.sessionRepo.getAll();
+    const sessions = await this.attendanceSessionRepository.getAll();
 
     return sessions.map((session) => this.withComputedStatus(session));
   }
 
   async getById(id: number): Promise<AttendanceSession> {
-    const session = await this.sessionRepo.getById(id);
+    const session = await this.attendanceSessionRepository.getById(id);
 
     if (!session) {
       throw new NotFoundException(`Không tìm thấy session id=${id}`);
     }
 
     return this.withComputedStatus(session);
+  }
+
+  async findByUser(userId: number): Promise<AttendanceSession[]> {
+    const records = await this.attendanceRecordsService.findByUser(userId);
+    const sessionIds = records.map((r) => r.sessionId);
+
+    if (sessionIds.length === 0) return [];
+
+    const sessions =
+      await this.attendanceSessionRepository.getByIds(sessionIds);
+
+    return sessions.map((session) => this.withComputedStatus(session));
+  }
+
+  async findByCreator(createdBy: number): Promise<AttendanceSession[]> {
+    const sessions =
+      await this.attendanceSessionRepository.findByCreator(createdBy);
+
+    return sessions.map((session) => this.withComputedStatus(session));
   }
 
   private withComputedStatus(session: AttendanceSession): AttendanceSession {
