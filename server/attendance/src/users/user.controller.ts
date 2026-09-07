@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ApiSuccessResponse, UserProfile } from '@gps-attendance/shared';
+import { ApiSuccessResponse, UserProfileDto } from '@gps-attendance/shared';
 import { ApiBearerAuth } from '@nestjs/swagger';
 
 @ApiBearerAuth()
@@ -25,7 +25,7 @@ export class UserController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getMe(@Req() req: AuthenticatedRequest): Promise<UserProfile> {
+  async getMe(@Req() req: AuthenticatedRequest): Promise<UserProfileDto> {
     const user = await this.usersService.findById(req.user.userId);
 
     if (!user) {

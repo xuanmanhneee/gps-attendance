@@ -1,41 +1,22 @@
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
 import { CreateSessionModal } from '../components/CreateSessionModal';
 import { useAuth } from '../hooks/useAuth';
+import { useAttendanceSessions } from '../hooks/useAttendanceSessions';
+import { useState } from 'react';
 
-//mock data
-// const sessions = [
-//   {
-//     className: "Lập trình Web",
-//     time: "07:00 - 09:00, Thứ 2",
-//     checkedIn: "39/48",
-//     status: "active",
-//   },
-//   {
-//     className: "Cơ sở dữ liệu",
-//     time: "13:00 - 15:00, Thứ 3",
-//     checkedIn: "0/45",
-//     status: "upcoming",
-//   },
-//   {
-//     className: "Mạng máy tính",
-//     time: "07:00 - 09:00, Thứ 2 tuần trước",
-//     checkedIn: "42/44",
-//     status: "closed",
-//   },
-// ];
+import type { SessionStatus } from '@gps-attendance/shared';
 
-// const statusBadge: Record<string, string> = {
-//   active: 'bg-green-100 text-green-600',
-//   upcoming: 'bg-gray-100 text-gray-500',
-//   closed: 'bg-gray-100 text-gray-400',
-// };
+const statusBadge: Record<SessionStatus, string> = {
+  open: 'bg-green-100 text-green-600',
+  pending: 'bg-gray-100 text-gray-500',
+  closed: 'bg-gray-100 text-gray-400',
+};
 
-// const statusLabel: Record<string, string> = {
-//   active: 'Đang diễn ra',
-//   upcoming: 'Sắp diễn ra',
-//   closed: 'Đã kết thúc',
-// };
+const statusLabel: Record<SessionStatus, string> = {
+  open: 'Đang diễn ra',
+  pending: 'Sắp diễn ra',
+  closed: 'Đã kết thúc',
+};
 
 const NavItem = ({ label, active }: { label: string; active?: boolean }) => {
   return (
@@ -49,51 +30,25 @@ const NavItem = ({ label, active }: { label: string; active?: boolean }) => {
   );
 };
 
-// const StatCard = ({
-//   label,
-//   value,
-//   color = 'text-gray-900',
-// }: {
-//   label: string;
-//   value: string;
-//   color?: string;
-// }) => {
-//   return (
-//     <div className="bg-white border border-gray-200 rounded-xl p-4">
-//       <p className="text-[12.5px] text-gray-500 mb-1.5">{label}</p>
-//       <p className={`text-2xl font-semibold ${color}`}>{value}</p>
-//     </div>
-//   );
-// };
-
-//Function
+const formatDateTime = (iso: string) =>
+  new Date(iso).toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [loading, setLoading] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        setLoading(true);
-
-        console.log('dashboard data:');
-      } catch (error) {
-        console.error('Fetch dashboard failed:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboard();
-  }, []);
-  if (loading) return <div>Đang tải...</div>;
+  const { sessions, isLoading, createSession } = useAttendanceSessions();
 
   const handleLogout = () => {
     logout();
     navigate('/login', { replace: true });
   };
+
   return (
     <div className="flex h-screen bg-gray-100 font-sans text-gray-900">
       {/* Sidebar */}
@@ -150,16 +105,54 @@ const DashboardPage = () => {
         <CreateSessionModal
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
+          onSubmitSuccess={async (data) => {
+            await createSession(data);
+            setIsCreateModalOpen(false);
+          }}
         />
 
-        {/* Stat cards
-        <div className="grid grid-cols-4 gap-3 mb-6">
-          <StatCard label="Tổng sinh viên" value="" />
-          <StatCard label="Đã điểm danh" value="" color="text-green-600" />
-          <StatCard label="Nghi ngờ gian lận" value="" color="text-amber-600" />
-          <StatCard label="Chưa điểm danh" value="" color="text-gray-400" />
-        </div> */}
         {/* Table */}
+        {isLoading ? (
+          <p className="text-sm text-gray-500">Đang tải danh sách...</p>
+        ) : sessions.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            Chưa có phiên điểm danh nào. Nhấn "Tạo phiên mới" để bắt đầu.
+          </p>
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 text-left">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">Tên phiên</th>
+                  <th className="px-4 py-2.5 font-medium">Thời gian</th>
+                  <th className="px-4 py-2.5 font-medium">Bán kính</th>
+                  <th className="px-4 py-2.5 font-medium">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((session) => (
+                  <tr key={session.id} className="border-t border-gray-100">
+                    <td className="px-4 py-2.5 font-medium">{session.title}</td>
+                    <td className="px-4 py-2.5 text-gray-600">
+                      {formatDateTime(session.openAt)} –{' '}
+                      {formatDateTime(session.closeAt)}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600">
+                      {session.radius}m
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[session.status]}`}
+                      >
+                        {statusLabel[session.status]}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </main>
     </div>
   );

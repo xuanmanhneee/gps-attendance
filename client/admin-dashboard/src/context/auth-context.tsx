@@ -1,13 +1,13 @@
 import { createContext, useEffect, useState, type ReactNode } from 'react';
 
-import type { LoginRequest, UserProfile } from '@gps-attendance/shared';
+import type { LoginRequest, UserProfileDto } from '@gps-attendance/shared';
 
 import { authApi } from '../api/auth.api';
 import { tokenService } from '../services/token.service';
 import { usersApi } from '../api/users.api';
 
 interface AuthContextValue {
-  user: UserProfile | null;
+  user: UserProfileDto | null;
   isLoading: boolean;
   login: (request: LoginRequest) => Promise<void>;
   logout: () => void;
@@ -16,7 +16,7 @@ interface AuthContextValue {
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<UserProfileDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadUser = async () => {

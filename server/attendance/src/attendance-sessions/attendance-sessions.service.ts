@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 
-import { AttendanceSession, SessionStatus } from './attendance-session.model';
+import { AttendanceSession } from './attendance-session.model';
 import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
 import { UserFilterService } from '../users/user-filter.service';
 
@@ -10,6 +10,7 @@ import { ILoggerFactory } from '../common/logging/logger.factory';
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
 import { IAttendanceSessionRepository } from './attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
+import { AttendanceSessionResponse, SessionStatus } from '@gps-attendance/shared';
 
 @Injectable()
 export class AttendanceSessionsService {
@@ -106,6 +107,19 @@ export class AttendanceSessionsService {
     return {
       ...session,
       status,
+    };
+  }
+
+  private toResponse(session: AttendanceSession): AttendanceSessionResponse {
+    return {
+      id: session.id,
+      title: session.title,
+      latitude: session.latitude,
+      longitude: session.longitude,
+      radius: session.radius,
+      openAt: session.openAt.toISOString(),
+      closeAt: session.closeAt.toISOString(),
+      status: session.status,
     };
   }
 }

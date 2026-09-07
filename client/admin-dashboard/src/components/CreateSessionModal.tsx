@@ -1,7 +1,5 @@
-import { useState, type ChangeEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { IoClose } from 'react-icons/io5';
-import * as XLSX from 'xlsx';
 import {
   MdMyLocation,
   MdLocationOn,
@@ -10,6 +8,7 @@ import {
   MdOutlineTitle,
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
+import type { UserFilterCriteria } from '@gps-attendance/shared';
 
 export interface CreateSessionFormData {
   title: string;
@@ -18,15 +17,21 @@ export interface CreateSessionFormData {
   radius: number;
   openAt: string;
   closeAt: string;
-  studentCodes: string;
+  participantCriteria: UserFilterCriteria;
 }
 
-interface CreateSessionFormValues
-  extends Omit<CreateSessionFormData, 'openAt' | 'closeAt'> {
+interface CreateSessionFormValues {
+  title: string;
+  latitude: number;
+  longitude: number;
+  radius: number;
   openDate: string;
   openTime: string;
   closeDate: string;
   closeTime: string;
+  // Vùng nhập tạm thời: text thô, phân cách bởi dấu phẩy.
+  // TODO: thay bằng UI chọn unit/tag khi có sẵn.
+  studentCodesText: string;
 }
 
 interface CreateSessionModalProps {
@@ -46,15 +51,21 @@ const formatDateTimeLocal = (date: Date): string => {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
+// Parse chuỗi mã sinh viên phân cách bằng dấu phẩy -> mảng code đã trim, loại rỗng, dedup
+const parseStudentCodes = (raw: string): string[] => {
+  const seen = new Set<string>();
+  for (const part of raw.split(',')) {
+    const code = part.trim();
+    if (code) seen.add(code);
+  }
+  return Array.from(seen);
+};
+
 export const CreateSessionModal = ({
   isOpen,
   onClose,
   onSubmitSuccess,
 }: CreateSessionModalProps) => {
-  const [gettingLocation, setGettingLocation] = useState(false);
-  const [studentFileName, setStudentFileName] = useState('');
-  const [studentCount, setStudentCount] = useState(0);
-
   const now = new Date();
   const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 
@@ -63,6 +74,7 @@ export const CreateSessionModal = ({
     handleSubmit,
     setValue,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<CreateSessionFormValues>({
     defaultValues: {
@@ -72,11 +84,14 @@ export const CreateSessionModal = ({
       openTime: formatDateTimeLocal(now).split('T')[1],
       closeDate: formatDateTimeLocal(twoHoursLater).split('T')[0],
       closeTime: formatDateTimeLocal(twoHoursLater).split('T')[1],
-      studentCodes: '',
+      studentCodesText: '',
     },
   });
 
   if (!isOpen) return null;
+
+  const studentCodesText = watch('studentCodesText');
+  const studentCodesPreviewCount = parseStudentCodes(studentCodesText).length;
 
   // Lấy tọa độ GPS hiện tại từ trình duyệt
   const handleGetCurrentLocation = () => {
@@ -85,86 +100,47 @@ export const CreateSessionModal = ({
       return;
     }
 
-    setGettingLocation(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setValue('latitude', parseFloat(position.coords.latitude.toFixed(6)));
         setValue('longitude', parseFloat(position.coords.longitude.toFixed(6)));
         toast.success('Đã lấy tọa độ hiện tại thành công!');
-        setGettingLocation(false);
       },
       (error) => {
         toast.error('Không thể lấy vị trí: ' + error.message);
-        setGettingLocation(false);
       },
       { enableHighAccuracy: true },
     );
   };
 
-  const handleStudentFileChange = async (
-    event: ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const workbook = XLSX.read(await file.arrayBuffer(), {
-        type: 'array',
-      });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-
-      if (!firstSheet) {
-        toast.error('File Excel không có sheet dữ liệu');
-        return;
-      }
-
-      const rows = XLSX.utils.sheet_to_json<(string | number)[]>(firstSheet, {
-        header: 1,
-        defval: '',
-        raw: false,
-      });
-      const codes = rows
-        .map((row) => String(row[0] ?? '').trim())
-        .filter(Boolean);
-      const firstValue = codes[0]?.toLowerCase() ?? '';
-      const studentCodes =
-        firstValue.includes('mã') ||
-        firstValue.includes('student') ||
-        firstValue.includes('code')
-          ? codes.slice(1)
-          : codes;
-
-      if (studentCodes.length === 0) {
-        toast.error('Không tìm thấy mã sinh viên trong cột đầu tiên');
-        return;
-      }
-
-      setValue('studentCodes', studentCodes.join(', '));
-      setStudentFileName(file.name);
-      setStudentCount(studentCodes.length);
-      toast.success(`Đã đọc ${studentCodes.length} mã sinh viên`);
-    } catch (error) {
-      console.error('Không thể đọc file Excel:', error);
-      toast.error('Không thể đọc file Excel');
-    } finally {
-      event.target.value = '';
-    }
-  };
-
   const handleFormSubmit = async (values: CreateSessionFormValues) => {
     try {
-      const data: CreateSessionFormData = {
-        ...values,
-        openAt: `${values.openDate}T${values.openTime}`,
-        closeAt: `${values.closeDate}T${values.closeTime}`,
-      };
+      const openAt = `${values.openDate}T${values.openTime}`;
+      const closeAt = `${values.closeDate}T${values.closeTime}`;
 
-      if (new Date(data.openAt) >= new Date(data.closeAt)) {
+      if (new Date(openAt) >= new Date(closeAt)) {
         toast.error('Thời gian kết thúc phải sau thời gian bắt đầu');
         return;
       }
 
-      // Xử lý callback khi submit
+      const codes = parseStudentCodes(values.studentCodesText);
+      if (codes.length === 0) {
+        toast.error('Vui lòng nhập ít nhất một mã sinh viên');
+        return;
+      }
+
+      const data: CreateSessionFormData = {
+        title: values.title,
+        latitude: values.latitude,
+        longitude: values.longitude,
+        radius: values.radius,
+        openAt,
+        closeAt,
+        participantCriteria: {
+          codeFilter: { addCodes: codes },
+        },
+      };
+
       if (onSubmitSuccess) {
         await onSubmitSuccess(data);
       }
@@ -236,11 +212,10 @@ export const CreateSessionModal = ({
               <button
                 type="button"
                 onClick={handleGetCurrentLocation}
-                disabled={gettingLocation}
-                className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200 cursor-pointer disabled:opacity-50"
+                className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200 cursor-pointer"
               >
                 <MdMyLocation />
-                {gettingLocation ? 'Đang định vị...' : 'Lấy vị trí hiện tại'}
+                Lấy vị trí hiện tại
               </button>
             </div>
 
@@ -363,40 +338,39 @@ export const CreateSessionModal = ({
             </div>
           </div>
 
-          {/* Section 4: Import danh sách mã SV từ Excel */}
+          {/* Section 4: Mã sinh viên tham gia (tạm thời: nhập tay, phân cách bằng dấu phẩy) */}
           <div>
             <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
               <MdGroup className="text-blue-600 text-sm" />
-              Mã sinh viên được tham gia (tùy chọn)
+              Mã sinh viên được tham gia <span className="text-red-500">*</span>
             </label>
-            <label className="flex cursor-pointer items-center justify-between rounded-lg border border-dashed border-blue-300 bg-blue-50 px-4 py-3 transition hover:bg-blue-100">
-              <div>
-                <p className="text-sm font-medium text-blue-700">
-                  {studentFileName || 'Chọn file Excel danh sách sinh viên'}
+            <textarea
+              rows={3}
+              placeholder="VD: SV001, SV002, SV003"
+              {...register('studentCodesText', {
+                required: 'Vui lòng nhập ít nhất một mã sinh viên',
+                validate: (value) =>
+                  parseStudentCodes(value).length > 0 ||
+                  'Vui lòng nhập ít nhất một mã sinh viên',
+              })}
+              className="w-full px-3.5 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 resize-none"
+            />
+            <div className="mt-1.5 flex items-center justify-between">
+              {errors.studentCodesText ? (
+                <p className="text-red-500 text-xs">
+                  {errors.studentCodesText.message}
                 </p>
-                <p className="mt-1 text-xs text-blue-600">
-                  Cột đầu tiên chứa mã sinh viên (.xlsx, .xls)
-                </p>
-              </div>
-              <span className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white">
-                Chọn file
-              </span>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleStudentFileChange}
-                className="hidden"
-              />
-            </label>
-            {studentCount > 0 && (
-              <p className="mt-2 text-sm text-green-600">
-                Đã import {studentCount} mã sinh viên
-              </p>
-            )}
-            <input type="hidden" {...register('studentCodes')} />
-            <span className="text-xs text-gray-400">
-              Để trống nếu áp dụng cho toàn bộ sinh viên trong lớp
-            </span>
+              ) : (
+                <span className="text-xs text-gray-400">
+                  Phân cách các mã bằng dấu phẩy
+                </span>
+              )}
+              {studentCodesPreviewCount > 0 && (
+                <span className="text-xs text-green-600">
+                  {studentCodesPreviewCount} mã hợp lệ
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Modal Actions */}
