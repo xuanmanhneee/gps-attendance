@@ -42,6 +42,7 @@ export class AttendanceRecordsService {
         latitude: null,
         longitude: null,
         accuracy: null,
+        updateBy: null,
       });
     }
   }
@@ -55,6 +56,7 @@ export class AttendanceRecordsService {
       latitude: input.latitude,
       longitude: input.longitude,
       accuracy: input.accuracy,
+      updateBy: input.updateBy,
     });
 
     return this.attendanceRecordRepository.getRecord(
@@ -70,7 +72,7 @@ export class AttendanceRecordsService {
     return this.attendanceRecordRepository.getRecord(sessionId, userId);
   }
 
-  async findBySession(sessionId: number): Promise<AttendanceRecord[]> {
+  async findBySessionId(sessionId: number): Promise<AttendanceRecord[]> {
     return this.attendanceRecordRepository.findBySession(sessionId);
   }
 

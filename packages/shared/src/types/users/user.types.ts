@@ -1,6 +1,6 @@
 import { Role } from '../auth';
 
-export interface UserDto {
+export interface UserResponse {
   code: string;
   role: Role;
   fullname: string;

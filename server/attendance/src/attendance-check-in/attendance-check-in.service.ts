@@ -37,7 +37,9 @@ export class AttendanceCheckInService {
     userId: number,
   ): Promise<AttendanceCheckInResult> {
     // --- Guard layer ---
-    const session = await this.attendanceSessionsService.getById(dto.sessionId);
+    const session = await this.attendanceSessionsService.findById(
+      dto.sessionId,
+    );
 
     if (!session) {
       throw new NotFoundException({
@@ -123,6 +125,7 @@ export class AttendanceCheckInService {
       latitude: dto.location.latitude,
       longitude: dto.location.longitude,
       accuracy: dto.location.accuracy,
+      updateBy: userId
     });
 
     if (validation.status === 'VALID') {

@@ -15,6 +15,10 @@ export class UsersService {
     return this.userRepository.findById(id);
   }
 
+  async findByIds(ids: number[]): Promise<User[]> {
+    return this.userRepository.findByIds(ids);
+  }
+
   async findByCode(code: string): Promise<User | undefined> {
     return this.userRepository.findByCode(code);
   }

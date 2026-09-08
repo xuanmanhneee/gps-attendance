@@ -10,7 +10,10 @@ import { ILoggerFactory } from '../common/logging/logger.factory';
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
 import { IAttendanceSessionRepository } from './attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
-import { AttendanceSessionResponse, SessionStatus } from '@gps-attendance/shared';
+import {
+  AttendanceSessionResponse,
+  SessionStatus,
+} from '@gps-attendance/shared';
 
 @Injectable()
 export class AttendanceSessionsService {
@@ -58,14 +61,14 @@ export class AttendanceSessionsService {
     return this.withComputedStatus(session);
   }
 
-  async getAll(): Promise<AttendanceSession[]> {
-    const sessions = await this.attendanceSessionRepository.getAll();
+  async findAll(): Promise<AttendanceSession[]> {
+    const sessions = await this.attendanceSessionRepository.findAll();
 
     return sessions.map((session) => this.withComputedStatus(session));
   }
 
-  async getById(id: number): Promise<AttendanceSession> {
-    const session = await this.attendanceSessionRepository.getById(id);
+  async findById(id: number): Promise<AttendanceSession> {
+    const session = await this.attendanceSessionRepository.findById(id);
 
     if (!session) {
       throw new NotFoundException(`Không tìm thấy session id=${id}`);
@@ -81,7 +84,7 @@ export class AttendanceSessionsService {
     if (sessionIds.length === 0) return [];
 
     const sessions =
-      await this.attendanceSessionRepository.getByIds(sessionIds);
+      await this.attendanceSessionRepository.findByIds(sessionIds);
 
     return sessions.map((session) => this.withComputedStatus(session));
   }

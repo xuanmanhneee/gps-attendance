@@ -4,8 +4,8 @@ import { CreateAttendanceSessionRecord } from './attendance-session.model';
 export interface IAttendanceSessionRepository {
   create(input: CreateAttendanceSessionRecord): Promise<AttendanceSession>;
 
-  getAll(): Promise<AttendanceSession[]>;
-  getById(id: number): Promise<AttendanceSession | null>;
-  getByIds(ids: number[]): Promise<AttendanceSession[]>;
+  findAll(): Promise<AttendanceSession[]>;
+  findById(id: number): Promise<AttendanceSession | null>;
+  findByIds(ids: number[]): Promise<AttendanceSession[]>;
   findByCreator(createdBy: number): Promise<AttendanceSession[]>;
 }

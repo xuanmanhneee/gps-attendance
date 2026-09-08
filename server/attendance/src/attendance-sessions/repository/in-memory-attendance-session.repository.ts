@@ -22,15 +22,15 @@ export class InMemoryAttendanceSessionRepository implements IAttendanceSessionRe
     return session;
   }
 
-  async getAll(): Promise<AttendanceSession[]> {
+  async findAll(): Promise<AttendanceSession[]> {
     return [...this.sessions.values()];
   }
 
-  async getById(id: number): Promise<AttendanceSession | null> {
+  async findById(id: number): Promise<AttendanceSession | null> {
     return this.sessions.get(id) ?? null;
   }
 
-  async getByIds(ids: number[]): Promise<AttendanceSession[]> {
+  async findByIds(ids: number[]): Promise<AttendanceSession[]> {
     const idSet = new Set(ids);
     return [...this.sessions.values()].filter((s) => idSet.has(s.id));
   }

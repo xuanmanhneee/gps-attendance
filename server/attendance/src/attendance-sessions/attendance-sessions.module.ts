@@ -8,6 +8,7 @@ import { AttendanceRecordModule } from '../attendance-record/attendance-record.m
 import { InMemoryAttendanceSessionRepository } from './repository/in-memory-attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
 import { AttendanceSessionSeeder } from './attendance-session.seeder';
+import { AttendanceSessionQueryService } from './attendance-session-query.service';
 
 @Module({
   imports: [UsersModule, GeoModule, AttendanceRecordModule, LoggingModule],
@@ -20,6 +21,7 @@ import { AttendanceSessionSeeder } from './attendance-session.seeder';
       provide: ATTENDANCE_SESSION_REPOSITORY,
       useClass: InMemoryAttendanceSessionRepository,
     },
+    AttendanceSessionQueryService
   ],
   exports: [AttendanceSessionsService],
 })

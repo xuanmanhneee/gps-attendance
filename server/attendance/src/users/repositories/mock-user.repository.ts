@@ -10,6 +10,10 @@ export class MockUserRepository implements IUserRepository {
     return MOCK_USERS.find((user) => user.id === id);
   }
 
+  async findByIds(ids: number[]): Promise<User[]> {
+    return MOCK_USERS.filter((user) => ids.includes(user.id));
+  }
+
   async findByCode(code: string): Promise<User | undefined> {
     return MOCK_USERS.find((user) => user.code === code);
   }
