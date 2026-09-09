@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 
 import type { ApiErrorResponse } from '@gps-attendance/shared';
-import { CommonErrorCode } from '@gps-attendance/shared';
+import {
+  AttendanceSessionErrorCode,
+  AuthErrorCode,
+  CommonErrorCode,
+} from '@gps-attendance/shared';
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
@@ -54,7 +58,11 @@ export class ApiExceptionFilter implements ExceptionFilter {
   }
 
   private isValidErrorCode(code: string): boolean {
-    const validCodes = Object.values(CommonErrorCode);
+    const validCodes = [
+      ...Object.values(CommonErrorCode),
+      ...Object.values(AuthErrorCode),
+      ...Object.values(AttendanceSessionErrorCode),
+    ];
     return validCodes.includes(code as any);
   }
 }

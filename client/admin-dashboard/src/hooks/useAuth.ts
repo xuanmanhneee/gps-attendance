@@ -1,33 +1,13 @@
-import { useState } from 'react';
+import { useContext } from 'react';
 
-import type { LoginRequest } from '@gps-attendance/shared';
-
-import { authApi } from '../api/auth.api';
-import { tokenService } from '../services/token.service';
+import { AuthContext } from '../context/auth-context';
 
 export const useAuth = () => {
-  const [isLoading, setIsLoading] = useState(false);
+  const context = useContext(AuthContext);
 
-  const login = async (request: LoginRequest) => {
-    setIsLoading(true);
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
 
-    try {
-      const response = await authApi.login(request);
-      tokenService.set(response.accessToken);
-
-      return response;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const logout = () => {
-    tokenService.remove();
-  };
-
-  return {
-    login,
-    logout,
-    isLoading,
-  };
+  return context;
 };

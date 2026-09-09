@@ -25,6 +25,16 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordStore {
     this.records.set(k, { ...record, updatedAt: new Date() });
   }
 
+  async findByUser(userId: number): Promise<AttendanceRecord[]> {
+    return [...this.records.values()].filter((record) => record.userId === userId);
+  }
+
+  async findBySession(sessionId: number): Promise<AttendanceRecord[]> {
+    return [...this.records.values()].filter(
+      (record) => record.sessionId === sessionId,
+    );
+  }
+
   async incrementAttempt(sessionId: number, userId: number): Promise<number> {
     const k = this.key(sessionId, userId);
     const next = (this.attempts.get(k) ?? 0) + 1;

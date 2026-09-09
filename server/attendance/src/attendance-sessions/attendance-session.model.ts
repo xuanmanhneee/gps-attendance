@@ -1,4 +1,4 @@
-export type SessionStatus = 'pending' | 'open' | 'closed';
+import { SessionStatus } from "@gps-attendance/shared";
 
 export interface AttendanceSession {
   id: number;

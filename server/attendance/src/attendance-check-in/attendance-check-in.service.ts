@@ -19,8 +19,7 @@ export class AttendanceCheckInService {
     // -------------------------------------------------------------------------
     // 1. Resolve session
     // -------------------------------------------------------------------------
-
-    const session = this.attendanceSessionsService.findById(dto.sessionId);
+    const session = await this.attendanceSessionsService.findById(dto.sessionId);
 
     if (session.status !== 'open') {
       throw new BadRequestException('Phiên điểm danh hiện không mở');
@@ -36,7 +35,7 @@ export class AttendanceCheckInService {
     // -------------------------------------------------------------------------
 
     // TODO: Lấy từ DB khi có AttendanceRecord.
-    const existingRecordCount = 0;
+    const existingRecordCount = existingRecord ? 1 : 0;
 
     // Không tin timestamp từ client cho thời điểm check-in.
     const checkedInAt = new Date();

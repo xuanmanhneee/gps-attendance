@@ -9,9 +9,9 @@ import {
   IsPositive,
   IsString,
 } from 'class-validator';
-import type { CreateAttendanceSessionPayload } from '@gps-attendance/shared';
+import type { CreateAttendanceSessionRequest } from '@gps-attendance/shared';
 
-export class CreateAttendanceSessionDto implements CreateAttendanceSessionPayload {
+export class CreateAttendanceSessionDto implements CreateAttendanceSessionRequest {
   @ApiProperty({ example: 'Điểm danh buổi sáng - Lớp CNTT K20' })
   @IsString()
   @IsNotEmpty()
@@ -49,5 +49,5 @@ export class CreateAttendanceSessionDto implements CreateAttendanceSessionPayloa
     },
   })
   @IsObject()
-  participantCriteria!: CreateAttendanceSessionPayload['participantCriteria'];
+  participantCriteria!: CreateAttendanceSessionRequest['participantCriteria'];
 }

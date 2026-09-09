@@ -15,6 +15,7 @@ import { useAuth } from '../hooks/useAuth';
 const LoginPage = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const togglePasswordView = () => setShowPassword(!showPassword);
   const {
     register,
@@ -25,6 +26,8 @@ const LoginPage = () => {
   const { login, isLoading } = useAuth();
 
   const handleLogin = async (data: LoginRequest) => {
+    setLoginError(null);
+
     try {
       await login(data);
 
@@ -35,20 +38,31 @@ const LoginPage = () => {
       if (error instanceof ApiError) {
         switch (error.code) {
           case AuthErrorCode.INVALID_CREDENTIALS:
-            toast.error('Sai username hoặc password');
+            setLoginError('Sai tên đăng nhập hoặc mật khẩu.');
             break;
           case AuthErrorCode.ACCOUNT_NOT_LINKED:
-            toast.error('Tài khoản chưa được liên kết');
+            setLoginError(
+              'Tài khoản chưa được liên kết với hồ sơ người dùng.',
+            );
             break;
           case AuthErrorCode.ROLE_NOT_ALLOWED:
-            toast.error('Bạn không có quyền truy cập');
+            setLoginError(
+              'Tài khoản không có quyền đăng nhập vào trang quản trị.',
+            );
             break;
-          default:
-            toast.error(error.message);
+          default: {
+            const detail = error.message || 'Máy chủ trả về lỗi không xác định.';
+            setLoginError(`Đăng nhập thất bại (${error.status}): ${detail}`);
+          }
         }
+        toast.error(error.message);
         return;
       }
-      toast.error('Đăng nhập thất bại');
+      const message = error instanceof Error ? error.message : 'Lỗi không xác định.';
+      setLoginError(
+        `Không thể kết nối tới máy chủ. Kiểm tra backend và địa chỉ API. Chi tiết: ${message}`,
+      );
+      toast.error('Không thể kết nối tới máy chủ');
     }
   };
 
@@ -99,6 +113,14 @@ const LoginPage = () => {
             </span>
           )}
         </div>
+        {loginError && (
+          <div
+            role="alert"
+            className="w-full rounded-lg border border-red-500/40 bg-red-950/60 px-3 py-2 text-left text-sm text-red-200"
+          >
+            {loginError}
+          </div>
+        )}
 
         <button
           type="submit"

@@ -18,17 +18,26 @@ export class InMemoryAttendanceSessionRepository implements IAttendanceSessionRe
       ...input,
       status: 'pending',
     };
-
     this.sessions.set(session.id, session);
-
     return session;
   }
 
-  getAll(): Promise<AttendanceSession[]> {
-    return Promise.resolve([...this.sessions.values()]);
+  async findAll(): Promise<AttendanceSession[]> {
+    return [...this.sessions.values()];
   }
 
-  getById(id: number): Promise<AttendanceSession | null> {
-    return Promise.resolve(this.sessions.get(id) ?? null);
+  async findById(id: number): Promise<AttendanceSession | null> {
+    return this.sessions.get(id) ?? null;
+  }
+
+  async findByIds(ids: number[]): Promise<AttendanceSession[]> {
+    const idSet = new Set(ids);
+    return [...this.sessions.values()].filter((s) => idSet.has(s.id));
+  }
+
+  async findByCreator(createdBy: number): Promise<AttendanceSession[]> {
+    return [...this.sessions.values()].filter(
+      (session) => session.createdBy === createdBy,
+    );
   }
 }
