@@ -15,6 +15,7 @@ Hệ thống điểm danh tự động sử dụng định vị GPS thời gian 
 ## Cấu trúc repo
 
 ```
+<<<<<<< HEAD
 gps-attendance-main/
 ├── server/
 │   └── attendance/              # Backend API (NestJS)
@@ -37,6 +38,18 @@ gps-attendance-main/
 ## Tài liệu hệ thống
 
 - [docs/system-overview.md](./docs/system-overview.md) — tổng quan kiến trúc, luồng nghiệp vụ, auth, anti-spoofing và API chính của hệ thống.
+=======
+gps-attendance/
+├── server/                       # Backend API (NestJS)
+├── client/
+│   ├── admin-dashboard/          # Web dashboard cho giảng viên/quản trị (React + Vite)
+│   └── mobile-client/            # Ứng dụng di động cho sinh viên (Expo / React Native)
+└── packages/
+    └── shared-types/             # Type/DTO dùng chung giữa server, admin, mobile
+```
+
+Đây là **pnpm workspace monorepo** — 3 project (`server`, `admin-dashboard`, `mobile-client`) và `shared-types` được quản lý cùng nhau qua **1** `pnpm-lock.yaml` duy nhất ở root, không cài dependency riêng lẻ từng thư mục.
+>>>>>>> feature/integrate-mobile-update
 
 ## Công nghệ sử dụng
 
@@ -70,6 +83,7 @@ pnpm install
 pnpm build:shared
 ```
 
+<<<<<<< HEAD
 Tạo file `server/attendance/.env` từ file mẫu trước khi chạy backend:
 
 ```bash
@@ -78,14 +92,22 @@ copy server\attendance\.env.example server\attendance\.env
 
 Đảm bảo `JWT_SECRET` có giá trị đủ dài và ngẫu nhiên. Giá trị trong file mẫu chỉ là placeholder, không dùng cho production.
 
+=======
+>>>>>>> feature/integrate-mobile-update
 Sau khi cài xong, chạy từng project bằng script ở root:
 
 ### 1. Server (NestJS)
 
 ```bash
+<<<<<<< HEAD
 pnpm dev:attendance
 ```
 Mặc định chạy tại `http://localhost:3000`. Lệnh này tự build `shared` trước khi khởi động.
+=======
+pnpm dev:server
+```
+Mặc định chạy tại `http://localhost:3000`. Lệnh này tự build `shared-types` trước khi khởi động.
+>>>>>>> feature/integrate-mobile-update
 
 ### 2. Admin Dashboard (React)
 
@@ -106,6 +128,7 @@ Quét mã QR hiện trên terminal bằng app **Expo Go** để chạy thử tr�
 ## Build & dọn cache
 
 ```bash
+<<<<<<< HEAD
 pnpm build          # build shared, attendance, admin-dashboard
 pnpm clean           # dọn cache/output khi gặp lỗi build lạ
 ```
@@ -115,6 +138,17 @@ pnpm clean           # dọn cache/output khi gặp lỗi build lạ
 Server dùng bản đã build sẵn (`dist/`) của `shared`, không đọc trực tiếp file `.ts` nguồn. Nếu sửa `shared` trong lúc `server` đang chạy dev, mở thêm terminal chạy:
 ```bash
 pnpm dev:shared
+=======
+pnpm build          # build shared-types, server, admin-dashboard
+pnpm clean           # dọn cache/output khi gặp lỗi build lạ
+```
+
+### Lưu ý khi sửa `packages/shared-types`
+
+Server dùng bản đã build sẵn (`dist/`) của `shared-types`, không đọc trực tiếp file `.ts` nguồn. Nếu sửa `shared-types` trong lúc `server` đang chạy dev, mở thêm terminal chạy:
+```bash
+pnpm dev:attendance
+>>>>>>> feature/integrate-mobile-update
 ```
 để tự động build lại mỗi khi lưu file. (Admin dashboard và mobile không cần bước này — 2 project đó dùng bundler nên đọc thẳng file `.ts` nguồn, thay đổi có hiệu lực ngay khi lưu.)
 

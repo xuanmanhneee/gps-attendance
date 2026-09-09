@@ -3,19 +3,22 @@ import type {
   ApiResponse,
   CheckInRequestPayload,
   CheckInResponsePayload,
-  AttendanceSessionPayload,
+  AttendanceSessionResponse,
 } from '@gps-attendance/shared';
 
 export type CheckInRequest = CheckInRequestPayload;
 export type ValidationResult = CheckInResponsePayload;
-export type AttendanceSession = AttendanceSessionPayload;
+export type AttendanceSession = AttendanceSessionResponse;
 
 export const AttendanceAPI = {
   /**
-   * Lấy danh sách các buổi học hiện có
+   * Lấy các phiên mà user hiện tại được gán
    */
   async getSessions(token: string): Promise<ApiResponse<AttendanceSession[]>> {
-    return http.get<ApiResponse<AttendanceSession[]>>('/attendance-sessions', token);
+    return http.get<ApiResponse<AttendanceSession[]>>(
+      '/v0/attendance-sessions/mine',
+      token,
+    );
   },
 
   /**
@@ -26,7 +29,7 @@ export const AttendanceAPI = {
     token: string,
   ): Promise<ApiResponse<AttendanceSession>> {
     return http.get<ApiResponse<AttendanceSession>>(
-      `/attendance-sessions/${sessionId}`,
+      `/v0/attendance-sessions/${sessionId}/detail`,
       token,
     );
   },
@@ -39,7 +42,11 @@ export const AttendanceAPI = {
     payload: CheckInRequest,
     token: string,
   ): Promise<ApiResponse<ValidationResult>> {
-    return http.post<ApiResponse<ValidationResult>>('/attendance/check-in', payload, token);
+    return http.post<ApiResponse<ValidationResult>>(
+      '/attendance/check-in',
+      payload,
+      token,
+    );
   },
 
   /**
@@ -48,7 +55,7 @@ export const AttendanceAPI = {
   async getAttendanceHistory(token: string): Promise<ApiResponse<never[]>> {
     return Promise.resolve({
       success: false,
-      code: 'ATTENDANCE_HISTORY_NOT_AVAILABLE',
+      code: 'UNKNOWN_ERROR',
       message: 'Backend chưa cung cấp API lịch sử điểm danh',
     });
   },
@@ -62,7 +69,7 @@ export const AttendanceAPI = {
   ): Promise<ApiResponse<never>> {
     return Promise.resolve({
       success: false,
-      code: 'ATTENDANCE_RECORD_NOT_AVAILABLE',
+      code: 'UNKNOWN_ERROR',
       message: 'Backend chưa cung cấp API chi tiết bản ghi điểm danh',
     });
   },

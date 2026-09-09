@@ -6,6 +6,16 @@ interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
 }
 
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
+}
+
 async function request<T>(
   path: string,
   options: RequestOptions = {},
@@ -33,8 +43,9 @@ async function request<T>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(
+      throw new ApiRequestError(
         errorData.message || `API request failed: ${response.status}`,
+        response.status,
       );
     }
 

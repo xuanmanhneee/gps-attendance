@@ -11,6 +11,8 @@ import * as Location from 'expo-location';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { useAuth } from '../../context/auth-context';
+import { ApiRequestError } from '../../api/api';
+import { useRouter } from 'expo-router';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { GPSStatusCard } from '../../components/gps-status-card';
@@ -30,7 +32,8 @@ interface Session {
 }
 
 export default function AttendanceScreen() {
-  const { user, token } = useAuth();
+  const router = useRouter();
+  const { user, token, logout } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [location, setLocation] = useState<Location.LocationObject | null>(
     null,
@@ -62,6 +65,11 @@ export default function AttendanceScreen() {
       setSessions(response.data);
     } catch (error) {
       console.error('Failed to load sessions:', error);
+      if (error instanceof ApiRequestError && error.status === 401) {
+        await logout();
+        router.replace('/login');
+        return;
+      }
       Alert.alert('Lỗi', 'Không thể tải danh sách buổi học');
     } finally {
       setIsLoading(false);

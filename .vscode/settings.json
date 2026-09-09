@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 {
 	"files.exclude": {
 		"**/node_modules": true
 	}
 }
+=======
+{}
+>>>>>>> feature/integrate-mobile-update

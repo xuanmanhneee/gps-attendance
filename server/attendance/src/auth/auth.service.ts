@@ -4,7 +4,7 @@ import { AccountService } from '../account/account.service';
 import { UsersService } from '../users/users.service';
 import type { AuthenticatedUser } from './types/authenticated-user.type';
 import { JwtPayload } from './strategies/jwt.strategy';
-import { LoginResponse } from '@gps-attendance/shared';
+import { AuthErrorCode, LoginResponse } from '@gps-attendance/shared';
 
 @Injectable()
 export class AuthService {
@@ -28,13 +28,19 @@ export class AuthService {
     // Sau này:
     // await bcrypt.compare(password, account.password)
     if (!account || account.password !== password) {
-      throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu');
+      throw new UnauthorizedException({
+        code: AuthErrorCode.INVALID_CREDENTIALS,
+        message: 'Tên đăng nhập hoặc mật khẩu không chính xác.',
+      });
     }
 
     const user = await this.usersService.findByAccountId(account.id);
 
     if (!user) {
-      throw new UnauthorizedException('Tài khoản chưa được liên kết với user');
+      throw new UnauthorizedException({
+        code: AuthErrorCode.ACCOUNT_NOT_LINKED,
+        message: 'Tài khoản chưa được liên kết với hồ sơ người dùng.',
+      });
     }
 
     return {

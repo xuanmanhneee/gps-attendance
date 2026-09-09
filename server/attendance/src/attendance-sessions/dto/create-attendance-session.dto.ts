@@ -11,7 +11,6 @@ import {
 } from 'class-validator';
 import type { CreateAttendanceSessionRequest } from '@gps-attendance/shared';
 
-
 export class CreateAttendanceSessionDto implements CreateAttendanceSessionRequest {
   @ApiProperty({ example: 'Điểm danh buổi sáng - Lớp CNTT K20' })
   @IsString()

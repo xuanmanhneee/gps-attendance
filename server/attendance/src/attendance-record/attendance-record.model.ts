@@ -1,4 +1,4 @@
-export type AttendanceStatus = 'present' | 'absent';
+import { AttendanceStatus } from '@gps-attendance/shared';
 
 export interface AttendanceRecord {
   sessionId: number;
@@ -11,4 +11,15 @@ export interface AttendanceRecord {
   accuracy: number | null;
   distanceMeters: number | null;
   updatedAt: Date;
+  updateBy: number | null;
+}
+
+export interface MarkPresentInput {
+  sessionId: number;
+  userId: number;
+  checkedInAt: Date;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  updateBy: number;
 }

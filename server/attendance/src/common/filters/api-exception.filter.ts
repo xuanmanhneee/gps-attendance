@@ -4,8 +4,9 @@ import {
   ExceptionFilter,
   HttpException,
 } from '@nestjs/common';
-
 import {
+  AttendanceSessionErrorCode,
+  AuthErrorCode,
   CommonErrorCode,
   type ApiErrorResponse,
 } from '@gps-attendance/shared';
@@ -13,36 +14,22 @@ import {
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse();
+    const response = host.switchToHttp().getResponse();
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
-      const exceptionResponse = exception.getResponse();
+      const raw = exception.getResponse();
+      const body = typeof raw === 'object' && raw !== null
+        ? (raw as { code?: string; message?: string | string[] })
+        : {};
+      const code = body.code && this.isValidErrorCode(body.code)
+        ? body.code as ApiErrorResponse['code']
+        : CommonErrorCode.UNKNOWN_ERROR;
+      const message = typeof body.message === 'string'
+        ? body.message
+        : exception.message;
 
-      let code: string = CommonErrorCode.UNKNOWN_ERROR;
-      let message = exception.message;
-
-      if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-        const body = exceptionResponse as {
-          code?: string;
-          message?: string | string[];
-        };
-
-        code = body.code ?? code;
-
-        if (typeof body.message === 'string') {
-          message = body.message;
-        }
-      }
-
-      const errorResponse: ApiErrorResponse = {
-        success: false,
-        code: code as ApiErrorResponse['code'],
-        message,
-      };
-
-      response.status(status).json(errorResponse);
+      response.status(status).json({ success: false, code, message } satisfies ApiErrorResponse);
       return;
     }
 
@@ -51,5 +38,14 @@ export class ApiExceptionFilter implements ExceptionFilter {
       code: CommonErrorCode.UNKNOWN_ERROR,
       message: 'Internal server error',
     } satisfies ApiErrorResponse);
+  }
+
+  private isValidErrorCode(code: string): boolean {
+    const validCodes = [
+      ...Object.values(CommonErrorCode),
+      ...Object.values(AuthErrorCode),
+      ...Object.values(AttendanceSessionErrorCode),
+    ];
+    return validCodes.includes(code as never);
   }
 }

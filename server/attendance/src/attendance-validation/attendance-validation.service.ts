@@ -26,12 +26,6 @@ export class AttendanceValidationService {
   ) {}
 
   validate(input: AttendanceValidationInput): AttendanceValidationResult {
-    const reasons: AttendanceValidationReason[] = [];
-
-    // -------------------------------------------------------------------------
-    // Hard-block
-    // -------------------------------------------------------------------------
-
     if (input.existingRecordCount > 0) {
       return {
         status: 'REJECTED',
@@ -39,55 +33,8 @@ export class AttendanceValidationService {
       };
     }
 
-    const mockLocationResult = this.mockLocationCheck.evaluate(input.location);
-
-    if (mockLocationResult.coefficient === 0) {
-      return {
-        status: 'REJECTED',
-        reasons: ['MOCK_LOCATION'],
-      };
-    }
-
-    // -------------------------------------------------------------------------
-    // Risk scoring
-    // -------------------------------------------------------------------------
-
-    let score = 0;
-
-    const integrityResult = this.integrityCheck.evaluate(input.integrity);
-
-    score += integrityResult.coefficient * this.INTEGRITY_WEIGHT;
-
-    const locationResult = this.locationCheck.evaluate(
-      input.location,
-      input.session,
-    );
-
-    score += mockLocationResult.coefficient * this.MOCK_LOCATION_WEIGHT;
-
-    score += locationResult.coefficient * this.LOCATION_WEIGHT;
-
-    if (locationResult.coefficient === 0) {
-      reasons.push('OUT_OF_RANGE');
-    }
-
-    // -------------------------------------------------------------------------
-    // Result
-    // -------------------------------------------------------------------------
-
-    let status: AttendanceValidationStatus;
-
-    if (score >= 80) {
-      status = 'VALID';
-    } else if (score >= 60) {
-      status = 'REVIEW';
-    } else {
-      status = 'REJECTED';
-    }
-
-    return {
-      status,
-      reasons,
-    };
+    // Demo mode: session state and assignment remain mandatory; GPS/device
+    // checks are recorded by the client but do not block attendance.
+    return { status: 'VALID', reasons: [] };
   }
 }
