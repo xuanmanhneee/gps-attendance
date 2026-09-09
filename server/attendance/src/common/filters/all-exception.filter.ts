@@ -1,4 +1,8 @@
-import { CommonErrorCode } from '@gps-attendance/shared';
+import {
+  CommonErrorCode,
+  ApiErrorCode,
+  ApiErrorResponse,
+} from '@gps-attendance/shared';
 import {
   ExceptionFilter,
   Catch,
@@ -9,9 +13,11 @@ import {
 import { Response } from 'express';
 
 interface ErrorPayload {
-  code?: string;
+  code?: ApiErrorCode;
   message?: string;
 }
+
+type ErrorCodeValue = typeof CommonErrorCode[keyof typeof CommonErrorCode];
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -32,7 +38,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         success: false,
         code: payload.code ?? this.defaultCodeFor(status),
         message: payload.message ?? exception.message,
-      });
+      } satisfies ApiErrorResponse);
     }
 
     console.error(exception);
@@ -41,11 +47,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       success: false,
       code: CommonErrorCode.INTERNAL_ERROR,
       message: 'Đã có lỗi xảy ra, vui lòng thử lại sau',
-    });
+    } satisfies ApiErrorResponse);
   }
 
-  private defaultCodeFor(status: number): string {
-    const map: Record<number, string> = {
+  private defaultCodeFor(status: number): ErrorCodeValue {
+    const map: Record<number, ErrorCodeValue> = {
       400: CommonErrorCode.VALIDATION_ERROR,
       401: CommonErrorCode.UNAUTHORIZED,
       403: CommonErrorCode.FORBIDDEN,

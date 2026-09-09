@@ -6,11 +6,7 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-
-export interface ApiSuccessResponse<T> {
-  success: true;
-  data: T;
-}
+import { ApiSuccessResponse } from '@gps-attendance/shared';
 
 @Injectable()
 export class ResponseInterceptor<T> implements NestInterceptor<

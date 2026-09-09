@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 
 import type { ApiErrorResponse } from '@gps-attendance/shared';
+import { CommonErrorCode } from '@gps-attendance/shared';
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
@@ -17,7 +18,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
       const status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
 
-      let code = 'UNKNOWN_ERROR';
+      let code: typeof CommonErrorCode[keyof typeof CommonErrorCode] = CommonErrorCode.UNKNOWN_ERROR;
       let message = exception.message;
 
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
@@ -26,7 +27,9 @@ export class ApiExceptionFilter implements ExceptionFilter {
           message?: string | string[];
         };
 
-        code = body.code ?? code;
+        if (body.code && this.isValidErrorCode(body.code)) {
+          code = body.code as any;
+        }
 
         if (typeof body.message === 'string') {
           message = body.message;
@@ -45,8 +48,13 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
     response.status(500).json({
       success: false,
-      code: 'INTERNAL_SERVER_ERROR',
+      code: CommonErrorCode.INTERNAL_ERROR,
       message: 'Internal server error',
     } satisfies ApiErrorResponse);
+  }
+
+  private isValidErrorCode(code: string): boolean {
+    const validCodes = Object.values(CommonErrorCode);
+    return validCodes.includes(code as any);
   }
 }

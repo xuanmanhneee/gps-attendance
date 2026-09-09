@@ -12,3 +12,13 @@ export interface CreateAttendanceSessionPayload {
 
   participantCriteria: UserFilterCriteria;
 }
+
+export type CreateAttendanceSessionRequest = CreateAttendanceSessionPayload;
+
+export interface AttendanceSessionPayload extends CreateAttendanceSessionPayload {
+  id: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateAttendanceSessionResponse = AttendanceSessionPayload;
