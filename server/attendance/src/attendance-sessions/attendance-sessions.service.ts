@@ -37,7 +37,7 @@ export class AttendanceSessionsService {
         openAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
         closeAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
 
-        userFilter: {
+        participantCriteria: {
           codeFilter: {
             addCodes: ['2312686', '2312716', '2312718'],
           },
@@ -53,7 +53,9 @@ export class AttendanceSessionsService {
   ): Promise<AttendanceSession> {
     const now = new Date();
 
-    const userIds = this.userFilterService.resolveUserIds(dto.userFilter);
+    const userIds = this.userFilterService.resolveUserIds(
+      dto.participantCriteria,
+    );
 
     const session: AttendanceSession = {
       id: this.nextId++,

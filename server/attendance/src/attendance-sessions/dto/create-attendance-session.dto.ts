@@ -9,7 +9,7 @@ import {
   IsPositive,
   IsString,
 } from 'class-validator';
-import type { CreateAttendanceSessionRequest } from '@gps-attendance/shared'
+import type { CreateAttendanceSessionRequest } from '@gps-attendance/shared';
 
 
 export class CreateAttendanceSessionDto implements CreateAttendanceSessionRequest {
@@ -50,5 +50,5 @@ export class CreateAttendanceSessionDto implements CreateAttendanceSessionReques
     },
   })
   @IsObject()
-  userFilter!: CreateAttendanceSessionRequest['userFilter'];
+  participantCriteria!: CreateAttendanceSessionRequest['participantCriteria'];
 }

@@ -5,7 +5,10 @@ import {
   HttpException,
 } from '@nestjs/common';
 
-import type { ApiErrorResponse } from '@gps-attendance/shared';
+import {
+  CommonErrorCode,
+  type ApiErrorResponse,
+} from '@gps-attendance/shared';
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
@@ -17,7 +20,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
       const status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
 
-      let code = 'UNKNOWN_ERROR';
+      let code: string = CommonErrorCode.UNKNOWN_ERROR;
       let message = exception.message;
 
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
@@ -35,7 +38,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
       const errorResponse: ApiErrorResponse = {
         success: false,
-        code,
+        code: code as ApiErrorResponse['code'],
         message,
       };
 
@@ -45,7 +48,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
     response.status(500).json({
       success: false,
-      code: 'INTERNAL_SERVER_ERROR',
+      code: CommonErrorCode.UNKNOWN_ERROR,
       message: 'Internal server error',
     } satisfies ApiErrorResponse);
   }
