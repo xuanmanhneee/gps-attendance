@@ -6,7 +6,8 @@ build/
 !.env.example
 .expo/
 .expo-shared/
+.vscode
+.github/*
 *.log
-
 *.tsbuildinfo
 *.code-workspace

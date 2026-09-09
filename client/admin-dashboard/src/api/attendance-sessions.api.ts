@@ -1,4 +1,5 @@
 import type {
+  AttendanceSessionDetailResponse,
   AttendanceSessionResponse,
   CreateAttendanceSessionRequest,
 } from '@gps-attendance/shared';
@@ -19,9 +20,9 @@ export const attendanceSessionsApi = {
     );
   },
 
-  getById(id: number) {
-    return httpClient.get<AttendanceSessionResponse>(
-      `/v0/attendance-sessions/${id}`,
+  getDetail(id: number) {
+    return httpClient.get<AttendanceSessionDetailResponse>(
+      `/v0/attendance-sessions/${id}/detail`,
     );
   },
 
