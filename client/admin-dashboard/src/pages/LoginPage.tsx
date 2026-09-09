@@ -110,11 +110,11 @@ const LoginPage = () => {
           {isLoading ? 'Đang đăng nhập...' : 'Login'}
         </button>
         <div className="relative w-full flex items-center justify-center py-3">
-          <div className="w-2/5 h-[2px] bg-gray-800"></div>
+          <div className="w-2/5 h-0.5 bg-gray-800"></div>
           <h3 className="font-lora text-xs md:text-sm px-4 text-gray-500">
             Or
           </h3>
-          <div className="w-2/5 h-[2px] bg-gray-800"></div>
+          <div className="w-2/5 h-0.5 bg-gray-800"></div>
         </div>
         <div className="w-full flex items-center justify-center  gap-2">
           <div className="p-1 md:px-6 lg:px-10 bg-slate-700 cursor-pointer rounded-xl hover:bg-slate-800">
