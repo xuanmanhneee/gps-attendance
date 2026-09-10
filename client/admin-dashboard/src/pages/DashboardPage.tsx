@@ -18,12 +18,12 @@ const DashboardPage = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 font-sans text-gray-900">
+    <div className="flex min-h-screen flex-col bg-gray-100 font-sans text-gray-900 md:h-screen md:flex-row">
       <DashboardSidebar user={user} onLogout={handleLogout} />
 
       {/* Main content */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        <div className="flex justify-between items-start mb-6">
+      <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
+        <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row">
           <div>
             <h1 className="text-xl font-semibold">Danh sách phiên điểm danh</h1>
           </div>

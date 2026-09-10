@@ -1,10 +1,28 @@
 import { useEffect, useState } from 'react';
-import { MdRefresh } from 'react-icons/md';
+import {
+  MdAccessTime,
+  MdLocationOn,
+  MdMyLocation,
+  MdRefresh,
+} from 'react-icons/md';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import type { AttendanceSessionDetailResponse } from '@gps-attendance/shared';
 
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
+
+const formatSessionDate = (value: string) =>
+  new Date(value).toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+const formatSessionTime = (value: string) =>
+  new Date(value).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
 const SessionDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -119,32 +137,63 @@ const SessionDetailPage = () => {
             </div>
           </div>
 
-          <div className="grid gap-3 p-4 sm:grid-cols-2 md:grid-cols-4 md:p-5">
-            <div className="rounded-lg bg-slate-50 px-4 py-3">
-              <p className="text-sm text-slate-500">Thời gian mở</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">
-                {new Date(session.openAt).toLocaleString('vi-VN')}
+          <div className="grid grid-cols-1 gap-2.5 p-3 sm:grid-cols-2 lg:grid-cols-4 md:p-4">
+            <div className="min-w-0 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-emerald-600 shadow-sm">
+                  <MdAccessTime aria-hidden="true" size={16} />
+                </span>
+                Thời gian mở
+              </div>
+              <p className="mt-3 flex flex-wrap items-baseline gap-x-1 text-base font-bold tracking-tight text-slate-900 sm:text-lg">
+                {formatSessionDate(session.openAt)}
+                <span> - {formatSessionTime(session.openAt)}</span>
               </p>
             </div>
 
-            <div className="rounded-lg bg-slate-50 px-4 py-3">
-              <p className="text-sm text-slate-500">Thời gian đóng</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">
-                {new Date(session.closeAt).toLocaleString('vi-VN')}
+            <div className="min-w-0 rounded-xl border border-orange-100 bg-orange-50/60 p-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-orange-700">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-orange-600 shadow-sm">
+                  <MdAccessTime aria-hidden="true" size={16} />
+                </span>
+                Thời gian đóng
+              </div>
+              <p className="mt-3 flex flex-wrap items-baseline gap-x-1 text-base font-bold tracking-tight text-slate-900 sm:text-lg">
+                {formatSessionDate(session.closeAt)}
+                <span> - {formatSessionTime(session.closeAt)}</span>
               </p>
             </div>
 
-            <div className="rounded-lg bg-slate-50 px-4 py-3">
-              <p className="text-sm text-slate-500">Bán kính điểm danh</p>
-              <p className="mt-1 text-lg font-bold text-blue-600">
-                {session.radius}m
+            <div className="min-w-0 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-blue-700">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm">
+                  <MdLocationOn aria-hidden="true" size={16} />
+                </span>
+                Bán kính điểm danh
+              </div>
+              <p className="mt-3 text-xl font-bold tracking-tight text-slate-900">
+                {session.radius}
+                <span className="ml-1 text-base font-semibold text-slate-500">
+                  m
+                </span>
+              </p>
+              <p className="mt-1 text-xs font-medium text-slate-500">
+                Phạm vi cho phép
               </p>
             </div>
 
-            <div className="rounded-lg bg-slate-50 px-4 py-3">
-              <p className="text-sm text-slate-500">Tọa độ</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">
+            <div className="min-w-0 rounded-xl border border-violet-100 bg-violet-50/60 p-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-violet-700">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white text-violet-600 shadow-sm">
+                  <MdMyLocation aria-hidden="true" size={16} />
+                </span>
+                Tọa độ GPS
+              </div>
+              <p className="mt-3 break-all text-base font-bold tracking-tight text-slate-900">
                 {session.latitude}, {session.longitude}
+              </p>
+              <p className="mt-1 text-xs font-medium text-slate-500">
+                Vị trí điểm danh
               </p>
             </div>
           </div>
