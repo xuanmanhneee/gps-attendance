@@ -1,45 +1,36 @@
-import { createContext, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import type { LoginRequest, UserProfileDto } from '@gps-attendance/shared';
-
 import { authApi } from '../api/auth.api';
 import { tokenService } from '../services/token.service';
 import { usersApi } from '../api/users.api';
-
-interface AuthContextValue {
-  user: UserProfileDto | null;
-  isLoading: boolean;
-  login: (request: LoginRequest) => Promise<void>;
-  logout: () => void;
-}
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
+import { AuthContext } from './auth-context-value';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfileDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadUser = async () => {
-    const token = tokenService.get();
-
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const user = await usersApi.getMe();
-      setUser(user);
-    } catch {
-      tokenService.remove();
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadUser();
+    const loadUser = async () => {
+      const token = tokenService.get();
+
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const user = await usersApi.getMe();
+        setUser(user);
+      } catch {
+        tokenService.remove();
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadUser();
   }, []);
 
   const login = async (request: LoginRequest) => {
