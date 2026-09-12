@@ -1,10 +1,10 @@
 // integrity.check.ts
-import { DeviceIntegrityPayload } from '@gps-attendance/shared';
+import { DeviceIntegrity } from '@gps-attendance/shared';
 
 import { IntegrityCheckResult } from '../attendance-validation.types';
 
 export class IntegrityCheck {
-  evaluate(integrity: DeviceIntegrityPayload): IntegrityCheckResult {
+  evaluate(integrity: DeviceIntegrity): IntegrityCheckResult {
     // TODO: sau này verify Play Integrity / App Attest token thật.
 
     // Mock kết quả PI hiện tại.

@@ -13,8 +13,9 @@ import { AttendanceRecordsService } from '../attendance-record/attendance-record
 import { CheckInRequestDto } from './attendance-check-in.dto';
 
 import {
+  CheckInRequest,
+  CheckInResponse,
   AttendanceSessionErrorCode,
-  AttendanceCheckInResult,
 } from '@gps-attendance/shared';
 import { AttemptCheck } from './checks/attempt.check';
 import { DeviceCheck } from './checks/device.check';
@@ -35,7 +36,7 @@ export class AttendanceCheckInService {
   async checkIn(
     dto: CheckInRequestDto,
     userId: number,
-  ): Promise<AttendanceCheckInResult> {
+  ): Promise<CheckInResponse> {
     // --- Guard layer ---
     const session = await this.attendanceSessionsService.findById(
       dto.sessionId,

@@ -20,15 +20,15 @@ export const attendanceSessionsApi = {
     );
   },
 
-  getDetail(id: number) {
-    return httpClient.get<AttendanceSessionDetailResponse>(
-      `/v0/attendance-sessions/${id}/detail`,
+  getCreatedByMe() {
+    return httpClient.get<AttendanceSessionResponse[]>(
+      '/v0/attendance-sessions/created-by-me',
     );
   },
 
-  getByUser(userId: number) {
-    return httpClient.get<AttendanceSessionResponse[]>(
-      `/v0/attendance-sessions/by-user/${userId}`,
+  getDetail(id: number) {
+    return httpClient.get<AttendanceSessionDetailResponse>(
+      `/v0/attendance-sessions/${id}`,
     );
   },
 };

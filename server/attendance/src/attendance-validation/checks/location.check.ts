@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { LocationPayload } from '@gps-attendance/shared';
+import { Location } from '@gps-attendance/shared';
 import { AttendanceSession } from '../../attendance-sessions/attendance-session.model';
 import { GeoService } from '../../geo/geo.service';
 import { LocationCheckResult } from '../attendance-validation.types';
@@ -9,7 +9,7 @@ export class LocationCheck {
   constructor(private readonly geoService: GeoService) {}
 
   evaluate(
-    location: LocationPayload,
+    location: Location,
     session: AttendanceSession,
   ): LocationCheckResult {
     const distance = this.geoService.getDistanceInMeters(

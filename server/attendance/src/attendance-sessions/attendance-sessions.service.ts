@@ -77,6 +77,11 @@ export class AttendanceSessionsService {
     return this.withComputedStatus(session);
   }
 
+  async findByIds(ids: number[]): Promise<AttendanceSession[]> {
+    const sessions = await this.attendanceSessionRepository.findByIds(ids);
+    return sessions.map((session) => this.withComputedStatus(session));
+  }
+
   async findByUser(userId: number): Promise<AttendanceSession[]> {
     const records = await this.attendanceRecordsService.findByUser(userId);
     const sessionIds = records.map((r) => r.sessionId);

@@ -6,7 +6,7 @@ export interface UserResponse {
   fullname: string;
 }
 
-export interface UserProfileDto {
+export interface UserProfileResponse {
   code: string;
   role: Role;
   fullname: string;
