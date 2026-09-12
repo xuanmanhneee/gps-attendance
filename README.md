@@ -1,174 +1,217 @@
 # GPS Attendance System
 
-Hệ thống điểm danh tự động sử dụng định vị GPS thời gian thực, kết hợp các cơ chế chống gian lận (giả mạo vị trí, trùng thiết bị) và kiến trúc đảm bảo chịu tải khi nhiều sinh viên điểm danh cùng lúc.
+Hệ thống điểm danh theo vị trí GPS cho sinh viên và giảng viên, xây dựng theo kiến trúc monorepo với backend NestJS, web dashboard React và mobile app Expo.
 
-## Mục tiêu
+## 1. Tổng quan
 
-- Cho phép sinh viên điểm danh bằng ứng dụng di động dựa trên vị trí GPS thực tế.
-- Phát hiện và ngăn chặn các hành vi gian lận phổ biến:
-  - **Giả mạo vị trí (location spoofing / mock location)**
-  - **Trùng thiết bị** — một thiết bị được dùng để điểm danh hộ nhiều tài khoản
-- Đảm bảo hệ thống hoạt động ổn định khi có lượng lớn yêu cầu điểm danh đến cùng lúc (đầu giờ học, đầu sự kiện).
+Dự án nhằm hỗ trợ:
+- Sinh viên điểm danh bằng vị trí GPS thực tế qua ứng dụng di động.
+- Giảng viên/quản trị tạo, theo dõi và quản lý phiên điểm danh trên web dashboard.
+- Phát hiện các dấu hiệu gian lận như mock location, trùng thiết bị, hoặc vị trí ngoài phạm vi cho phép.
+- Tích hợp một tầng shared types để các package frontend, backend và mobile đồng bộ interface, DTO và response contract.
 
-> Lưu ý: hệ thống không hướng đến việc chặn tuyệt đối mọi hình thức gian lận, mà tập trung chặn các kịch bản phổ biến, nâng cao chi phí gian lận ở mức hợp lý cho một hệ thống quy mô trường học.
+> Dự án đang ở giai đoạn phát triển, nhưng cấu trúc monorepo và luồng nghiệp vụ đã được tổ chức rõ ràng để mở rộng theo từng module.
 
-## Cấu trúc repo
+## 2. Cấu trúc monorepo
 
-```
-<<<<<<< HEAD
+```text
 gps-attendance-main/
-├── server/
-│   └── attendance/              # Backend API (NestJS)
-├── client/
-│   ├── admin-dashboard/         # Web dashboard cho giảng viên/quản trị (React + Vite)
-│   └── mobile-client/           # Ứng dụng di động cho sinh viên (Expo / React Native)
-├── packages/
-│   └── shared/                  # Type/DTO dùng chung giữa server, admin, mobile
-├── docs/
-│   ├── conventions/
-│   └── system-overview.md
+├── AGENTS.md
+├── README.md
 ├── package.json
 ├── pnpm-lock.yaml
 ├── pnpm-workspace.yaml
-└── docker-compose.yml
-```
-
-Đây là **pnpm workspace monorepo** — 3 project (`attendance`, `admin-dashboard`, `mobile-client`) và `shared` được quản lý cùng nhau qua **1** `pnpm-lock.yaml` duy nhất ở root, không cài dependency riêng lẻ từng thư mục.
-
-## Tài liệu hệ thống
-
-- [docs/system-overview.md](./docs/system-overview.md) — tổng quan kiến trúc, luồng nghiệp vụ, auth, anti-spoofing và API chính của hệ thống.
-=======
-gps-attendance/
-├── server/                       # Backend API (NestJS)
+├── tsconfig.json
+├── docker-compose.yml
 ├── client/
-│   ├── admin-dashboard/          # Web dashboard cho giảng viên/quản trị (React + Vite)
-│   └── mobile-client/            # Ứng dụng di động cho sinh viên (Expo / React Native)
-└── packages/
-    └── shared-types/             # Type/DTO dùng chung giữa server, admin, mobile
+│   ├── admin-dashboard/         # React + Vite dashboard cho admin/lecturer
+│   └── mobile-client/           # Expo + React Native app cho sinh viên
+├── packages/
+│   └── shared/                  # Shared types, DTO, API response, utility contract
+├── server/
+│   └── attendance/              # NestJS backend API
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── QUICK_REFERENCE.md
+│   ├── SYSTEM_OVERVIEW.md
+│   ├── system-overview.md
+│   └── conventions/
+└── .vscode/
 ```
 
-Đây là **pnpm workspace monorepo** — 3 project (`server`, `admin-dashboard`, `mobile-client`) và `shared-types` được quản lý cùng nhau qua **1** `pnpm-lock.yaml` duy nhất ở root, không cài dependency riêng lẻ từng thư mục.
->>>>>>> feature/integrate-mobile-update
+## 3. Công nghệ chính
 
-## Công nghệ sử dụng
-
-| Thành phần | Công nghệ |
+| Phần | Công nghệ |
 |---|---|
-| Backend | NestJS |
-| Admin Dashboard | React + Vite + TypeScript |
-| Mobile Client | Expo SDK 54 (React Native) |
-| Package manager | pnpm workspace |
+| Backend | NestJS 11, TypeScript |
+| Admin dashboard | React 19, Vite, TypeScript |
+| Mobile app | Expo SDK 54, React Native 0.81 |
+| Shared package | TypeScript workspace package |
+| Package manager | pnpm |
+| Database | Prisma + PostgreSQL (cấu hình đang được chuẩn bị) |
+| Authentication | JWT + Passport |
 
-## Yêu cầu môi trường
+## 4. Kiến trúc hệ thống
 
-- **Node.js** >= 20.x (khuyến nghị dùng qua [nvm](https://github.com/nvm-sh/nvm))
-- **pnpm** — bật qua corepack (đã có sẵn từ Node 16.13+):
-  ```bash
-  corepack enable
-  ```
-  Repo đã pin sẵn version pnpm trong `package.json` (`packageManager`), corepack sẽ tự dùng đúng version, không cần cài thủ công.
-- App **Expo Go** trên điện thoại (Android/iOS) để chạy thử `mobile-client` mà không cần build native
-  > Dự án đang dùng **Expo SDK 54** để đảm bảo tương thích với bản Expo Go hiện có trên CH Play/App Store. Nếu bản Expo Go trên máy bạn không khớp SDK, vào store cập nhật Expo Go lên bản mới nhất hoặc kiểm tra lại version SDK của project trong `client/mobile-client/package.json`.
-- (Tuỳ chọn, cho giai đoạn sau) Docker — dùng khi cần chạy database hoặc chuẩn bị deploy
-
-## Cài đặt
-
-Chỉ cài đặt **1 lần duy nhất ở root**, không `cd` vào từng project để `pnpm install` riêng (sẽ phá vỡ liên kết workspace).
-
-```bash
-git clone <repo-url>
-cd gps-attendance
-pnpm install
-pnpm build:shared
+```text
+Mobile App (Expo)          Admin Dashboard (React)           Backend (NestJS)
+       |                               |                               |
+       |---- Login / Check-in -------->|                               |
+       |                               |---- CRUD session / reports --->|
+       |                               |                               |
+       |<---- JWT + response ---------|                               |
+       |                               |                               |
+       |---- GPS + device payload -->|                               |
+       |                               |                               |
+       |                               |                               |-- Validate session
+       |                               |                               |-- Check location/radius
+       |                               |                               |-- Detect mock location
+       |                               |                               |-- Save attendance record
+       |                               |                               |
+       |<---- Result / validation ----|                               |
 ```
 
-<<<<<<< HEAD
-Tạo file `server/attendance/.env` từ file mẫu trước khi chạy backend:
+### 4.1 Backend
+Backend nằm trong `server/attendance` và có các module chính:
+- `auth/` — xác thực, JWT, guard, strategy
+- `users/` — profile người dùng, account và user mapping
+- `attendance-sessions/` — tạo, liệt kê, lấy chi tiết session
+- `attendance-check-in/` — endpoint điểm danh
+- `attendance-validation/` — kiểm tra vị trí, mock location, integrity
+- `attendance-record/` — lưu trữ record điểm danh
+- `geo/` — tính khoảng cách GPS và kiểm tra bán kính
+- `common/` — logging, filter và util chung
 
+### 4.2 Frontend web
+Dashboard nằm trong `client/admin-dashboard`:
+- React Router quản lý route
+- `LoginPage` và `DashboardPage` là màn hình chính hiện có
+- Dùng `axios` để giao tiếp với API
+- Shared package cung cấp contract cho payload và response
+
+### 4.3 Mobile app
+Mobile app nằm trong `client/mobile-client`:
+- Expo Router để quản lý route
+- `AuthProvider` để lưu trạng thái đăng nhập
+- GPS / device metadata được thu thập tại thời điểm điểm danh
+- Có các màn hình login, tab điểm danh, lịch sử, profile
+
+### 4.4 Shared package
+Package `packages/shared` chứa:
+- TypeScript type dùng chung
+- DTO cho API request/response
+- constant error code
+- interface response chuẩn hóa
+
+## 5. Quy trình nghiệp vụ chính
+
+### 5.1 Tạo phiên điểm danh
+1. Admin/lecturer sử dụng dashboard để tạo session.
+2. Session chứa thông tin: title, tọa độ tâm, bán kính, thời gian mở/đóng, người tạo.
+3. Backend lưu session trong store hiện tại (prototype), có thể mở rộng sang database sau này.
+
+### 5.2 Sinh viên điểm danh
+1. Mobile app lấy vị trí GPS hiện tại.
+2. App gửi `sessionId`, `location`, `device`, `integrity` lên backend.
+3. Backend xác thực JWT.
+4. Server kiểm tra:
+   - session có đang mở không
+   - vị trí có nằm trong bán kính cho phép không
+   - có bị mock location không
+   - thiết bị có trùng lặp, không đáng tin cậy không
+5. Kết quả trả về cho client: thành công, review, hoặc từ chối.
+
+### 5.3 Anti-fraud
+Hệ thống hiện đang tích hợp logic kiểm tra chính:
+- `LocationCheck` — so sánh khoảng cách GPS với radius
+- `MockLocationCheck` — phát hiện `isMockLocation` và các dấu hiệu giả mạo vị trí
+- `IntegrityCheck` — đánh giá device ID và dữ liệu tích hợp
+
+Các rule này được tổ chức trong `attendance-validation` module để dễ mở rộng.
+
+## 6. Yêu cầu môi trường
+
+- Node.js >= 20
+- pnpm 11.x (được pin ở root package.json)
+- Expo Go trên điện thoại thật để test GPS
+- Cần có file `.env` cho backend nếu server yêu cầu biến môi trường
+
+## 7. Cài đặt và chạy
+
+### 7.1 Cài dependency tại root
+```bash
+cd gps-attendance-main
+pnpm install
+```
+
+### 7.2 Tạo file môi trường backend
 ```bash
 copy server\attendance\.env.example server\attendance\.env
 ```
 
-Đảm bảo `JWT_SECRET` có giá trị đủ dài và ngẫu nhiên. Giá trị trong file mẫu chỉ là placeholder, không dùng cho production.
+Kiểm tra các biến môi trường quan trọng như JWT secret trước khi chạy backend trong môi trường thật.
 
-=======
->>>>>>> feature/integrate-mobile-update
-Sau khi cài xong, chạy từng project bằng script ở root:
-
-### 1. Server (NestJS)
-
+### 7.3 Chạy project
 ```bash
-<<<<<<< HEAD
+# Backend
 pnpm dev:attendance
-```
-Mặc định chạy tại `http://localhost:3000`. Lệnh này tự build `shared` trước khi khởi động.
-=======
-pnpm dev:server
-```
-Mặc định chạy tại `http://localhost:3000`. Lệnh này tự build `shared-types` trước khi khởi động.
->>>>>>> feature/integrate-mobile-update
 
-### 2. Admin Dashboard (React)
-
-```bash
+# Admin dashboard
 pnpm dev:admin
-```
-Mặc định chạy tại `http://localhost:5173`.
 
-### 3. Mobile Client (Expo)
-
-```bash
+# Mobile app
 pnpm dev:mobile
 ```
-Quét mã QR hiện trên terminal bằng app **Expo Go** để chạy thử trên điện thoại thật (khuyến nghị dùng thiết bị thật thay vì emulator, vì tính năng GPS/anti-spoofing cần thiết bị thật để hoạt động và kiểm thử chính xác).
 
-> Nếu điện thoại và máy tính không cùng mạng WiFi, dùng `expo start --tunnel` (chạy trong `client/mobile-client`), hoặc kết nối qua USB bằng `adb reverse tcp:8081 tcp:8081`.
-
-## Build & dọn cache
-
+### 7.4 Build
 ```bash
-<<<<<<< HEAD
-pnpm build          # build shared, attendance, admin-dashboard
-pnpm clean           # dọn cache/output khi gặp lỗi build lạ
+pnpm build:shared
+pnpm build:attendance
+pnpm build:admin
 ```
 
-### Lưu ý khi sửa `packages/shared`
-
-Server dùng bản đã build sẵn (`dist/`) của `shared`, không đọc trực tiếp file `.ts` nguồn. Nếu sửa `shared` trong lúc `server` đang chạy dev, mở thêm terminal chạy:
+### 7.5 Clean cache/output
 ```bash
-pnpm dev:shared
-=======
-pnpm build          # build shared-types, server, admin-dashboard
-pnpm clean           # dọn cache/output khi gặp lỗi build lạ
+pnpm clean
 ```
 
-### Lưu ý khi sửa `packages/shared-types`
+## 8. Scripts root
+Root `package.json` cung cấp các lệnh chính:
+- `dev:attendance` — chạy backend NestJS ở chế độ watch
+- `dev:admin` — chạy dashboard Vite
+- `dev:mobile` — chạy Expo app
+- `dev:shared` — watch build cho package shared
+- `build:shared` — build package shared
+- `build` — build shared + attendance + admin
 
-Server dùng bản đã build sẵn (`dist/`) của `shared-types`, không đọc trực tiếp file `.ts` nguồn. Nếu sửa `shared-types` trong lúc `server` đang chạy dev, mở thêm terminal chạy:
-```bash
-pnpm dev:attendance
->>>>>>> feature/integrate-mobile-update
-```
-để tự động build lại mỗi khi lưu file. (Admin dashboard và mobile không cần bước này — 2 project đó dùng bundler nên đọc thẳng file `.ts` nguồn, thay đổi có hiệu lực ngay khi lưu.)
+## 9. Quy ước repo
 
-## Cách hoạt động (tổng quan)
+Project có các tài liệu quy ước trong `docs/conventions`:
+- `api-response.md` — format `ApiResponse<T>` và error codes
+- `module-structure.md` — cấu trúc module NestJS và route order
+- `auth-guards.md` — JWT, guard và user id semantics
 
-1. Giảng viên/quản trị tạo một **phiên điểm danh** (attendance session) qua admin dashboard, gồm: thời gian, vị trí trung tâm (toạ độ GPS), bán kính cho phép.
-2. Sinh viên mở mobile app trong khung thời gian của phiên, ứng dụng lấy vị trí GPS hiện tại của thiết bị.
-3. Server nhận yêu cầu điểm danh, kiểm tra:
-   - Khoảng cách giữa vị trí sinh viên và tâm điểm phiên có nằm trong bán kính cho phép không.
-   - Vị trí có dấu hiệu bị giả lập (mock location) không.
-   - Thiết bị này đã dùng để điểm danh cho tài khoản khác trong cùng phiên chưa.
-4. Kết quả điểm danh (hợp lệ / nghi ngờ gian lận) được ghi nhận và hiển thị trên admin dashboard để giảng viên xem xét.
+Các quy ước này là nguồn tham chiếu chính khi phát triển tính năng mới.
 
-## Trạng thái phát triển
+## 10. Dự án hiện tại và điểm cần lưu ý
 
-Dự án đang trong giai đoạn phát triển ban đầu. Cấu trúc và API có thể thay đổi.
+- Backend vẫn đang phát triển theo kiểu prototype; store hiện tại là in-memory cho session và attendance record.
+- Prisma/PostgreSQL đã được cấu hình nhưng chưa hoàn thiện toàn bộ model nghiệp vụ.
+- Admin dashboard đang ở mức prototype với route chính login/dashboard.
+- Mobile app đang là nền tảng điều hướng và kiểm tra GPS, cần tích hợp API thực tế khi backend hoàn thiện hơn.
+- Shared package là trung tâm để đồng bộ contract giữa client và server.
 
-## Đóng góp
+## 11. Tài liệu tham khảo
 
-Repo dùng chung cho các thành viên trong nhóm đồ án. Khi thêm tính năng mới:
-- Tạo branch riêng, không push trực tiếp lên `main`.
-- Đặt tên commit rõ ràng, mô tả đúng thay đổi.
-- Cập nhật README này nếu có thay đổi về cấu trúc hoặc cách chạy dự án.
+- `docs/system-overview.md` — tổng quan hệ thống
+- `docs/ARCHITECTURE.md` — sơ đồ kiến trúc
+- `docs/QUICK_REFERENCE.md` — hướng dẫn nhanh
+- `docs/conventions/` — quy ước phát triển
+
+---
+
+Nếu bạn muốn, tôi có thể tiếp tục mở rộng tài liệu này thành:
+1. mô tả chi tiết từng module backend;
+2. bản thiết kế API đầy đủ từng endpoint;
+3. sơ đồ ERD cho database tương lai;
+4. checklist triển khai production.

@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { IoClose } from 'react-icons/io5';
 import {
   MdMyLocation,
@@ -74,7 +74,7 @@ export const CreateSessionModal = ({
     handleSubmit,
     setValue,
     reset,
-    watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<CreateSessionFormValues>({
     defaultValues: {
@@ -88,9 +88,13 @@ export const CreateSessionModal = ({
     },
   });
 
+  const studentCodesText = useWatch({
+    control,
+    name: 'studentCodesText',
+  });
+
   if (!isOpen) return null;
 
-  const studentCodesText = watch('studentCodesText');
   const studentCodesPreviewCount = parseStudentCodes(studentCodesText).length;
 
   // Lấy tọa độ GPS hiện tại từ trình duyệt
