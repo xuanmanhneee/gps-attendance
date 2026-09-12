@@ -1,3 +1,4 @@
+import { StudentAttendanceHistoryItemDto } from '@gps-attendance/shared';
 import { AttendanceRecord } from './attendance-record.model';
 
 export interface IAttendanceRecordRepository {
@@ -7,5 +8,9 @@ export interface IAttendanceRecordRepository {
   ): Promise<AttendanceRecord | null>;
   findByUser(userId: number): Promise<AttendanceRecord[]>;
   findBySession(sessionId: number): Promise<AttendanceRecord[]>;
+  findDetailedHistoryByUser(
+    userId: number,
+  ): Promise<StudentAttendanceHistoryItemDto[]>;
   upsertRecord(record: Omit<AttendanceRecord, 'updatedAt'>): Promise<void>;
 }
+

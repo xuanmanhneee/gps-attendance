@@ -69,6 +69,8 @@ export class AttendanceCheckInService {
         latitude: dto.location.latitude,
         longitude: dto.location.longitude,
         accuracy: dto.location.accuracy,
+        deviceId: dto.device.deviceId,
+        distanceMeters: result.distance,
         updateBy: userId,
       });
     }

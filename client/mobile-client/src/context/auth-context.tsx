@@ -35,6 +35,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
+  lastLoginAt: string | null;
   isLoading: boolean;
   isSignedIn: boolean;
   login: (username: string, password: string) => Promise<void>;
@@ -47,6 +48,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [lastLoginAt, setLastLoginAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Restore token and user on app start
@@ -58,10 +60,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const savedToken = await AsyncStorage.getItem('authToken');
       const savedUser = await AsyncStorage.getItem('user');
+      const savedLastLoginAt = await AsyncStorage.getItem('lastLoginAt');
 
       if (savedToken && savedUser) {
         setToken(savedToken);
         setUser(JSON.parse(savedUser));
+      }
+
+      if (savedLastLoginAt) {
+        setLastLoginAt(savedLastLoginAt);
       }
     } catch (error) {
       console.error('Failed to restore token:', error);
@@ -77,6 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (response.success && response.data) {
         const accessToken = response.data.accessToken;
+        const loginAt = new Date().toISOString();
         const userData: User = {
           id: decodeTokenPayload(accessToken).id ?? 0,
           accountId: 0,
@@ -87,10 +95,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         setUser(userData);
         setToken(accessToken);
+        setLastLoginAt(loginAt);
 
         // Save to persistent storage
         await AsyncStorage.setItem('authToken', accessToken);
         await AsyncStorage.setItem('user', JSON.stringify(userData));
+        await AsyncStorage.setItem('lastLoginAt', loginAt);
       } else {
         throw new Error('Login failed');
       }
@@ -110,8 +120,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setUser(null);
       setToken(null);
+      setLastLoginAt(null);
       await AsyncStorage.removeItem('authToken');
       await AsyncStorage.removeItem('user');
+      await AsyncStorage.removeItem('lastLoginAt');
     } catch (error) {
       console.error('Logout error:', error);
       throw error;
@@ -123,6 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value: AuthContextType = {
     user,
     token,
+    lastLoginAt,
     isLoading,
     isSignedIn: !!user,
     login,

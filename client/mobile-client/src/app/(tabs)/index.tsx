@@ -6,6 +6,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import * as Location from 'expo-location';
 import * as Device from 'expo-device';
@@ -18,6 +19,7 @@ import { Card } from '../../components/ui/card';
 import { GPSStatusCard } from '../../components/gps-status-card';
 import { AttendanceModal } from '../../components/attendance-modal';
 import { AttendanceAPI } from '../../api/attendance.api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/theme';
 
 interface Session {
@@ -33,6 +35,7 @@ interface Session {
 
 export default function AttendanceScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, token, logout } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [location, setLocation] = useState<Location.LocationObject | null>(
@@ -45,6 +48,10 @@ export default function AttendanceScreen() {
   const [validationResult, setValidationResult] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<
+    Record<number, 'idle' | 'completed' | 'failed'>
+  >({});
 
   useEffect(() => {
     if (!token) return;
@@ -56,9 +63,14 @@ export default function AttendanceScreen() {
     return () => subscription?.remove();
   }, [token]);
 
-  const loadSessions = async () => {
+  const loadSessions = async (showLoader = true) => {
     try {
-      setIsLoading(true);
+      if (showLoader) {
+        setIsLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
+
       if (!token) return;
       const response = await AttendanceAPI.getSessions(token);
       if (!response.success) throw new Error(response.message);
@@ -72,8 +84,16 @@ export default function AttendanceScreen() {
       }
       Alert.alert('Lỗi', 'Không thể tải danh sách buổi học');
     } finally {
-      setIsLoading(false);
+      if (showLoader) {
+        setIsLoading(false);
+      } else {
+        setIsRefreshing(false);
+      }
     }
+  };
+
+  const handleRefresh = async () => {
+    await loadSessions(false);
   };
 
   const startLocationTracking = async (): Promise<Location.LocationSubscription | undefined> => {
@@ -122,6 +142,24 @@ export default function AttendanceScreen() {
     return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   };
 
+  const getFailureMessage = (reasons?: string[]) => {
+    const mapped: Record<string, string> = {
+      LOW_LOCATION_ACCURACY: 'Vị trí hiện tại không đủ chính xác để điểm danh.',
+      MOCK_LOCATION: 'Hệ thống phát hiện vị trí giả mạo. Vui lòng tắt vị trí giả hoặc dùng GPS thật.',
+      DUPLICATE_DEVICE: 'Thiết bị này đã được dùng để điểm danh cho buổi học này.',
+      OUT_OF_RANGE: 'Bạn đang ở ngoài phạm vi cho phép của buổi học.',
+    };
+
+    if (!reasons || reasons.length === 0) {
+      return 'Điểm danh không thành công do điều kiện xác thực không đạt yêu cầu.';
+    }
+
+    return reasons
+      .map((reason) => mapped[reason] || reason)
+      .filter(Boolean)
+      .join(' ');
+  };
+
   const handleCheckIn = async (sessionId: number) => {
     if (!location) {
       Alert.alert('Lỗi', 'Chưa có thông tin vị trí. Vui lòng đợi...');
@@ -133,28 +171,73 @@ export default function AttendanceScreen() {
       setSelectedSessionId(sessionId);
 
       if (!token) throw new Error('Phiên đăng nhập đã hết hạn');
-      const response = await AttendanceAPI.checkIn({
-        sessionId,
-        location: {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          accuracy: location.coords.accuracy ?? 0,
-          timestamp: location.timestamp,
-          isMockLocation: location.mocked ?? false,
+      const response = await AttendanceAPI.checkIn(
+        {
+          sessionId,
+          location: {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            accuracy: location.coords.accuracy ?? 0,
+            timestamp: location.timestamp,
+            isMockLocation: location.mocked ?? false,
+          },
+          device: {
+            deviceId: Device.osBuildId ?? Device.modelId ?? 'unknown-device',
+            platform: Platform.OS === 'ios' ? 'ios' : 'android',
+            model: Device.modelName ?? 'unknown-model',
+          },
+          integrity: { integrityToken: null },
         },
-        device: {
-          deviceId: Device.osBuildId ?? Device.modelId ?? 'unknown-device',
-          platform: Platform.OS === 'ios' ? 'ios' : 'android',
-          model: Device.modelName ?? 'unknown-model',
-        },
-        integrity: { integrityToken: null },
-      }, token);
-      if (!response.success) throw new Error(response.message);
-      setValidationResult(response.data);
-      setShowModal(true);
+        token,
+      );
+
+      if (!response.success) {
+        throw new Error(response.message || 'Điểm danh không thành công');
+      }
+
+      const validation = response.data;
+      setValidationResult(validation);
+
+      if (validation.status === 'VALID' || validation.status === 'REVIEW') {
+        setSessionStatus((prev) => ({
+          ...prev,
+          [sessionId]: 'completed',
+        }));
+
+        const successMessage =
+          validation.status === 'REVIEW'
+            ? 'Điểm danh đã được ghi nhận, đang chờ xét duyệt.'
+            : 'Điểm danh thành công.';
+
+        Alert.alert('Thành công', successMessage);
+        setShowModal(true);
+        return;
+      }
+
+      setSessionStatus((prev) => ({
+        ...prev,
+        [sessionId]: 'failed',
+      }));
+
+      Alert.alert(
+        'Điểm danh không thành công',
+        getFailureMessage(validation.reasons),
+      );
     } catch (error) {
       console.error('Check-in failed:', error);
-      Alert.alert('Lỗi', 'Điểm danh không thành công');
+      const apiMessage =
+        error instanceof ApiRequestError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Điểm danh không thành công';
+
+      setSessionStatus((prev) => ({
+        ...prev,
+        [selectedSessionId ?? 0]: 'failed',
+      }));
+
+      Alert.alert('Lỗi', apiMessage);
     } finally {
       setIsCheckingIn(false);
     }
@@ -162,7 +245,7 @@ export default function AttendanceScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.centerContainer, { paddingTop: insets.top + 16 }]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
@@ -170,55 +253,103 @@ export default function AttendanceScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Xin chào, {user?.name}</Text>
-        <Text style={styles.headerSubtitle}>Chọn buổi học để điểm danh</Text>
-      </View>
-
-      {location && (
-        <GPSStatusCard
-          location={location}
-          distance={sessions[0] ? getDistanceInMeters(sessions[0]) : null}
-        />
-      )}
-
       <ScrollView
-        style={styles.sessionList}
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: Math.max(insets.top, 20) + 16,
+            paddingBottom: Math.max(insets.bottom, 20) + 24,
+          },
+        ]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+            title="Kéo xuống để làm mới"
+            titleColor={COLORS.text.secondary}
+          />
+        }
       >
-        {sessions.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              Không có buổi học nào sắp diễn ra
-            </Text>
+        <View style={styles.centerWrapper}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Xin chào, {user?.name}</Text>
+            <Text style={styles.headerSubtitle}>Chọn buổi học để điểm danh</Text>
           </View>
-        ) : (
-          sessions.map((session) => (
-            <Card key={session.id} style={styles.sessionCard}>
-              <Text style={styles.sessionTitle}>{session.title}</Text>
-              <Text style={styles.sessionTime}>
-                {new Date(session.openAt).toLocaleTimeString('vi-VN')} -{' '}
-                {new Date(session.closeAt).toLocaleTimeString('vi-VN')}
-              </Text>
-              <Text style={styles.sessionStatus}>
-                Trạng thái: {session.status === 'open' ? '🟢 Mở' : '⚫ Đóng'}
-              </Text>
-              {getDistanceInMeters(session) !== null && (
-                <Text style={styles.sessionDistance}>
-                  Khoảng cách: {getDistanceInMeters(session)} m
-                </Text>
-              )}
 
-              <Button
-                title={isCheckingIn ? 'Đang xử lý...' : 'Điểm Danh'}
-                onPress={() => handleCheckIn(session.id)}
-                disabled={
-                  isCheckingIn || session.status !== 'open'
-                }
-              />
-            </Card>
-          ))
-        )}
+          {location && (
+            <GPSStatusCard
+              location={location}
+              distance={sessions[0] ? getDistanceInMeters(sessions[0]) : null}
+            />
+          )}
+
+          <Button
+            title={isRefreshing ? 'Đang tải...' : 'Làm mới'}
+            onPress={handleRefresh}
+            disabled={isRefreshing || isCheckingIn || isLoading}
+            variant="primary"
+            style={styles.refreshButton}
+          />
+
+          {sessions.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                Không có buổi học nào sắp diễn ra
+              </Text>
+            </View>
+          ) : (
+            sessions.map((session) => {
+              const isCompleted = sessionStatus[session.id] === 'completed';
+              const isFailed = sessionStatus[session.id] === 'failed';
+
+              return (
+                <Card key={session.id} style={styles.sessionCard}>
+                  <Text style={styles.sessionTitle}>{session.title}</Text>
+                  <Text style={styles.sessionTime}>
+                    {new Date(session.openAt).toLocaleTimeString('vi-VN')} -{' '}
+                    {new Date(session.closeAt).toLocaleTimeString('vi-VN')}
+                  </Text>
+                  <Text style={styles.sessionStatus}>
+                    Trạng thái: {session.status === 'open' ? '🟢 Mở' : '⚫ Đóng'}
+                  </Text>
+                  {getDistanceInMeters(session) !== null && (
+                    <Text style={styles.sessionDistance}>
+                      Khoảng cách: {getDistanceInMeters(session)} m
+                    </Text>
+                  )}
+
+                  <Button
+                    title={
+                      isCompleted
+                        ? 'Hoàn thành'
+                        : isFailed
+                          ? 'Thử lại'
+                          : isCheckingIn && selectedSessionId === session.id
+                            ? 'Đang xử lý...'
+                            : 'Điểm Danh'
+                    }
+                    onPress={() => handleCheckIn(session.id)}
+                    disabled={
+                      isCompleted ||
+                      isCheckingIn ||
+                      session.status !== 'open'
+                    }
+                    variant={isCompleted ? 'secondary' : 'primary'}
+                    style={
+                      isCompleted
+                        ? styles.completedButton
+                        : styles.checkInButton
+                    }
+                  />
+                </Card>
+              );
+            })
+          )}
+        </View>
       </ScrollView>
 
       <AttendanceModal
@@ -237,8 +368,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 16,
+  },
+  centerWrapper: {
+    width: '100%',
+    maxWidth: 480,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 16,
   },
   header: {
     marginBottom: 20,
@@ -255,6 +404,16 @@ const styles = StyleSheet.create({
   },
   sessionList: {
     flex: 1,
+  },
+  refreshButton: {
+    marginBottom: 12,
+    borderRadius: 10,
+  },
+  checkInButton: {
+    backgroundColor: COLORS.primary,
+  },
+  completedButton: {
+    backgroundColor: '#2E7D32',
   },
   sessionCard: {
     marginBottom: 12,

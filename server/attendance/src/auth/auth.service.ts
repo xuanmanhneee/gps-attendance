@@ -1,3 +1,4 @@
+import * as bcrypt from 'bcryptjs';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AccountService } from '../account/account.service';
@@ -24,10 +25,26 @@ export class AuthService {
   ): Promise<AuthenticatedUser> {
     const account = await this.accountService.findByUsername(username);
 
-    // Plain text tạm thời.
-    // Sau này:
-    // await bcrypt.compare(password, account.password)
-    if (!account || account.password !== password) {
+    if (!account) {
+      throw new UnauthorizedException({
+        code: AuthErrorCode.INVALID_CREDENTIALS,
+        message: 'Tên đăng nhập hoặc mật khẩu không chính xác.',
+      });
+    }
+
+    let isPasswordValid = false;
+    if (
+      account.password.startsWith('$2a$') ||
+      account.password.startsWith('$2b$') ||
+      account.password.startsWith('$2y$')
+    ) {
+      isPasswordValid = await bcrypt.compare(password, account.password);
+    } else {
+      // Hỗ trợ backward compatibility với dữ liệu plaintext cũ nếu chưa seed lại
+      isPasswordValid = account.password === password;
+    }
+
+    if (!isPasswordValid) {
       throw new UnauthorizedException({
         code: AuthErrorCode.INVALID_CREDENTIALS,
         message: 'Tên đăng nhập hoặc mật khẩu không chính xác.',

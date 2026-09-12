@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { StudentAttendanceHistoryItemDto } from '@gps-attendance/shared';
 import { AttendanceRecord } from '../attendance-record.model';
 import { IAttendanceRecordRepository } from '../attendance-record.repository';
 
@@ -20,6 +21,30 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordRepositor
       if (r) result.push(r);
     }
     return result;
+  }
+
+  async findDetailedHistoryByUser(
+    userId: number,
+  ): Promise<StudentAttendanceHistoryItemDto[]> {
+    const records = await this.findByUser(userId);
+    return records.map((r) => ({
+      id: r.sessionId,
+      sessionId: r.sessionId,
+      sessionTitle: `Buổi học #${r.sessionId}`,
+      sessionStatus: 'closed' as const,
+      openAt: new Date().toISOString(),
+      closeAt: new Date().toISOString(),
+      radius: 50,
+      sessionLatitude: 0,
+      sessionLongitude: 0,
+      status: r.status,
+      checkedInAt: r.checkedInAt ? r.checkedInAt.toISOString() : null,
+      deviceId: r.deviceId,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      accuracy: r.accuracy,
+      distanceMeters: r.distanceMeters,
+    }));
   }
 
   async findBySession(sessionId: number): Promise<AttendanceRecord[]> {

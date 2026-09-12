@@ -22,4 +22,7 @@ export interface MarkPresentInput {
   longitude: number;
   accuracy: number;
   updateBy: number;
+  deviceId?: string | null;
+  distanceMeters?: number | null;
 }
+

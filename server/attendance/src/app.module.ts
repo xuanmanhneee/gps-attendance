@@ -9,12 +9,14 @@ import { AttendanceSessionsModule } from './attendance-sessions/attendance-sessi
 import { AttendanceValidationModule } from './attendance-validation/attendance-validation.module';
 import { AttendanceCheckInModule } from './attendance-check-in/attendance-check-in.module';
 import { LoggingModule } from './common/logging/logging.module';
+import { DatabaseModule } from './common/database/database.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    DatabaseModule,
     AuthModule,
     UsersModule,
     AttendanceSessionsModule,

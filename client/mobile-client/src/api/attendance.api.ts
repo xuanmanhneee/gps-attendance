@@ -4,7 +4,10 @@ import type {
   CheckInRequestPayload,
   CheckInResponsePayload,
   AttendanceSessionResponse,
+  StudentAttendanceHistoryItemDto,
 } from '@gps-attendance/shared';
+
+export type AttendanceHistoryItem = StudentAttendanceHistoryItemDto;
 
 export type CheckInRequest = CheckInRequestPayload;
 export type ValidationResult = CheckInResponsePayload;
@@ -50,14 +53,15 @@ export const AttendanceAPI = {
   },
 
   /**
-   * Lấy lịch sử điểm danh của user hiện tại
+   * Lấy lịch sử điểm danh thực tế của user hiện tại từ DB
    */
-  async getAttendanceHistory(token: string): Promise<ApiResponse<never[]>> {
-    return Promise.resolve({
-      success: false,
-      code: 'UNKNOWN_ERROR',
-      message: 'Backend chưa cung cấp API lịch sử điểm danh',
-    });
+  async getAttendanceHistory(
+    token: string,
+  ): Promise<ApiResponse<StudentAttendanceHistoryItemDto[]>> {
+    return http.get<ApiResponse<StudentAttendanceHistoryItemDto[]>>(
+      '/attendance/records/mine',
+      token,
+    );
   },
 
   /**

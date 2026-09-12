@@ -1,14 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../common/database/prisma.service';
 import { Account } from './account.model';
-import { MOCK_ACCOUNTS } from './mocks/accounts.mock';
 
 @Injectable()
 export class AccountService {
+  constructor(private readonly prisma: PrismaService) {}
+
   async findByUsername(username: string): Promise<Account | undefined> {
-    return MOCK_ACCOUNTS.find((account) => account.username === username);
+    return (await this.prisma.account.findUnique({ where: { username } })) ?? undefined;
   }
 
   async findById(id: number): Promise<Account | undefined> {
-    return MOCK_ACCOUNTS.find((account) => account.id === id);
+    return (await this.prisma.account.findUnique({ where: { id } })) ?? undefined;
   }
 }

@@ -7,6 +7,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/auth-context';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -14,6 +15,7 @@ import { COLORS } from '../../constants/theme';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -44,17 +46,28 @@ export default function ProfileScreen() {
 
   if (!user) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.centerContainer, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.errorText}>Không thể tải thông tin người dùng</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Thông Tin Cá Nhân</Text>
-      </View>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.scrollContent,
+        {
+          paddingTop: Math.max(insets.top, 20) + 16,
+          paddingBottom: Math.max(insets.bottom, 20) + 24,
+        },
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.centerWrapper}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Thông Tin Cá Nhân</Text>
+        </View>
 
       {/* Profile Info Card */}
       <Card style={styles.profileCard}>
@@ -145,6 +158,7 @@ export default function ProfileScreen() {
       <View style={styles.footer}>
         <Text style={styles.footerText}>GPS Attendance System v1.0.0</Text>
       </View>
+      </View>
     </ScrollView>
   );
 }
@@ -153,8 +167,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 16,
+  },
+  centerWrapper: {
+    width: '100%',
+    maxWidth: 480,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 16,
   },
   header: {
     marginBottom: 20,

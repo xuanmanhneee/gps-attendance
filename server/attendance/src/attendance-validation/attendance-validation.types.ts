@@ -55,4 +55,6 @@ export interface LocationCheckResult {
 export interface AttendanceValidationResult {
   status: AttendanceValidationStatus;
   reasons: AttendanceValidationReason[];
+  distance?: number;
 }
+

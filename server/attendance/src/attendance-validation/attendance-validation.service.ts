@@ -33,8 +33,47 @@ export class AttendanceValidationService {
       };
     }
 
-    // Demo mode: session state and assignment remain mandatory; GPS/device
-    // checks are recorded by the client but do not block attendance.
-    return { status: 'VALID', reasons: [] };
+    const mockCheck = this.mockLocationCheck.evaluate(input.location);
+    const locationCheck = this.locationCheck.evaluate(input.location, input.session);
+    const integrityCheck = this.integrityCheck.evaluate(input.integrity);
+
+    const score =
+      mockCheck.coefficient * this.MOCK_LOCATION_WEIGHT +
+      locationCheck.coefficient * this.LOCATION_WEIGHT +
+      integrityCheck.coefficient * this.INTEGRITY_WEIGHT;
+
+    const reasons: AttendanceValidationReason[] = [];
+
+    if (locationCheck.coefficient === 0) {
+      reasons.push('OUT_OF_RANGE');
+    }
+
+    if (mockCheck.coefficient === 0) {
+      reasons.push('MOCK_LOCATION');
+    }
+
+    if (score < 70) {
+      reasons.push('LOW_LOCATION_ACCURACY');
+    }
+
+    const distance = locationCheck.distance;
+
+    if (reasons.length === 0) {
+      return { status: 'VALID', reasons: [], distance };
+    }
+
+    if (reasons.length === 1) {
+      return {
+        status: 'REVIEW',
+        reasons: reasons as [AttendanceValidationReason, ...AttendanceValidationReason[]],
+        distance,
+      };
+    }
+
+    return {
+      status: 'REJECTED',
+      reasons: reasons as [AttendanceValidationReason, ...AttendanceValidationReason[]],
+      distance,
+    };
   }
 }

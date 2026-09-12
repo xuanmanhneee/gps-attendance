@@ -5,6 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 
+import { StudentAttendanceHistoryItemDto } from '@gps-attendance/shared';
 import { AttendanceRecord, MarkPresentInput } from './attendance-record.model';
 import { LOGGER_FACTORY } from '../common/logging/logger.token';
 import { ILogger } from '../common/logging/logger.interface';
@@ -54,12 +55,12 @@ export class AttendanceRecordsService {
       sessionId: input.sessionId,
       userId: input.userId,
       status: 'present',
-      deviceId: null,
+      deviceId: input.deviceId ?? null,
       checkedInAt: input.checkedInAt,
       latitude: input.latitude,
       longitude: input.longitude,
       accuracy: input.accuracy,
-      distanceMeters: null,
+      distanceMeters: input.distanceMeters ?? null,
       updateBy: input.updateBy,
     });
 
@@ -83,4 +84,11 @@ export class AttendanceRecordsService {
   async findByUser(userId: number): Promise<AttendanceRecord[]> {
     return this.attendanceRecordRepository.findByUser(userId);
   }
+
+  async findDetailedHistoryByUser(
+    userId: number,
+  ): Promise<StudentAttendanceHistoryItemDto[]> {
+    return this.attendanceRecordRepository.findDetailedHistoryByUser(userId);
+  }
 }
+

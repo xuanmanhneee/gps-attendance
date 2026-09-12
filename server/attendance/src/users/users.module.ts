@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { MockUserRepository } from './repositories/mock-user.repository';
+import { PrismaUserRepository } from './repositories/prisma-user.repository';
 import { USER_REPOSITORY } from './user.repository.token';
 import { UserController } from './user.controller';
 import { UserFilterService } from './user-filter.service';
@@ -10,7 +10,7 @@ import { UsersService } from './users.service';
   providers: [
     {
       provide: USER_REPOSITORY,
-      useClass: MockUserRepository,
+      useClass: PrismaUserRepository,
     },
     UsersService,
     UserFilterService,

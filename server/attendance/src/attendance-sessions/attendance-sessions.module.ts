@@ -3,7 +3,7 @@ import { AttendanceSessionsService } from './attendance-sessions.service';
 import { AttendanceSessionsController } from './attendance-sessions.controller';
 import { UsersModule } from '../users/users.module';
 import { AttendanceRecordModule } from '../attendance-record/attendance-record.module';
-import { InMemoryAttendanceSessionRepository } from './repository/in-memory-attendance-session.repository';
+import { PrismaAttendanceSessionRepository } from './repository/prisma-attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
 import { AttendanceSessionQueryService } from './attendance-session-query.service';
 
@@ -14,7 +14,7 @@ import { AttendanceSessionQueryService } from './attendance-session-query.servic
     AttendanceSessionsService,
     {
       provide: ATTENDANCE_SESSION_REPOSITORY,
-      useClass: InMemoryAttendanceSessionRepository,
+      useClass: PrismaAttendanceSessionRepository,
     },
     AttendanceSessionQueryService,
   ],
