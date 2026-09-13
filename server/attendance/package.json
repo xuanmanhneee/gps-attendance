@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "postinstall": "prisma generate",
     "predev": "rimraf tsconfig.build.tsbuildinfo tsconfig.tsbuildinfo",
     "dev": "nest start --watch",
     "debug": "nest start --debug --watch",
