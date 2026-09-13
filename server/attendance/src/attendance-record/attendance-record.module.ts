@@ -1,20 +1,25 @@
 import { Module } from '@nestjs/common';
-import { ATTENDANCE_RECORD_STORE } from './attendance-record.token';
+import {
+  ATTENDANCE_RECORD_REPOSITORY,
+  ATTENDANCE_RECORD_STORE,
+} from './attendance-record.token';
 import { AttendanceRecordsService } from './attendance-records.service';
-import { PrismaAttendanceRecordStore } from './prisma-attendance-record.store';
-
+import { PrismaAttendanceRecordRepository } from './repositories/prisma-attendance-record.repository';
 import { AttendanceRecordController } from './attendance-record.controller';
 
 @Module({
-  imports: [],
   controllers: [AttendanceRecordController],
   providers: [
     AttendanceRecordsService,
     {
-      provide: ATTENDANCE_RECORD_STORE,
-      useClass: PrismaAttendanceRecordStore,
+      provide: ATTENDANCE_RECORD_REPOSITORY,
+      useClass: PrismaAttendanceRecordRepository,
     },
   ],
-  exports: [ATTENDANCE_RECORD_STORE, AttendanceRecordsService],
+  exports: [
+    ATTENDANCE_RECORD_REPOSITORY,
+    ATTENDANCE_RECORD_STORE,
+    AttendanceRecordsService,
+  ],
 })
 export class AttendanceRecordModule {}

@@ -39,6 +39,10 @@ export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepo
     return sessions.map((session) => this.toModel(session));
   }
 
+  async delete(id: number): Promise<void> {
+    await this.prisma.attendanceSession.delete({ where: { id } });
+  }
+
   private toModel(session: {
     id: number;
     title: string;

@@ -47,23 +47,10 @@ export interface DeviceIntegrityPayload {
 // Attendance
 // -----------------------------------------------------------------------------
 
-// export interface CreateAttendanceSessionPayload {
-//   title: string;
-
-//   latitude: number;
-//   longitude: number;
-//   radius: number;
-
-//   /** ISO 8601 date string */
-//   openAt: string;
-//   closeAt: string;
-
-//   participantCodes: string[];
-// }
-
 export type AttendanceValidationStatus = 'VALID' | 'REVIEW' | 'REJECTED';
 
 export type AttendanceValidationReason =
+  | 'LOW_CONFIDENCE_SCORE'
   | 'LOW_LOCATION_ACCURACY'
   | 'MOCK_LOCATION'
   | 'DUPLICATE_DEVICE'
@@ -80,5 +67,5 @@ export interface CheckInRequestPayload {
 
 export interface CheckInResponsePayload {
   status: AttendanceValidationStatus;
-  reasons: AttendanceValidationReason[];
+  reasons: (AttendanceValidationReason | 'TOO_MANY_ATTEMPTS')[];
 }

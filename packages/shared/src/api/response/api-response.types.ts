@@ -1,4 +1,5 @@
-import type { ApiErrorCode } from './codes';
+import type { ApiErrorCode } from './error_codes';
+
 export interface ApiSuccessResponse<T> {
   success: true;
   data: T;

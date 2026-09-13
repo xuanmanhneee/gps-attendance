@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 interface SessionTableProps {
   sessions: AttendanceSessionResponse[];
   isLoading: boolean;
+  onDelete: (id: number) => Promise<void>;
 }
 
 const statusBadge: Record<SessionStatus, string> = {
@@ -52,8 +53,19 @@ const groupSessionsByDate = (
   );
 };
 
-const SessionTable = ({ sessions, isLoading }: SessionTableProps) => {
+const SessionTable = ({ sessions, isLoading, onDelete }: SessionTableProps) => {
   const navigate = useNavigate();
+
+  const handleDelete = async (session: AttendanceSessionResponse) => {
+    const confirmed = window.confirm(
+      `Xóa phiên "${session.title}"? Toàn bộ bản ghi điểm danh và dữ liệu liên quan sẽ bị xóa vĩnh viễn.`,
+    );
+
+    if (!confirmed) return;
+
+    await onDelete(session.id);
+  };
+
   if (isLoading) {
     return <p className="text-sm text-gray-500">Đang tải danh sách...</p>;
   }
@@ -100,13 +112,22 @@ const SessionTable = ({ sessions, isLoading }: SessionTableProps) => {
 
                   <p>Bán kính: {session.radius}m</p>
 
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/sessions/${session.id}`)}
-                    className="mt-4 inline-flex rounded-lg px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                  >
-                    Xem chi tiết
-                  </button>
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/sessions/${session.id}`)}
+                      className="inline-flex rounded-lg px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    >
+                      Xem chi tiết
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(session)}
+                      className="inline-flex rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                    >
+                      Xóa
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}

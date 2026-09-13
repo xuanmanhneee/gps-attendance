@@ -1,2 +1,3 @@
 export * from './attendance-session.type';
-export * from './attendance-sesssion.api';
+export * from './attendance-session.api';
+export * from '../response/error_codes/attendance-session-error.codes';

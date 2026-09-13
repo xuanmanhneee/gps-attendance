@@ -11,7 +11,8 @@ import { AuthAPI } from '../api/auth.api';
 const decodeTokenPayload = (token: string): Partial<User> => {
   try {
     const payload = token.split('.')[1];
-    const decoded = JSON.parse(globalThis.atob(payload));
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = JSON.parse(globalThis.atob(normalizedPayload));
     return {
       id: decoded.sub,
       accountId: 0,
@@ -21,6 +22,17 @@ const decodeTokenPayload = (token: string): Partial<User> => {
     };
   } catch {
     return {};
+  }
+};
+
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const payload = token.split('.')[1];
+    const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = JSON.parse(globalThis.atob(normalizedPayload));
+    return typeof decoded.exp !== 'number' || decoded.exp * 1000 <= Date.now();
+  } catch {
+    return true;
   }
 };
 
@@ -62,9 +74,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const savedUser = await AsyncStorage.getItem('user');
       const savedLastLoginAt = await AsyncStorage.getItem('lastLoginAt');
 
-      if (savedToken && savedUser) {
+      if (savedToken && savedUser && !isTokenExpired(savedToken)) {
         setToken(savedToken);
         setUser(JSON.parse(savedUser));
+      } else if (savedToken || savedUser) {
+        await AsyncStorage.multiRemove(['authToken', 'user']);
       }
 
       if (savedLastLoginAt) {

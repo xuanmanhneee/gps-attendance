@@ -12,5 +12,10 @@ export interface IAttendanceRecordRepository {
     userId: number,
   ): Promise<StudentAttendanceHistoryItemDto[]>;
   upsertRecord(record: Omit<AttendanceRecord, 'updatedAt'>): Promise<void>;
+  incrementAttempt?(sessionId: number, userId: number): Promise<number>;
+  getAttemptCount?(sessionId: number, userId: number): Promise<number>;
+  clearSession?(sessionId: number): Promise<void>;
 }
 
+// Alias tương thích ngược
+export type IAttendanceRecordStore = IAttendanceRecordRepository;

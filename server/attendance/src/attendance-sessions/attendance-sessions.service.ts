@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SessionStatus } from '@gps-attendance/shared';
 
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
@@ -21,7 +26,7 @@ export class AttendanceSessionsService {
     dto: CreateAttendanceSessionDto,
     createdBy: number,
   ): Promise<AttendanceSession> {
-    const userIds = this.userFilterService.resolveUserIds(
+    const userIds = await this.userFilterService.resolveUserIds(
       dto.participantCriteria,
     );
     const now = new Date();
@@ -60,11 +65,18 @@ export class AttendanceSessionsService {
 
   async findByUser(userId: number): Promise<AttendanceSession[]> {
     const records = await this.attendanceRecordsService.findByUser(userId);
-    const sessionIds = records.map((record) => record.sessionId);
-    if (sessionIds.length === 0) return [];
+    const assignedSessionIds = new Set(records.map((record) => record.sessionId));
 
-    const sessions = await this.attendanceSessionRepository.findByIds(sessionIds);
-    return sessions.map((session) => this.withComputedStatus(session));
+    const allSessions = await this.attendanceSessionRepository.findAll();
+    const now = new Date();
+
+    const relevantSessions = allSessions.filter((session) => {
+      if (assignedSessionIds.has(session.id)) return true;
+      // Sinh viên cũng thấy các phiên đang mở hoặc sắp diễn ra
+      return now <= session.closeAt;
+    });
+
+    return relevantSessions.map((session) => this.withComputedStatus(session));
   }
 
   async findByCreator(createdBy: number): Promise<AttendanceSession[]> {
@@ -72,6 +84,25 @@ export class AttendanceSessionsService {
       createdBy,
     );
     return sessions.map((session) => this.withComputedStatus(session));
+  }
+
+  async delete(
+    id: number,
+    user: { userId: number; role: string },
+  ): Promise<void> {
+    const session = await this.attendanceSessionRepository.findById(id);
+
+    if (!session) {
+      throw new NotFoundException(`Không tìm thấy session id=${id}`);
+    }
+
+    if (user.role !== 'admin' && session.createdBy !== user.userId) {
+      throw new ForbiddenException(
+        'Bạn không có quyền xóa phiên điểm danh này',
+      );
+    }
+
+    await this.attendanceSessionRepository.delete(id);
   }
 
   private withComputedStatus(session: AttendanceSession): AttendanceSession {

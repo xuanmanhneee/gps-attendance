@@ -31,4 +31,8 @@ export const attendanceSessionsApi = {
       `/v0/attendance-sessions/by-user/${userId}`,
     );
   },
+
+  remove(id: number) {
+    return httpClient.delete<null>(`/v0/attendance-sessions/${id}`);
+  },
 };

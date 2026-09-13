@@ -28,6 +28,20 @@ export const AttendanceModal = ({
   const isApproved = result.status === 'VALID';
   const isFlagged = result.status === 'REVIEW';
   const isRejected = result.status === 'REJECTED';
+  const reasons = result.reasons ?? [];
+
+  const getReasonMessage = (reason: string) => {
+    const mapped: Record<string, string> = {
+      TOO_MANY_ATTEMPTS: 'Bạn đã vượt quá 3 lần thử cho phiên điểm danh này. Không thể tiếp tục điểm danh phiên này.',
+      LOW_CONFIDENCE_SCORE: 'Độ tin cậy của thông tin xác thực chưa đủ để điểm danh.',
+      LOW_LOCATION_ACCURACY: 'Vị trí hiện tại không đủ chính xác để điểm danh.',
+      MOCK_LOCATION: 'Hệ thống phát hiện vị trí giả mạo. Vui lòng tắt vị trí giả hoặc dùng GPS thật.',
+      DUPLICATE_DEVICE: 'Thiết bị này đã được dùng để điểm danh cho buổi học này.',
+      OUT_OF_RANGE: 'Khoảng cách cộng sai số GPS vượt quá bán kính cho phép của buổi học.',
+    };
+
+    return mapped[reason] ?? reason;
+  };
 
   const getStatusIcon = () => {
     if (isApproved) return '✅';
@@ -67,7 +81,9 @@ export const AttendanceModal = ({
             <View style={styles.scoreContainer}>
               <Text style={styles.scoreLabel}>Kết quả:</Text>
               <Text style={[styles.scoreValue, { color: getStatusColor() }]}>
-                {result.reasons.length === 0 ? 'Hợp lệ' : result.reasons.join(', ')}
+                {reasons.length === 0
+                  ? 'Hợp lệ'
+                  : reasons.map(getReasonMessage).join(' ')}
               </Text>
             </View>
 
@@ -84,8 +100,9 @@ export const AttendanceModal = ({
             {isRejected && (
               <View style={styles.errorBox}>
                 <Text style={styles.errorText}>
-                  ❌ Điểm danh không được phép. Vui lòng đảm bảo bạn ở đúng vị
-                  trí và thử lại.
+                  {reasons.includes('TOO_MANY_ATTEMPTS')
+                    ? '❌ Bạn đã vượt quá số lần thử cho phép. Vui lòng liên hệ giảng viên nếu cần mở lại phiên.'
+                    : '❌ Vui lòng kiểm tra nguyên nhân ở trên, điều chỉnh điều kiện điểm danh và thử lại.'}
                 </Text>
               </View>
             )}

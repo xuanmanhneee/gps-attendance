@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { StudentAttendanceHistoryItemDto } from '@gps-attendance/shared';
-import { PrismaService } from '../common/database/prisma.service';
-import { AttendanceRecord } from './attendance-record.model';
-import { IAttendanceRecordStore } from './attendance-record.store';
-
+import { PrismaService } from '../../common/database/prisma.service';
+import { AttendanceRecord } from '../attendance-record.model';
+import { IAttendanceRecordRepository } from '../attendance-record.repository';
 
 @Injectable()
-export class PrismaAttendanceRecordStore implements IAttendanceRecordStore {
+export class PrismaAttendanceRecordRepository
+  implements IAttendanceRecordRepository
+{
   constructor(private readonly prisma: PrismaService) {}
 
   async getRecord(
@@ -25,7 +26,9 @@ export class PrismaAttendanceRecordStore implements IAttendanceRecordStore {
     return record ? this.toModel(record) : null;
   }
 
-  async upsertRecord(record: Omit<AttendanceRecord, 'updatedAt'>): Promise<void> {
+  async upsertRecord(
+    record: Omit<AttendanceRecord, 'updatedAt'>,
+  ): Promise<void> {
     await this.prisma.attendanceRecord.upsert({
       where: {
         sessionId_userId: {
@@ -137,7 +140,9 @@ export class PrismaAttendanceRecordStore implements IAttendanceRecordStore {
         sessionLatitude: this.toNumber(record.session.latitude) ?? 0,
         sessionLongitude: this.toNumber(record.session.longitude) ?? 0,
         status: record.status as StudentAttendanceHistoryItemDto['status'],
-        checkedInAt: record.checkedInAt ? record.checkedInAt.toISOString() : null,
+        checkedInAt: record.checkedInAt
+          ? record.checkedInAt.toISOString()
+          : null,
         deviceId: record.deviceId,
         latitude: this.toNumber(record.latitude),
         longitude: this.toNumber(record.longitude),
@@ -155,7 +160,6 @@ export class PrismaAttendanceRecordStore implements IAttendanceRecordStore {
 
     return records.map((record) => this.toModel(record));
   }
-
 
   private toModel(record: {
     sessionId: number;
@@ -185,7 +189,9 @@ export class PrismaAttendanceRecordStore implements IAttendanceRecordStore {
     };
   }
 
-  private toNumber(value: number | null | { toNumber: () => number }): number | null {
+  private toNumber(
+    value: number | null | { toNumber: () => number },
+  ): number | null {
     if (value === null) return null;
     return typeof value === 'number' ? value : value.toNumber();
   }

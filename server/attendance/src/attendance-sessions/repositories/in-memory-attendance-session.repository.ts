@@ -40,4 +40,8 @@ export class InMemoryAttendanceSessionRepository implements IAttendanceSessionRe
       (session) => session.createdBy === createdBy,
     );
   }
+
+  async delete(id: number): Promise<void> {
+    this.sessions.delete(id);
+  }
 }

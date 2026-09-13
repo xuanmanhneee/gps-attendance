@@ -1,9 +1,9 @@
 import type { ApiResponse } from '../response';
 import { http } from '../http';
-import { 
-    AttendanceSessionPayload, 
-    CreateAttendanceSessionRequest, 
-    CreateAttendanceSessionResponse 
+import {
+  AttendanceSessionPayload,
+  CreateAttendanceSessionRequest,
+  CreateAttendanceSessionResponse,
 } from './attendance-session.type';
 
 export const attendanceSessionApi = {
@@ -22,9 +22,7 @@ export const attendanceSessionApi = {
     );
   },
 
-  getById(
-    id: number,
-  ): Promise<ApiResponse<AttendanceSessionPayload>> {
+  getById(id: number): Promise<ApiResponse<AttendanceSessionPayload>> {
     return http.get<ApiResponse<AttendanceSessionPayload>>(
       `/attendance-sessions/${id}`,
     );

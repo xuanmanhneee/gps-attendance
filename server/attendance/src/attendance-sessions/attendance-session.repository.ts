@@ -8,4 +8,5 @@ export interface IAttendanceSessionRepository {
   findById(id: number): Promise<AttendanceSession | null>;
   findByIds(ids: number[]): Promise<AttendanceSession[]>;
   findByCreator(createdBy: number): Promise<AttendanceSession[]>;
+  delete(id: number): Promise<void>;
 }

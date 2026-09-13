@@ -31,7 +31,7 @@ export default function HistoryScreen() {
 
   useEffect(() => {
     loadAttendanceHistory(true);
-  }, []);
+  }, [token]);
 
   const loadAttendanceHistory = async (showLoader = false) => {
     try {

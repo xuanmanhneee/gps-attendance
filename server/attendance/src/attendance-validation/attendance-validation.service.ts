@@ -26,16 +26,22 @@ export class AttendanceValidationService {
   ) {}
 
   validate(input: AttendanceValidationInput): AttendanceValidationResult {
-    if (input.existingRecordCount > 0) {
+    const mockCheck = this.mockLocationCheck.evaluate(input.location);
+    const locationCheck = this.locationCheck.evaluate(
+      input.location,
+      input.session,
+    );
+    const integrityCheck = this.integrityCheck.evaluate(input.integrity);
+    const distance = locationCheck.distance;
+
+    // Giả mạo vị trí bị chặn trực tiếp
+    if (mockCheck.coefficient === 0) {
       return {
         status: 'REJECTED',
-        reasons: ['DUPLICATE_DEVICE'],
+        reasons: ['MOCK_LOCATION'],
+        distance,
       };
     }
-
-    const mockCheck = this.mockLocationCheck.evaluate(input.location);
-    const locationCheck = this.locationCheck.evaluate(input.location, input.session);
-    const integrityCheck = this.integrityCheck.evaluate(input.integrity);
 
     const score =
       mockCheck.coefficient * this.MOCK_LOCATION_WEIGHT +
@@ -48,31 +54,35 @@ export class AttendanceValidationService {
       reasons.push('OUT_OF_RANGE');
     }
 
-    if (mockCheck.coefficient === 0) {
-      reasons.push('MOCK_LOCATION');
+    if (score < 80 && locationCheck.coefficient !== 0) {
+      reasons.push('LOW_CONFIDENCE_SCORE');
     }
 
-    if (score < 70) {
-      reasons.push('LOW_LOCATION_ACCURACY');
-    }
-
-    const distance = locationCheck.distance;
-
-    if (reasons.length === 0) {
+    if (score >= 80 && reasons.length === 0) {
       return { status: 'VALID', reasons: [], distance };
     }
 
-    if (reasons.length === 1) {
+    if (score >= 60) {
       return {
         status: 'REVIEW',
-        reasons: reasons as [AttendanceValidationReason, ...AttendanceValidationReason[]],
+        reasons: reasons as [
+          AttendanceValidationReason,
+          ...AttendanceValidationReason[],
+        ],
         distance,
       };
     }
 
+    if (reasons.length === 0) {
+      reasons.push('LOW_CONFIDENCE_SCORE');
+    }
+
     return {
       status: 'REJECTED',
-      reasons: reasons as [AttendanceValidationReason, ...AttendanceValidationReason[]],
+      reasons: reasons as [
+        AttendanceValidationReason,
+        ...AttendanceValidationReason[],
+      ],
       distance,
     };
   }

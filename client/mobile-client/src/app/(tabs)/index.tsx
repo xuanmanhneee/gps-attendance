@@ -7,10 +7,10 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import * as Location from 'expo-location';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
 import { useAuth } from '../../context/auth-context';
 import { ApiRequestError } from '../../api/api';
 import { useRouter } from 'expo-router';
@@ -142,24 +142,6 @@ export default function AttendanceScreen() {
     return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   };
 
-  const getFailureMessage = (reasons?: string[]) => {
-    const mapped: Record<string, string> = {
-      LOW_LOCATION_ACCURACY: 'Vị trí hiện tại không đủ chính xác để điểm danh.',
-      MOCK_LOCATION: 'Hệ thống phát hiện vị trí giả mạo. Vui lòng tắt vị trí giả hoặc dùng GPS thật.',
-      DUPLICATE_DEVICE: 'Thiết bị này đã được dùng để điểm danh cho buổi học này.',
-      OUT_OF_RANGE: 'Bạn đang ở ngoài phạm vi cho phép của buổi học.',
-    };
-
-    if (!reasons || reasons.length === 0) {
-      return 'Điểm danh không thành công do điều kiện xác thực không đạt yêu cầu.';
-    }
-
-    return reasons
-      .map((reason) => mapped[reason] || reason)
-      .filter(Boolean)
-      .join(' ');
-  };
-
   const handleCheckIn = async (sessionId: number) => {
     if (!location) {
       Alert.alert('Lỗi', 'Chưa có thông tin vị trí. Vui lòng đợi...');
@@ -218,11 +200,7 @@ export default function AttendanceScreen() {
         ...prev,
         [sessionId]: 'failed',
       }));
-
-      Alert.alert(
-        'Điểm danh không thành công',
-        getFailureMessage(validation.reasons),
-      );
+      setShowModal(true);
     } catch (error) {
       console.error('Check-in failed:', error);
       const apiMessage =
@@ -321,6 +299,9 @@ export default function AttendanceScreen() {
                       Khoảng cách: {getDistanceInMeters(session)} m
                     </Text>
                   )}
+                  <Text style={styles.sessionDistance}>
+                    Phạm vi: {session.radius} m | Sai số GPS: ±{Math.round(location?.coords.accuracy ?? 0)} m
+                  </Text>
 
                   <Button
                     title={

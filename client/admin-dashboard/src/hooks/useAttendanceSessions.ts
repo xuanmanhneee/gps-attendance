@@ -35,5 +35,16 @@ export const useAttendanceSessions = () => {
     setSessions((prev) => [created, ...prev]);
   };
 
-  return { sessions, isLoading, createSession, reload: loadSessions };
+  const deleteSession = async (id: number) => {
+    await attendanceSessionsApi.remove(id);
+    setSessions((prev) => prev.filter((session) => session.id !== id));
+  };
+
+  return {
+    sessions,
+    isLoading,
+    createSession,
+    deleteSession,
+    reload: loadSessions,
+  };
 };

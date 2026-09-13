@@ -128,10 +128,6 @@ export const CreateSessionModal = ({
       }
 
       const codes = parseStudentCodes(values.studentCodesText);
-      if (codes.length === 0) {
-        toast.error('Vui lòng nhập ít nhất một mã sinh viên');
-        return;
-      }
 
       const data: CreateSessionFormData = {
         title: values.title,
@@ -342,38 +338,34 @@ export const CreateSessionModal = ({
             </div>
           </div>
 
-          {/* Section 4: Mã sinh viên tham gia (tạm thời: nhập tay, phân cách bằng dấu phẩy) */}
+          {/* Section 4: Mã sinh viên tham gia */}
           <div>
             <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
               <MdGroup className="text-blue-600 text-sm" />
-              Mã sinh viên được tham gia <span className="text-red-500">*</span>
+              Mã sinh viên tham gia{' '}
+              <span className="text-xs font-normal text-gray-500">
+                (để trống nếu áp dụng cho toàn bộ sinh viên)
+              </span>
             </label>
             <textarea
               rows={3}
-              placeholder="VD: SV001, SV002, SV003"
-              {...register('studentCodesText', {
-                required: 'Vui lòng nhập ít nhất một mã sinh viên',
-                validate: (value) =>
-                  parseStudentCodes(value).length > 0 ||
-                  'Vui lòng nhập ít nhất một mã sinh viên',
-              })}
+              placeholder="Để trống để áp dụng cho tất cả sinh viên, hoặc nhập: 2312686, 2312716, 2312718..."
+              {...register('studentCodesText')}
               className="w-full px-3.5 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 resize-none"
             />
             <div className="mt-1.5 flex items-center justify-between">
-              {errors.studentCodesText ? (
-                <p className="text-red-500 text-xs">
-                  {errors.studentCodesText.message}
-                </p>
+              {studentCodesPreviewCount > 0 ? (
+                <span className="text-xs text-blue-600 font-medium">
+                  Đã chỉ định {studentCodesPreviewCount} sinh viên cụ thể
+                </span>
               ) : (
-                <span className="text-xs text-gray-400">
-                  Phân cách các mã bằng dấu phẩy
+                <span className="text-xs text-emerald-600 font-medium">
+                  Áp dụng cho toàn bộ sinh viên trong hệ thống
                 </span>
               )}
-              {studentCodesPreviewCount > 0 && (
-                <span className="text-xs text-green-600">
-                  {studentCodesPreviewCount} mã hợp lệ
-                </span>
-              )}
+              <span className="text-xs text-gray-400">
+                Phân cách các mã bằng dấu phẩy
+              </span>
             </div>
           </div>
 

@@ -10,7 +10,8 @@ const DashboardPage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const { sessions, isLoading, createSession } = useAttendanceSessions();
+  const { sessions, isLoading, createSession, deleteSession } =
+    useAttendanceSessions();
 
   const handleLogout = () => {
     logout();
@@ -44,7 +45,11 @@ const DashboardPage = () => {
           }}
         />
 
-        <SessionTable sessions={sessions} isLoading={isLoading} />
+        <SessionTable
+          sessions={sessions}
+          isLoading={isLoading}
+          onDelete={deleteSession}
+        />
       </main>
     </div>
   );
