@@ -5,9 +5,172 @@
 
 generator client {
   provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  output   = "../src/prisma/generated"
+  moduleFormat = "cjs"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum AccountStatus {
+  active
+  locked
+  disabled
+}
+
+enum UserRole {
+  admin
+  lecturer
+  student
+}
+
+enum UnitType {
+  faculty
+  department
+  class
+  group
+}
+
+enum SessionStatus {
+  draft
+  open
+  closed
+  cancelled
+}
+
+enum AttendanceStatus {
+  absent
+  present
+  late
+  excused
+}
+
+model Account {
+  id           Int           @id @default(autoincrement()) @map("id")
+  username     String        @unique @map("username")
+  passwordHash String        @map("password_hash")
+  status       AccountStatus @map("status")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  user User?
+
+  @@map("accounts")
+}
+
+model Tag {
+  id        Int      @id @default(autoincrement()) @map("id")
+  name      String   @map("name") @db.VarChar(100)
+  ownerId   Int      @map("owner_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users UserTag[]
+
+  @@index([ownerId])
+  @@map("tags")
+}
+
+model UserTag {
+  tagId  Int @map("tag_id")
+  userId Int @map("user_id")
+
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([tagId, userId])
+  @@index([userId])
+  @@map("user_tags")
+}
+
+model Unit {
+  id       Int      @id @default(autoincrement()) @map("id")
+  parentId Int?     @map("parent_id")
+  name     String   @db.VarChar(150)
+  type     UnitType
+
+  parent   Unit?      @relation("UnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Unit[]     @relation("UnitHierarchy")
+  users    UserUnit[]
+
+  @@index([parentId])
+  @@map("units")
+}
+
+model User {
+  id        Int      @id @default(autoincrement()) @map("id")
+  accountId Int      @unique @map("account_id")
+  code      String   @unique @map("code")
+  role      UserRole @map("role")
+  fullname  String   @map("fullname")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account Account @relation(fields: [accountId], references: [id])
+
+  createdSessions   AttendanceSession[] @relation("SessionCreator")
+  attendanceRecords AttendanceRecord[]
+  updatedRecords    AttendanceRecord[]  @relation("RecordUpdater")
+  tags              UserTag[]
+  units             UserUnit[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model UserUnit {
+  userId Int @map("user_id")
+  unitId Int @map("unit_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@id([userId, unitId])
+  @@index([unitId])
+  @@map("user_units")
+}
+
+model AttendanceSession {
+  id        Int           @id @default(autoincrement())
+  title     String        @db.VarChar(255)
+  latitude  Decimal       @db.Decimal(10, 7)
+  longitude Decimal       @db.Decimal(10, 7)
+  radius    Decimal       @db.Decimal(8, 2)
+  openAt    DateTime      @map("open_at")
+  closeAt   DateTime      @map("close_at")
+  status    SessionStatus @default(draft)
+  createdBy Int           @map("created_by")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  creator           User               @relation("SessionCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  attendanceRecords AttendanceRecord[]
+
+  @@index([createdBy])
+  @@index([openAt, closeAt])
+  @@map("attendance_sessions")
+}
+
+model AttendanceRecord {
+  id             Int              @id @default(autoincrement())
+  sessionId      Int              @map("session_id")
+  userId         Int              @map("user_id")
+  status         AttendanceStatus
+  deviceId       String?          @map("device_id") @db.VarChar(255)
+  checkedInAt    DateTime?        @map("checked_in_at")
+  latitude       Decimal?         @db.Decimal(10, 7)
+  longitude      Decimal?         @db.Decimal(10, 7)
+  accuracy       Decimal?         @db.Decimal(8, 2)
+  distanceMeters Decimal?         @map("distance_meters") @db.Decimal(8, 2)
+  updatedBy      Int?             @map("updated_by")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  session AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  updater User?             @relation("RecordUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, userId])
+  @@index([userId, updatedAt])
+  @@map("attendance_records")
 }

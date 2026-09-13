@@ -82,7 +82,7 @@ export class AttendanceSessionsController {
     @Query('userId', ParseIntPipe) userId: number,
   ): Promise<AttendanceSessionResponse[]> {
     const sessions = await this.attendanceSessionsService.findByCreator(userId);
-    return sessions.map(toAttendanceSessionResponse);
+    return sessions.map(toAttendanceSessionResponse); 
   }
 
   @ApiOperation({
