@@ -35,7 +35,6 @@ async function bootstrap() {
     logger: new AppBootstrapLogger(),
   });
 
-  app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new ResponseInterceptor());
   app.enableCors();
 
