@@ -1,20 +1,22 @@
 import { Module } from '@nestjs/common';
-import { MockUserRepository } from './repositories/mock-user.repository';
 import { USER_REPOSITORY } from './user.repository.token';
 import { UsersService } from './users.service';
 import { UserFilterService } from './user-filter.service';
 import { UserController } from './user.controller';
+import { PrismaUserRepository } from './infra/prisma/prisma-user.repository';
+import { TagModule } from '../tags/tag.module';
 
 @Module({
   controllers: [UserController],
+  imports: [TagModule],
   providers: [
     {
       provide: USER_REPOSITORY,
-      useClass: MockUserRepository,
+      useClass: PrismaUserRepository,
     },
     UsersService,
     UserFilterService,
   ],
-  exports: [UsersService, UserFilterService],
+  exports: [USER_REPOSITORY, UsersService, UserFilterService],
 })
 export class UsersModule {}

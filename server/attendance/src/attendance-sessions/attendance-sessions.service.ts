@@ -37,7 +37,7 @@ export class AttendanceSessionsService {
   ): Promise<AttendanceSession> {
     const now = new Date();
 
-    const userIds = this.userFilterService.resolveUserIds(
+    const userIds = await this.userFilterService.resolveUserIds(
       dto.participantCriteria,
     );
 

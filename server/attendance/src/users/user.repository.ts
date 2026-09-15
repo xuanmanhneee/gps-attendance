@@ -1,4 +1,6 @@
-import type { User } from './user.model';
+import type { User, CreateUserInput } from './user.model';
+import type { ITransactionContext } from '#common/unit-of-work/unit-of-work.interface';
+
 
 export interface IUserRepository {
   findById(id: number): Promise<User | undefined>;
@@ -6,4 +8,5 @@ export interface IUserRepository {
   findByCode(code: string): Promise<User | undefined>;
   findByAccountId(accountId: number): Promise<User | undefined>;
   findAll(): Promise<User[]>;
+  create(data: CreateUserInput, ctx?: ITransactionContext): Promise<User>;
 }
