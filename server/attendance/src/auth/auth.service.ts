@@ -5,7 +5,7 @@ import { UsersService } from '../users/users.service';
 import type { AuthenticatedUser } from './types/authenticated-user.type';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { LoginResponse } from '@gps-attendance/shared';
-
+import * as bcrypt from 'bcrypt';
 @Injectable()
 export class AuthService {
   constructor(
@@ -24,10 +24,10 @@ export class AuthService {
   ): Promise<AuthenticatedUser> {
     const account = await this.accountService.findByUsername(username);
 
-    // Plain text tạm thời.
-    // Sau này:
-    // await bcrypt.compare(password, account.password)
-    if (!account || account.password !== password) {
+    const isPasswordValid =
+      account && (await bcrypt.compare(password, account.passwordHash));
+
+    if (!isPasswordValid) {
       throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu');
     }
 

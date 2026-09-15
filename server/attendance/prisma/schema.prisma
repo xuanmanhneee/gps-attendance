@@ -50,11 +50,12 @@ model Account {
   id           Int           @id @default(autoincrement()) @map("id")
   username     String        @unique @map("username")
   passwordHash String        @map("password_hash")
-  status       AccountStatus @map("status")
+  status       AccountStatus @default(active) @map("status")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
-  user User?
+  userId Int  @unique @map("user_id")
+  user   User @relation(fields: [userId], references: [id])
 
   @@map("accounts")
 }
@@ -99,14 +100,13 @@ model Unit {
 
 model User {
   id        Int      @id @default(autoincrement()) @map("id")
-  accountId Int      @unique @map("account_id")
   code      String   @unique @map("code")
   role      UserRole @map("role")
   fullname  String   @map("fullname")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  account Account @relation(fields: [accountId], references: [id])
+  account Account?
 
   createdSessions   AttendanceSession[] @relation("SessionCreator")
   attendanceRecords AttendanceRecord[]
