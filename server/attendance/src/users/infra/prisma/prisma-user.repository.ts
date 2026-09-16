@@ -14,37 +14,54 @@ export class PrismaUserRepository implements IUserRepository {
     return ctx instanceof PrismaTransactionContext ? ctx.tx : this.prisma;
   }
 
-  async findById(id: number): Promise<User | undefined> {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+  async findById(
+    id: number,
+    ctx?: ITransactionContext,
+  ): Promise<User | undefined> {
+    const user = await this.client(ctx).user.findUnique({
+      where: { id },
+    });
+
     return user ?? undefined;
   }
 
-  async findByIds(ids: number[]): Promise<User[]> {
-    return this.prisma.user.findMany({ where: { id: { in: ids } } });
+  async findByIds(ids: number[], ctx?: ITransactionContext): Promise<User[]> {
+    return this.client(ctx).user.findMany({
+      where: { id: { in: ids } },
+    });
   }
 
-  async findByCode(code: string): Promise<User | undefined> {
-    const user = await this.prisma.user.findUnique({ where: { code } });
+  async findByCode(
+    code: string,
+    ctx?: ITransactionContext,
+  ): Promise<User | undefined> {
+    const user = await this.client(ctx).user.findUnique({
+      where: { code },
+    });
+
     return user ?? undefined;
   }
 
-  async findByAccountId(accountId: number): Promise<User | undefined> {
-    const account = await this.prisma.account.findUnique({
+  async findByAccountId(
+    accountId: number,
+    ctx?: ITransactionContext,
+  ): Promise<User | undefined> {
+    const account = await this.client(ctx).account.findUnique({
       where: { id: accountId },
       include: { user: true },
     });
+
     return account?.user ?? undefined;
   }
 
-  async findAll(): Promise<User[]> {
-    return this.prisma.user.findMany();
+  async findAll(ctx?: ITransactionContext): Promise<User[]> {
+    return this.client(ctx).user.findMany();
   }
 
   async create(
     data: CreateUserInput,
     ctx?: ITransactionContext,
   ): Promise<User> {
-    console.log('[DEBUG] creating user with data:', data);
     return this.client(ctx).user.create({ data });
   }
 }

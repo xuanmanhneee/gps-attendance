@@ -1,4 +1,3 @@
-// src/account/infra/prisma/account.repository.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '#prisma/prisma.service';
 import type { IAccountRepository } from '../../account.repository';
@@ -14,20 +13,36 @@ export class PrismaAccountRepository implements IAccountRepository {
     return ctx instanceof PrismaTransactionContext ? ctx.tx : this.prisma;
   }
 
-  async findById(id: number): Promise<Account | undefined> {
-    const account = await this.prisma.account.findUnique({ where: { id } });
+  async findById(
+    id: number,
+    ctx?: ITransactionContext,
+  ): Promise<Account | undefined> {
+    const account = await this.client(ctx).account.findUnique({
+      where: { id },
+    });
+
     return account ?? undefined;
   }
 
-  async findByUsername(username: string): Promise<Account | undefined> {
-    const account = await this.prisma.account.findUnique({
+  async findByUsername(
+    username: string,
+    ctx?: ITransactionContext,
+  ): Promise<Account | undefined> {
+    const account = await this.client(ctx).account.findUnique({
       where: { username },
     });
+
     return account ?? undefined;
   }
 
-  async findByUserId(userId: number): Promise<Account | undefined> {
-    const account = await this.prisma.account.findUnique({ where: { userId } });
+  async findByUserId(
+    userId: number,
+    ctx?: ITransactionContext,
+  ): Promise<Account | undefined> {
+    const account = await this.client(ctx).account.findUnique({
+      where: { userId },
+    });
+
     return account ?? undefined;
   }
 

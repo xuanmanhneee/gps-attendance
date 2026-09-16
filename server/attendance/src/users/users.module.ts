@@ -4,6 +4,7 @@ import { UsersService } from './users.service';
 import { UserFilterService } from './user-filter.service';
 import { UserController } from './user.controller';
 import { PrismaUserRepository } from './infra/prisma/prisma-user.repository';
+import { InMemoryUserRepository } from './infra/in-memory/in-memory-user.repository';
 import { TagModule } from '../tags/tag.module';
 
 @Module({
@@ -12,7 +13,7 @@ import { TagModule } from '../tags/tag.module';
   providers: [
     {
       provide: USER_REPOSITORY,
-      useClass: PrismaUserRepository,
+      useClass: InMemoryUserRepository,
     },
     UsersService,
     UserFilterService,

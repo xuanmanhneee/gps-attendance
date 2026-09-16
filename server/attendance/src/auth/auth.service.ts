@@ -31,7 +31,7 @@ export class AuthService {
       throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu');
     }
 
-    const user = await this.usersService.findByAccountId(account.id);
+    const user = await this.usersService.findById(account.userId);
 
     if (!user) {
       throw new UnauthorizedException('Tài khoản chưa được liên kết với user');

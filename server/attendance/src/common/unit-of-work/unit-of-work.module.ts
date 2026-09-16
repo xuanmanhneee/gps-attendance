@@ -3,11 +3,12 @@ import { Global, Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { UNIT_OF_WORK } from './unit-of-work.token';
 import { PrismaUnitOfWork } from './prisma-unit-of-work';
+import { InMemoryUnitOfWork } from './in-memory-unit-of-work';
 
 @Global()
 @Module({
   imports: [PrismaModule],
-  providers: [{ provide: UNIT_OF_WORK, useClass: PrismaUnitOfWork }],
+  providers: [{ provide: UNIT_OF_WORK, useClass: InMemoryUnitOfWork }],
   exports: [UNIT_OF_WORK],
 })
 export class UnitOfWorkModule {}
