@@ -57,7 +57,6 @@ export class PrismaTagRepository implements ITagRepository {
     await this.prisma.userTag.deleteMany({
       where: { tagId, userId },
     });
-    // dùng deleteMany thay vì delete để không throw nếu record không tồn tại
   }
 
   async findUserIdsByTag(tagId: number): Promise<number[]> {
