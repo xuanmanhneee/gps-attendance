@@ -17,5 +17,6 @@ allowBuilds:
   '@prisma/engines': true
   '@scarf/scarf': true
   bcrypt: true
+  esbuild: true
   prisma: true
   unrs-resolver: true

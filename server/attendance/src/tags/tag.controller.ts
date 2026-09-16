@@ -38,8 +38,8 @@ export class TagController {
    */
   @Get()
   @ApiOperation({ summary: 'Get my tags' })
-  findMine(@CurrentUser() user: AuthenticatedUser) {
-    return this.tagService.findByOwner(user.userId);
+  async findMine(@CurrentUser() user: AuthenticatedUser) {
+    return await this.tagService.findByOwner(user.userId);
   }
 
   /**

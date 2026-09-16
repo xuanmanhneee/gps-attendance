@@ -13,7 +13,7 @@ import { TagModule } from '../tags/tag.module';
   providers: [
     {
       provide: USER_REPOSITORY,
-      useClass: InMemoryUserRepository,
+      useClass: PrismaUserRepository,
     },
     UsersService,
     UserFilterService,
