@@ -37,7 +37,7 @@ export class AttendanceSessionsService {
   ): Promise<AttendanceSession> {
     const now = new Date();
 
-    const userIds = this.userFilterService.resolveUserIds(
+    const userIds = await this.userFilterService.resolveUserIds(
       dto.participantCriteria,
     );
 
@@ -75,6 +75,11 @@ export class AttendanceSessionsService {
     }
 
     return this.withComputedStatus(session);
+  }
+
+  async findByIds(ids: number[]): Promise<AttendanceSession[]> {
+    const sessions = await this.attendanceSessionRepository.findByIds(ids);
+    return sessions.map((session) => this.withComputedStatus(session));
   }
 
   async findByUser(userId: number): Promise<AttendanceSession[]> {

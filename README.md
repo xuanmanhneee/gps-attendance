@@ -16,21 +16,22 @@ Hệ thống điểm danh tự động sử dụng định vị GPS thời gian 
 
 ```
 gps-attendance/
-├── server/                       # Backend API (NestJS)
+├── server/
+│   └── attendance/                # Backend API (NestJS) — @gps-attendance/attendance
 ├── client/
-│   ├── admin-dashboard/          # Web dashboard cho giảng viên/quản trị (React + Vite)
-│   └── mobile-client/            # Ứng dụng di động cho sinh viên (Expo / React Native)
+│   ├── admin-dashboard/           # Web dashboard cho giảng viên/quản trị (React + Vite)
+│   └── mobile-client/             # Ứng dụng di động cho sinh viên (Expo / React Native)
 └── packages/
-    └── shared-types/             # Type/DTO dùng chung giữa server, admin, mobile
+    └── shared/                    # Type/DTO dùng chung giữa server, admin, mobile — @gps-attendance/shared
 ```
 
-Đây là **pnpm workspace monorepo** — 3 project (`server`, `admin-dashboard`, `mobile-client`) và `shared-types` được quản lý cùng nhau qua **1** `pnpm-lock.yaml` duy nhất ở root, không cài dependency riêng lẻ từng thư mục.
+Đây là **pnpm workspace monorepo** — các project (`server/attendance`, `admin-dashboard`, `mobile-client`) và `shared` được quản lý cùng nhau qua **1** `pnpm-lock.yaml` duy nhất ở root, không cài dependency riêng lẻ từng thư mục.
 
 ## Công nghệ sử dụng
 
 | Thành phần | Công nghệ |
 |---|---|
-| Backend | NestJS |
+| Backend | NestJS + Prisma ORM 7 (PostgreSQL) |
 | Admin Dashboard | React + Vite + TypeScript |
 | Mobile Client | Expo SDK 54 (React Native) |
 | Package manager | pnpm workspace |
@@ -45,27 +46,74 @@ gps-attendance/
   Repo đã pin sẵn version pnpm trong `package.json` (`packageManager`), corepack sẽ tự dùng đúng version, không cần cài thủ công.
 - App **Expo Go** trên điện thoại (Android/iOS) để chạy thử `mobile-client` mà không cần build native
   > Dự án đang dùng **Expo SDK 54** để đảm bảo tương thích với bản Expo Go hiện có trên CH Play/App Store. Nếu bản Expo Go trên máy bạn không khớp SDK, vào store cập nhật Expo Go lên bản mới nhất hoặc kiểm tra lại version SDK của project trong `client/mobile-client/package.json`.
-- (Tuỳ chọn, cho giai đoạn sau) Docker — dùng khi cần chạy database hoặc chuẩn bị deploy
+- **Docker** — bắt buộc để chạy PostgreSQL cho `server/attendance`.
 
 ## Cài đặt
 
-Chỉ cài đặt **1 lần duy nhất ở root**, không `cd` vào từng project để `pnpm install` riêng (sẽ phá vỡ liên kết workspace).
+Cài đặt duy nhất ở root bằng `pnpm install` — không cần (và không nên) chạy lại trong từng thư mục con, vì root đã cài đủ dependency cho toàn bộ workspace.
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/xuanmanhneee/gps-attendance.git
 cd gps-attendance
 pnpm install
 pnpm build:shared
 ```
 
-Sau khi cài xong, chạy từng project bằng script ở root:
+`pnpm install` sẽ tự động chạy `prisma generate` cho `server/attendance` (qua script `postinstall`) — không cần chạy thủ công.
+
+## Database (PostgreSQL + Prisma)
+
+`server/attendance` dùng PostgreSQL, chạy qua Docker, và Prisma ORM 7 để quản lý schema/migration.
+
+### 1. Cấu hình biến môi trường
+
+Copy file mẫu và điền giá trị thật:
+
+```bash
+cd server/attendance
+cp .env.example .env
+```
+
+Đảm bảo `.env` có dòng `DATABASE_URL`, ví dụ:
+
+```
+DATABASE_URL="postgresql://user:password@localhost:5432/gps_attendance"
+```
+
+### 2. Khởi động Postgres qua Docker
+
+```bash
+docker compose up -d
+```
+
+Kiểm tra container đã chạy: `docker ps`.
+
+### 3. Chạy migration
+
+```bash
+pnpm --filter @gps-attendance/attendance prisma migrate dev
+```
+
+Lệnh này áp dụng schema vào database và tự sinh lại Prisma Client.
+
+### 4. (Tuỳ chọn) Xem dữ liệu trực quan
+
+```bash
+pnpm --filter @gps-attendance/attendance prisma studio
+```
+
+> **Lưu ý cấu hình Prisma:** project dùng generator `prisma-client` với `moduleFormat = "cjs"` (trong `server/attendance/prisma/schema.prisma`) vì NestJS build theo CommonJS, không phải ESM. Đây là chủ đích — nhiều tutorial Prisma 7 trên mạng hướng dẫn theo ESM mặc định, **không áp dụng cho project này**. Code sinh ra nằm ở `server/attendance/src/prisma/generated/` (đã `.gitignore`, không commit), và biến kết nối `DATABASE_URL` được đọc qua `server/attendance/prisma.config.ts`, không nằm trong `schema.prisma`.
+
+## Chạy project
+
+Sau khi cài xong (và đã setup Database ở trên với `server/attendance`), chạy từng project bằng script ở root:
 
 ### 1. Server (NestJS)
 
 ```bash
 pnpm dev:server
 ```
-Mặc định chạy tại `http://localhost:3000`. Lệnh này tự build `shared-types` trước khi khởi động.
+Mặc định chạy tại `http://localhost:3000`. Lệnh này tự build `shared` trước khi khởi động.
 
 ### 2. Admin Dashboard (React)
 
@@ -86,13 +134,13 @@ Quét mã QR hiện trên terminal bằng app **Expo Go** để chạy thử tr�
 ## Build & dọn cache
 
 ```bash
-pnpm build          # build shared-types, server, admin-dashboard
+pnpm build          # build shared, server, admin-dashboard
 pnpm clean           # dọn cache/output khi gặp lỗi build lạ
 ```
 
-### Lưu ý khi sửa `packages/shared-types`
+### Lưu ý khi sửa `packages/shared`
 
-Server dùng bản đã build sẵn (`dist/`) của `shared-types`, không đọc trực tiếp file `.ts` nguồn. Nếu sửa `shared-types` trong lúc `server` đang chạy dev, mở thêm terminal chạy:
+Server dùng bản đã build sẵn (`dist/`) của `shared`, không đọc trực tiếp file `.ts` nguồn. Nếu sửa `shared` trong lúc `server` đang chạy dev, mở thêm terminal chạy:
 ```bash
 pnpm dev:attendance
 ```

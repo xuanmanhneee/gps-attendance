@@ -18,7 +18,7 @@ const DashboardPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-100 font-sans text-gray-900 md:h-screen md:flex-row">
+    <div className="flex h-screen bg-gray-100 font-sans text-gray-900">
       <DashboardSidebar user={user} onLogout={handleLogout} />
 
       {/* Main content */}

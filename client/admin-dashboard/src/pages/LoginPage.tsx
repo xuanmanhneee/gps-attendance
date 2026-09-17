@@ -32,6 +32,9 @@ const LoginPage = () => {
 
       navigate('/dashboard', { replace: true });
     } catch (error) {
+      console.error('LOGIN ERROR:', error);
+      console.error('instanceof ApiError:', error instanceof ApiError);
+
       if (error instanceof ApiError) {
         switch (error.code) {
           case AuthErrorCode.INVALID_CREDENTIALS:
@@ -48,6 +51,7 @@ const LoginPage = () => {
         }
         return;
       }
+
       toast.error('Đăng nhập thất bại');
     }
   };

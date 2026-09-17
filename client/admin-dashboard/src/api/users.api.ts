@@ -1,8 +1,8 @@
-import type { UserProfileDto } from '@gps-attendance/shared';
+import type { UserProfileResponse } from '@gps-attendance/shared';
 import { httpClient } from './http';
 
 export const usersApi = {
   getMe() {
-    return httpClient.get<UserProfileDto>('/users/me');
+    return httpClient.get<UserProfileResponse>('/v0/users/me');
   },
 };

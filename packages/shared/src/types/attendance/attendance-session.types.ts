@@ -1,5 +1,9 @@
+// attendance-session.types.ts
 import type { UserFilterCriteria } from '../users';
-import { AttendanceParticipantResponse, AttendanceRecordReponse } from './attendance-record.types';
+import type {
+  AttendanceParticipantResponse,
+  AttendanceStatus,
+} from './attendance-record.types';
 
 export type SessionStatus = 'pending' | 'open' | 'closed';
 
@@ -14,17 +18,15 @@ export interface AttendanceSessionResponse {
   status: SessionStatus;
 }
 
-export interface AttendanceSessionDetailResponse {
-  id: number;
-  title: string;
-  latitude: number;
-  longitude: number;
-  radius: number;
-  openAt: string;
-  closeAt: string;
-  status: SessionStatus;
-
+export interface AttendanceSessionDetailResponse extends AttendanceSessionResponse {
   participants: AttendanceParticipantResponse[];
+}
+
+export interface MyAttendanceSessionResponse extends AttendanceSessionResponse {
+  myAttendance: {
+    status: AttendanceStatus;
+    checkedInAt: string | null; // null nếu absent
+  };
 }
 
 export interface CreateAttendanceSessionRequest {

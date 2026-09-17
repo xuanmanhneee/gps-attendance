@@ -13,3 +13,5 @@ build/
 *.log
 *.tsbuildinfo
 *.code-workspace
+
+server/attendance/src/prisma/generated/

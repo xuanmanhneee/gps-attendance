@@ -12,17 +12,17 @@ import {
 import { Type } from 'class-transformer';
 
 import {
-  CheckInRequestPayload,
-  LocationPayload,
-  DevicePayload,
-  DeviceIntegrityPayload,
+  CheckInRequest,
+  Location,
+  Device,
+  DeviceIntegrity,
 } from '@gps-attendance/shared';
 
 // -----------------------------------------------------------------------------
 // Location
 // -----------------------------------------------------------------------------
 
-export class LocationDto implements LocationPayload {
+export class LocationDto implements Location {
   @ApiProperty({
     description: 'Vĩ độ (decimal degrees)',
     example: 11.9404,
@@ -63,7 +63,7 @@ export class LocationDto implements LocationPayload {
 // Device
 // -----------------------------------------------------------------------------
 
-export class DeviceDto implements DevicePayload {
+export class DeviceDto implements Device {
   @ApiProperty({
     description: 'Installation ID do app tự sinh và lưu trên thiết bị',
     example: 'device-installation-123',
@@ -93,7 +93,7 @@ export class DeviceDto implements DevicePayload {
 // Device integrity
 // -----------------------------------------------------------------------------
 
-export class DeviceIntegrityDto implements DeviceIntegrityPayload {
+export class DeviceIntegrityDto implements DeviceIntegrity {
   @ApiProperty({
     description: 'Play Integrity (Android) / App Attest (iOS) token',
     nullable: true,
@@ -108,7 +108,7 @@ export class DeviceIntegrityDto implements DeviceIntegrityPayload {
 // Check-in
 // -----------------------------------------------------------------------------
 
-export class CheckInRequestDto implements CheckInRequestPayload {
+export class CheckInRequestDto implements CheckInRequest {
   @ApiProperty({
     description: 'Phiên điểm danh',
     example: 1,

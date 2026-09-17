@@ -13,7 +13,7 @@
     "dev:admin": "pnpm --filter @gps-attendance/admin-dashboard dev",
     "predev:mobile": "pnpm build:shared",
     "dev:mobile": "pnpm --filter @gps-attendance/mobile-client dev",
-    "dev:shared": "pnpm --filter @gps-attendance/shared build -- --watch",
+    "dev:shared": "pnpm --filter @gps-attendance/shared dev",
     "build:shared": "pnpm --filter @gps-attendance/shared build",
     "build:attendance": "pnpm build:shared && pnpm --filter @gps-attendance/attendance build",
     "build:admin": "pnpm build:shared && pnpm --filter @gps-attendance/admin-dashboard build",

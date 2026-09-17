@@ -6,7 +6,7 @@ import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiBearerAuth } from '@nestjs/swagger';
 
-@Controller('attendance')
+@Controller('v0/attendance')
 export class AttendanceCheckInController {
   constructor(
     private readonly attendanceCheckInService: AttendanceCheckInService,

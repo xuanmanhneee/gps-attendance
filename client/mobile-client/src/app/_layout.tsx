@@ -1,11 +1,15 @@
 import { Stack } from 'expo-router';
 
+import { AuthProvider } from '../context/auth-context';
+
 export default function RootLayout() {
   return (
-    <Stack>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="login" options={{ headerShown: false }} />
-      <Stack.Screen name="home" options={{ title: 'Trang chủ' }} />
-    </Stack>
+    <AuthProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="home" />
+      </Stack>
+    </AuthProvider>
   );
 }
