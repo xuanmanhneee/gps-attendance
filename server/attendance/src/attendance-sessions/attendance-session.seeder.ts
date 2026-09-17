@@ -17,7 +17,7 @@ export class AttendanceSessionSeeder implements OnModuleInit {
     const sessions: CreateAttendanceSessionDto[] = [
       // 1. Quá khứ: 7 ngày trước (Đã đóng)
       {
-        title: 'Tuần trước - Cơ sở dữ liệu (7 ngày trước)',
+        title: ' Cơ sở dữ liệu',
         latitude: 11.9404,
         longitude: 108.4583,
         radius: 80,
@@ -31,7 +31,7 @@ export class AttendanceSessionSeeder implements OnModuleInit {
       },
       // 2. Quá khứ: 3 ngày trước (Đã đóng)
       {
-        title: 'Thực hành Lập trình mạng (3 ngày trước)',
+        title: 'Thực hành Lập trình mạng',
         latitude: 11.9416,
         longitude: 108.4585,
         radius: 50,
@@ -45,7 +45,7 @@ export class AttendanceSessionSeeder implements OnModuleInit {
       },
       // 3. Quá khứ: Hôm qua (Đã đóng)
       {
-        title: 'Kiểm tra giữa kỳ - Hệ điều hành (Hôm qua)',
+        title: 'Kiểm tra giữa kỳ - Hệ điều hành',
         latitude: 11.9404,
         longitude: 108.4583,
         radius: 100,
@@ -59,7 +59,7 @@ export class AttendanceSessionSeeder implements OnModuleInit {
       },
       // 4. Hôm nay: Đang diễn ra (Đà Lạt)
       {
-        title: 'Đang mở - Điểm danh lớp Đồ án (Đà Lạt)',
+        title: 'Điểm danh lớp Đồ án',
         latitude: 11.9404,
         longitude: 108.4583,
         radius: 100,
@@ -73,7 +73,7 @@ export class AttendanceSessionSeeder implements OnModuleInit {
       },
       // 5. Hôm nay: Đang diễn ra (TP.HCM, bán kính lớn)
       {
-        title: 'Đang mở - Hội thảo Công nghệ TP.HCM (Bán kính 500m)',
+        title: 'Hội thảo Công nghệ TP.HCM',
         latitude: 10.7769,
         longitude: 106.7009,
         radius: 500,
@@ -87,7 +87,7 @@ export class AttendanceSessionSeeder implements OnModuleInit {
       },
       // 6. Hôm nay: Sắp diễn ra sau 2 giờ
       {
-        title: 'Sắp mở - Sinh hoạt cố vấn học tập (Sau 2 giờ)',
+        title: 'Sinh hoạt cố vấn học tập',
         latitude: 11.942,
         longitude: 108.459,
         radius: 120,
@@ -101,7 +101,7 @@ export class AttendanceSessionSeeder implements OnModuleInit {
       },
       // 7. Tương lai: Ngày mai
       {
-        title: 'Ngày mai - Chuyên đề Lập trình di động',
+        title: 'Chuyên đề Lập trình di động',
         latitude: 11.9416,
         longitude: 108.4585,
         radius: 60,
@@ -115,7 +115,7 @@ export class AttendanceSessionSeeder implements OnModuleInit {
       },
       // 8. Tương lai: 3 ngày tới
       {
-        title: '3 ngày tới - Báo cáo tiến độ đồ án',
+        title: 'Báo cáo tiến độ đồ án',
         latitude: 11.9404,
         longitude: 108.4583,
         radius: 100,
@@ -129,7 +129,7 @@ export class AttendanceSessionSeeder implements OnModuleInit {
       },
       // 9. Tương lai: Tuần sau (7 ngày tới)
       {
-        title: 'Tuần sau - Kỳ thi kết thúc học phần (7 ngày tới)',
+        title: 'Kỳ thi kết thúc học phần',
         latitude: 11.9404,
         longitude: 108.4583,
         radius: 150,
