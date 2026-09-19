@@ -188,5 +188,14 @@ export const en: Record<TranslationKey, string> = {
   'units.expand': 'Expand',
   'units.level': 'Level {level}',
   'units.editUnit': 'Edit unit {name}',
+  'units.nameTooLong': 'Unit name must be at most {max} characters',
+  'units.nameLength': '{current}/{max} characters',
+  'units.noChanges': 'No changes yet',
+  'units.error.notFound': 'Unit not found.',
+  'units.error.parentNotFound': 'Parent unit does not exist.',
+  'units.error.selfReference': 'A unit cannot be its own parent.',
+  'units.error.cycleDetected': 'A unit cannot be moved under one of its descendants.',
+  'units.error.hierarchyCorrupted': 'The current unit tree contains a cycle.',
+  'units.error.hasChildren': 'The unit still has child units.',
 } as const;
 

@@ -1,12 +1,13 @@
-import type { UnitTreeResponse } from '@gps-attendance/shared';
 import { MdChevronRight, MdEdit, MdExpandMore } from 'react-icons/md';
 
+import type { UnitTreeItemViewModel } from './unit.view-model';
+
 type UnitTreeNodeProps = {
-  node: UnitTreeResponse;
+  node: UnitTreeItemViewModel;
   depth: number;
   expandedIds: Set<number>;
   onToggle: (id: number) => void;
-  onEdit: (unit: UnitTreeResponse) => void;
+  onEdit: (unit: UnitTreeItemViewModel) => void;
   expandLabel: string;
   collapseLabel: string;
   editLabel: (name: string) => string;
@@ -51,7 +52,7 @@ export const UnitTreeNode = ({
         )}
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-bold text-ink">{node.name}</p>
+          <p className="truncate text-[13px] font-bold text-ink">{node.label}</p>
           <p className="mt-0.5 text-[11px] text-muted">
             {levelLabel(node.level)}
             {hasChildren && ` · ${node.children.length} ${childrenLabel}`}
@@ -61,7 +62,7 @@ export const UnitTreeNode = ({
         <button
           type="button"
           onClick={() => onEdit(node)}
-          aria-label={editLabel(node.name)}
+          aria-label={editLabel(node.label)}
           className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-transparent text-muted transition-colors hover:border-accent-strong/40 hover:bg-accent-soft hover:text-accent-strong"
         >
           <MdEdit aria-hidden="true" className="text-[15px]" />

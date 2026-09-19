@@ -184,4 +184,13 @@ export const vi = {
   'units.expand': 'Mở rộng',
   'units.level': 'Cấp {level}',
   'units.editUnit': 'Sửa đơn vị {name}',
+  'units.nameTooLong': 'Tên đơn vị tối đa {max} ký tự',
+  'units.nameLength': '{current}/{max} ký tự',
+  'units.noChanges': 'Chưa có thay đổi',
+  'units.error.notFound': 'Không tìm thấy đơn vị.',
+  'units.error.parentNotFound': 'Đơn vị cha không tồn tại.',
+  'units.error.selfReference': 'Đơn vị không thể là cha của chính nó.',
+  'units.error.cycleDetected': 'Không thể chuyển đơn vị xuống dưới đơn vị con của nó.',
+  'units.error.hierarchyCorrupted': 'Cây đơn vị hiện tại bị lỗi vòng lặp.',
+  'units.error.hasChildren': 'Đơn vị còn đơn vị con nên chưa thể xử lý.',
 } as const;

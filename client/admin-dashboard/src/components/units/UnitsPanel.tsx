@@ -2,24 +2,34 @@ import { useMemo, useState } from 'react';
 import { MdAdd, MdEdit } from 'react-icons/md';
 import { toast } from 'react-toastify';
 
-import type { UnitResponse, UnitTreeResponse } from '@gps-attendance/shared';
-
 import { useTranslation } from '../../hooks/useTranslation';
 import type { UseUnitsResult } from '../../hooks/useUnits';
 import { DataState, EmptyState, ErrorState, LoadingState } from '../ui/DataState';
 import { PageHeading } from '../ui/PageHeading';
 import { Panel, PanelHeader } from '../ui/Panel';
 import { PrimaryButton } from '../ui/PrimaryButton';
+import { resolveUnitErrorKey } from './unit-errors';
 import { UnitFormModal, type UnitFormValues } from './UnitFormModal';
 import { UnitTreeNode } from './UnitTreeNode';
 import { collectDescendantIds, filterTree, findNodeById } from './unit-tree.utils';
+import type {
+  UnitListItemViewModel,
+  UnitTreeItemViewModel,
+} from './unit.view-model';
+import {
+  mapUnitForestToViewModels,
+  mapUnitsToListItems,
+  MAX_UNIT_NAME_LENGTH,
+} from './unit.view-model';
 
 type UnitsPanelProps = {
   unitsState: UseUnitsResult;
 };
 
-const toFormErrorMessage = (error: unknown): string =>
-  error instanceof Error && error.message ? error.message : 'Unknown error';
+const toLoadErrorMessage = (error: Error, fallback: string): string =>
+  error.message && error.message !== 'Unable to load units'
+    ? error.message
+    : fallback;
 
 export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
   const { t } = useTranslation();
@@ -39,18 +49,24 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
   const [search, setSearch] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUnit, setEditingUnit] = useState<UnitResponse | null>(null);
+  const [editingUnit, setEditingUnit] = useState<UnitListItemViewModel | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const filteredTree = useMemo(() => filterTree(tree, search), [tree, search]);
+  // JSX chỉ bind view model; mapper giữ component ổn định khi backend đổi shape.
+  const unitItems = useMemo(() => mapUnitsToListItems(units), [units]);
+  const treeItems = useMemo(() => mapUnitForestToViewModels(tree), [tree]);
+  const filteredTree = useMemo(
+    () => filterTree(treeItems, search),
+    [treeItems, search],
+  );
 
   const forbiddenParentIds = useMemo(() => {
     if (!editingUnit) return new Set<number>();
-    const node = findNodeById(tree, editingUnit.id);
+    const node = findNodeById(treeItems, editingUnit.id);
     const descendants = node ? collectDescendantIds(node) : new Set<number>();
     return new Set<number>([...descendants, editingUnit.id]);
-  }, [editingUnit, tree]);
+  }, [editingUnit, treeItems]);
 
   const toggleNode = (id: number) => {
     setExpandedIds((prev) => {
@@ -70,16 +86,16 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
     setIsModalOpen(true);
   };
 
-  const openEditFromTree = (node: UnitTreeResponse) => {
-    const full = units.find((unit) => unit.id === node.id);
+  const openEditFromTree = (node: UnitTreeItemViewModel) => {
+    const full = unitItems.find((unit) => unit.id === node.id);
     setEditingUnit(
-      full ?? { id: node.id, name: node.name, parentId: null, level: node.level },
+      full ?? { id: node.id, label: node.label, parentId: null, level: node.level },
     );
     setFormError(null);
     setIsModalOpen(true);
   };
 
-  const openEditFromList = (unit: UnitResponse) => {
+  const openEditFromList = (unit: UnitListItemViewModel) => {
     setEditingUnit(unit);
     setFormError(null);
     setIsModalOpen(true);
@@ -92,28 +108,60 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
     setFormError(null);
   };
 
+  const resolveSubmitError = (submitError: unknown, isEdit: boolean): string => {
+    // Map error code backend sang i18n; fallback message chuẩn, không nuốt lỗi.
+    const errorKey = resolveUnitErrorKey(submitError);
+    const detail = errorKey
+      ? t(errorKey)
+      : submitError instanceof Error && submitError.message
+        ? submitError.message
+        : t(isEdit ? 'units.updateError' : 'units.createError');
+
+    return `${t(isEdit ? 'units.updateError' : 'units.createError')}: ${detail}`;
+  };
+
   const handleSubmit = async (values: UnitFormValues) => {
-    const name = values.name.trim();
-    if (!name) {
+    const trimmedName = values.name.trim();
+    if (!trimmedName) {
       setFormError(t('units.nameRequired'));
+      return;
+    }
+    if (trimmedName.length > MAX_UNIT_NAME_LENGTH) {
+      setFormError(t('units.nameTooLong', { max: MAX_UNIT_NAME_LENGTH }));
+      return;
+    }
+    // Tránh PUT/PATCH rỗng: khi không đổi field nào thì chỉ đóng form.
+    if (
+      editingUnit &&
+      editingUnit.label === trimmedName &&
+      editingUnit.parentId === values.parentId
+    ) {
+      setIsModalOpen(false);
+      setEditingUnit(null);
+      setFormError(null);
       return;
     }
     setIsSubmitting(true);
     setFormError(null);
     try {
       if (editingUnit) {
-        await updateUnit(editingUnit.id, { name, parentId: values.parentId });
+        // Gửi đúng field thay đổi: tránh PATCH rỗng khi backend validate nghiêm.
+        const payload =
+          editingUnit.label === trimmedName
+            ? { parentId: values.parentId }
+            : editingUnit.parentId === values.parentId
+              ? { name: trimmedName }
+              : { name: trimmedName, parentId: values.parentId };
+        await updateUnit(editingUnit.id, payload);
         toast.success(t('units.updateSuccess'));
       } else {
-        await createUnit({ name, parentId: values.parentId });
+        await createUnit({ name: trimmedName, parentId: values.parentId });
         toast.success(t('units.createSuccess'));
       }
       setIsModalOpen(false);
       setEditingUnit(null);
     } catch (submitError) {
-      setFormError(
-        `${editingUnit ? t('units.updateError') : t('units.createError')}: ${toFormErrorMessage(submitError)}`,
-      );
+      setFormError(resolveSubmitError(submitError, Boolean(editingUnit)));
     } finally {
       setIsSubmitting(false);
     }
@@ -138,7 +186,7 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
           <Panel>
             <ErrorState
               title={t('common.errorTitle')}
-              description={error?.message ?? treeError?.message ?? t('units.loadError')}
+              description={toLoadErrorMessage(error ?? treeError!, t('units.loadError'))}
               onRetry={handleRetry}
             />
           </Panel>
@@ -163,10 +211,10 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
               <LoadingState />
             ) : treeError ? (
               <ErrorState
-                description={treeError.message ?? t('units.treeLoadError')}
+                description={toLoadErrorMessage(treeError, t('units.treeLoadError'))}
                 onRetry={() => void reloadTree()}
               />
-            ) : tree.length === 0 ? (
+            ) : treeItems.length === 0 ? (
               <EmptyState description={t('units.treeEmpty')} />
             ) : filteredTree.length === 0 ? (
               <DataState
@@ -203,17 +251,17 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
               <LoadingState />
             ) : error ? (
               <ErrorState
-                description={error.message ?? t('units.loadError')}
+                description={toLoadErrorMessage(error, t('units.loadError'))}
                 onRetry={() => void reload()}
               />
-            ) : units.length === 0 ? (
+            ) : unitItems.length === 0 ? (
               <EmptyState description={t('units.empty')} />
             ) : (
               <ul className="m-0 list-none divide-y divide-line p-0">
-                {units.map((unit) => (
+                {unitItems.map((unit) => (
                   <li key={unit.id} className="flex items-center gap-3 px-5 py-3">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-bold text-ink">{unit.name}</p>
+                      <p className="truncate text-[13px] font-bold text-ink">{unit.label}</p>
                       <p className="mt-0.5 text-[11px] text-muted">
                         {t('units.level', { level: unit.level })}
                       </p>
@@ -221,7 +269,7 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
                     <button
                       type="button"
                       onClick={() => openEditFromList(unit)}
-                      aria-label={t('units.editUnit', { name: unit.name })}
+                      aria-label={t('units.editUnit', { name: unit.label })}
                       className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-transparent text-muted transition-colors hover:border-accent-strong/40 hover:bg-accent-soft hover:text-accent-strong"
                     >
                       <MdEdit aria-hidden="true" className="text-[15px]" />
@@ -237,7 +285,7 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
       <UnitFormModal
         isOpen={isModalOpen}
         editingUnit={editingUnit}
-        units={units}
+        units={unitItems}
         forbiddenParentIds={forbiddenParentIds}
         isSubmitting={isSubmitting}
         formError={formError}

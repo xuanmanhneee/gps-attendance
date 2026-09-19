@@ -15,6 +15,29 @@ const assertValidId = (id: number) => {
   }
 };
 
+const assertValidName = (name: string) => {
+  const trimmed = name.trim();
+
+  if (trimmed.length === 0) {
+    throw new Error('Unit name is required');
+  }
+
+  // Backend validate name 1-150 ký tự; chặn sớm ở client để giảm request lỗi.
+  if (trimmed.length > 150) {
+    throw new Error('Unit name must be at most 150 characters');
+  }
+
+  return trimmed;
+};
+
+const assertValidParentId = (parentId: number | null | undefined) => {
+  if (parentId === undefined || parentId === null) return;
+
+  if (!Number.isInteger(parentId) || parentId <= 0) {
+    throw new Error(`Invalid parent id: ${String(parentId)}`);
+  }
+};
+
 type ApiSuccessPayload<T> = { success: true; data: T };
 type ApiErrorPayload = { success: false; code: ApiErrorCode; message: string };
 
@@ -83,10 +106,27 @@ export const unitsApi = {
   },
 
   create(request: CreateUnitRequest) {
-    return httpClient.post<UnitResponse>('/units', request);
+    const name = assertValidName(request.name);
+    assertValidParentId(request.parentId);
+
+    return httpClient.post<UnitResponse>('/units', {
+      name,
+      ...(request.parentId !== undefined && { parentId: request.parentId }),
+    });
   },
 
   update(id: number, request: UpdateUnitRequest) {
+    if (request.name !== undefined) {
+      return patchUnit(id, {
+        ...request,
+        name: assertValidName(request.name),
+      });
+    }
+
+    if (request.parentId !== undefined) {
+      assertValidParentId(request.parentId);
+    }
+
     return patchUnit(id, request);
   },
 };

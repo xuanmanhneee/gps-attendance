@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { IoClose } from 'react-icons/io5';
 
-import type { UnitResponse } from '@gps-attendance/shared';
-
 import { useTranslation } from '../../hooks/useTranslation';
+import type {
+  UnitListItemViewModel,
+} from './unit.view-model';
+import { MAX_UNIT_NAME_LENGTH } from './unit.view-model';
 
 export type UnitFormValues = {
   name: string;
@@ -12,8 +14,8 @@ export type UnitFormValues = {
 
 type UnitFormModalProps = {
   isOpen: boolean;
-  editingUnit: UnitResponse | null;
-  units: UnitResponse[];
+  editingUnit: UnitListItemViewModel | null;
+  units: UnitListItemViewModel[];
   forbiddenParentIds: Set<number>;
   isSubmitting: boolean;
   formError: string | null;
@@ -38,7 +40,7 @@ export const UnitFormModal = ({
 
   useEffect(() => {
     if (isOpen) {
-      setName(editingUnit?.name ?? '');
+      setName(editingUnit?.label ?? '');
       setParentId(editingUnit?.parentId ?? null);
       setValidationError(null);
     }
@@ -49,11 +51,22 @@ export const UnitFormModal = ({
   const parentOptions = units.filter(
     (unit) => !forbiddenParentIds.has(unit.id),
   );
+  const trimmedName = name.trim();
+  const nameLength = trimmedName.length;
+  const isParentUnchanged = editingUnit?.parentId === parentId;
+  const isNameUnchanged = editingUnit
+    ? editingUnit.label === trimmedName
+    : trimmedName.length === 0;
+  const isUnchanged = Boolean(editingUnit) && isNameUnchanged && isParentUnchanged;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (name.trim().length === 0) {
+    if (nameLength === 0) {
       setValidationError(t('units.nameRequired'));
+      return;
+    }
+    if (nameLength > MAX_UNIT_NAME_LENGTH) {
+      setValidationError(t('units.nameTooLong', { max: MAX_UNIT_NAME_LENGTH }));
       return;
     }
     setValidationError(null);
@@ -93,6 +106,7 @@ export const UnitFormModal = ({
             <input
               type="text"
               value={name}
+              maxLength={MAX_UNIT_NAME_LENGTH}
               onChange={(event) => setName(event.target.value)}
               placeholder={t('units.namePlaceholder')}
               disabled={isSubmitting}
@@ -115,7 +129,7 @@ export const UnitFormModal = ({
               <option value="">{t('units.root')}</option>
               {parentOptions.map((unit) => (
                 <option key={unit.id} value={unit.id}>
-                  {unit.name}
+                  {unit.label}
                 </option>
               ))}
             </select>
@@ -126,6 +140,17 @@ export const UnitFormModal = ({
               {validationError ?? formError}
             </p>
           )}
+
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] text-muted">
+              {t('units.nameLength', { current: nameLength, max: MAX_UNIT_NAME_LENGTH })}
+            </p>
+            {editingUnit && isUnchanged && (
+              <p className="text-[11px] font-bold text-muted">
+                {t('units.noChanges')}
+              </p>
+            )}
+          </div>
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
@@ -138,7 +163,7 @@ export const UnitFormModal = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || (Boolean(editingUnit) && isUnchanged)}
               className="rounded-lg border border-accent-strong bg-accent-strong px-4 py-2 text-[12px] font-bold text-white transition-opacity disabled:opacity-50"
             >
               {isSubmitting

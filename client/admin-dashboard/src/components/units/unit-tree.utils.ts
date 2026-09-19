@@ -1,7 +1,7 @@
-import type { UnitTreeResponse } from '@gps-attendance/shared';
+import type { UnitTreeItemViewModel } from './unit.view-model';
 
 export const collectDescendantIds = (
-  node: UnitTreeResponse,
+  node: UnitTreeItemViewModel,
   acc: Set<number> = new Set(),
 ): Set<number> => {
   for (const child of node.children) {
@@ -12,9 +12,9 @@ export const collectDescendantIds = (
 };
 
 export const findNodeById = (
-  nodes: UnitTreeResponse[],
+  nodes: UnitTreeItemViewModel[],
   id: number,
-): UnitTreeResponse | null => {
+): UnitTreeItemViewModel | null => {
   for (const node of nodes) {
     if (node.id === id) return node;
     const found = findNodeById(node.children, id);
@@ -24,17 +24,17 @@ export const findNodeById = (
 };
 
 export const filterTree = (
-  nodes: UnitTreeResponse[],
+  nodes: UnitTreeItemViewModel[],
   keyword: string,
-): UnitTreeResponse[] => {
+): UnitTreeItemViewModel[] => {
   const normalized = keyword.trim().toLowerCase();
   if (!normalized) return nodes;
 
-  const result: UnitTreeResponse[] = [];
+  const result: UnitTreeItemViewModel[] = [];
   for (const node of nodes) {
     const filteredChildren = filterTree(node.children, keyword);
     if (
-      node.name.toLowerCase().includes(normalized) ||
+      node.label.toLowerCase().includes(normalized) ||
       filteredChildren.length > 0
     ) {
       result.push({ ...node, children: filteredChildren });
