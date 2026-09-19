@@ -1,0 +1,10 @@
+export const UnitErrorCode = {
+  NOT_FOUND: 'UNIT_NOT_FOUND',
+  PARENT_NOT_FOUND: 'UNIT_PARENT_NOT_FOUND',
+  SELF_REFERENCE: 'UNIT_SELF_REFERENCE',
+  CYCLE_DETECTED: 'UNIT_CYCLE_DETECTED',
+  HIERARCHY_CORRUPTED: 'UNIT_HIERARCHY_CORRUPTED',
+  HAS_CHILDREN: 'UNIT_HAS_CHILDREN',
+} as const;
+
+export type UnitErrorCode = (typeof UnitErrorCode)[keyof typeof UnitErrorCode];

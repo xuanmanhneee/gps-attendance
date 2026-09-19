@@ -11,3 +11,10 @@ export interface UserProfileResponse {
   role: Role;
   fullname: string;
 }
+
+export interface CreateUserRequest {
+  code: string;
+  role: 'admin' | 'lecturer' | 'student';
+  fullname: string;
+  unitId: number;
+}

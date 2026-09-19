@@ -25,13 +25,6 @@ enum UserRole {
   student
 }
 
-enum UnitType {
-  faculty
-  department
-  class
-  group
-}
-
 enum SessionStatus {
   draft
   open
@@ -85,16 +78,17 @@ model UserTag {
 }
 
 model Unit {
-  id       Int      @id @default(autoincrement()) @map("id")
-  parentId Int?     @map("parent_id")
-  name     String   @db.VarChar(150)
-  type     UnitType
+  id       Int    @id @default(autoincrement()) @map("id")
+  parentId Int?   @map("parent_id")
+  name     String @db.VarChar(150)
+  level    Int
 
-  parent   Unit?      @relation("UnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children Unit[]     @relation("UnitHierarchy")
-  users    UserUnit[]
+  parent   Unit?  @relation("UnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Unit[] @relation("UnitHierarchy")
+  users    User[]
 
   @@index([parentId])
+  @@index([level])
   @@map("units")
 }
 
@@ -106,28 +100,19 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  unitId Int  @map("unit_id")
+  unit   Unit @relation(fields: [unitId], references: [id], onDelete: Restrict)
+
   account Account?
 
   createdSessions   AttendanceSession[] @relation("SessionCreator")
   attendanceRecords AttendanceRecord[]
   updatedRecords    AttendanceRecord[]  @relation("RecordUpdater")
   tags              UserTag[]
-  units             UserUnit[]
 
   @@index([role])
-  @@map("users")
-}
-
-model UserUnit {
-  userId Int @map("user_id")
-  unitId Int @map("unit_id")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
-
-  @@id([userId, unitId])
   @@index([unitId])
-  @@map("user_units")
+  @@map("users")
 }
 
 model AttendanceSession {

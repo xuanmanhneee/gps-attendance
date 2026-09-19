@@ -7,10 +7,13 @@ import { USER_REPOSITORY } from '#user/user.repository.token';
 import { ACCOUNT_REPOSITORY } from './account.repository.token';
 import type { IAccountRepository } from './account.repository';
 
-import type { CreateAccountInput, Account, CreateAccountWithUserInput } from './account.model';
+import type {
+  CreateAccountInput,
+  Account,
+  CreateAccountWithUserInput,
+} from './account.model';
 import type { User } from '../users/user.model';
 import { IUserRepository } from '#user/user.repository';
-
 
 @Injectable()
 export class AccountService {
@@ -22,7 +25,7 @@ export class AccountService {
     private readonly accountRepository: IAccountRepository,
 
     @Inject(USER_REPOSITORY)
-    private readonly userRepository: IUserRepository
+    private readonly userRepository: IUserRepository,
   ) {}
 
   async createAccountWithUser(
@@ -33,7 +36,11 @@ export class AccountService {
     return this.unitOfWork.runInTransaction(async (ctx) => {
       const user = await this.userRepository.create(
         {
-          code: input.code, fullname: input.fullname, role: input.role },
+          code: input.code,
+          fullname: input.fullname,
+          role: input.role,
+          unitId: input.unitId,
+        },
         ctx,
       );
 
