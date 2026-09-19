@@ -1,22 +1,29 @@
 import { AuthenticatedRequest } from '../auth/types/authenticated-request';
 import {
+  Body,
   Controller,
   Get,
   NotFoundException,
   Param,
   ParseIntPipe,
+  Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { UserProfileResponse } from '@gps-attendance/shared';
+import { UserFilterCriteria, UserProfileResponse } from '@gps-attendance/shared';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { UserFilterService } from './user-filter.service';
+import { UserFilterDto } from './dto/user-filter.dto';
 
 @ApiBearerAuth()
 @Controller('v0/users')
 export class UserController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly userFilterService: UserFilterService,
+  ) {}
 
   @Get()
   async findAll() {
@@ -42,5 +49,9 @@ export class UserController {
   @Get(':id')
   async findById(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findById(id);
+  }
+
+  @Post('test-filter') async testFilter(@Body() criteria: UserFilterDto) {
+    return this.userFilterService.resolveUserIds(criteria as UserFilterCriteria);
   }
 }

@@ -1,24 +1,25 @@
-// users/user-filter.types.ts
-
 export interface UnitFilterStep {
-  /** Unit được chọn, tự kéo theo toàn bộ unit con. */
-  includedUnitIds: number[];
+  /** Chọn Unit và tự kéo theo toàn bộ Unit con. */
+  include: number[];
 
-  /** Phải là unit con của một trong các includedUnitIds. */
-  excludedUnitIds: number[];
+  /** Loại bỏ Unit con và toàn bộ subtree của chúng. */
+  exclude: number[];
 }
 
 export interface TagFilterStep {
-  /** Union — cộng thêm user match vào tập kết quả, dedup tự nhiên. */
-  tagIds: number[];
+  /** Cộng thêm user có các tag này vào tập kết quả. */
+  include: number[];
+
+  /** Loại bỏ user có các tag này khỏi tập kết quả. */
+  exclude: number[];
 }
 
 export interface CodeFilterStep {
-  /** Cộng thêm user theo code. */
-  addCodes?: string[];
+  /** Cộng thêm user có các code này vào tập kết quả. */
+  include?: string[];
 
-  /** Loại bỏ user theo code. */
-  excludeCodes?: string[];
+  /** Loại bỏ user có các code này khỏi tập kết quả. */
+  exclude?: string[];
 }
 
 type RequireAtLeastOne<T, K extends keyof T = keyof T> = Omit<T, K> &
@@ -34,7 +35,10 @@ type RequireAtLeastOne<T, K extends keyof T = keyof T> = Omit<T, K> &
  * - tagFilter
  * - codeFilter
  *
- * Có thể kết hợp nhiều filter cùng lúc.
+ * Các filter có thể kết hợp với nhau.
+ *
+ * Include của các filter được UNION.
+ * Exclude luôn được áp dụng sau cùng.
  */
 export type UserFilterCriteria = RequireAtLeastOne<{
   unitFilter?: UnitFilterStep;

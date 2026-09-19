@@ -1,4 +1,4 @@
-import { Unit } from '#unit/unit.model';
+import { Unit } from "#units/unit.model";
 
 export const mockUnits: Unit[] = [
   // ===== Trường Đại học =====

@@ -27,6 +27,10 @@ export class UsersService {
     return this.userRepository.findByAccountId(accountId);
   }
 
+  findByUnitIds(unitIds: number[]): Promise<User[]> {
+    return this.userRepository.findByUnitIds(unitIds);
+  }
+
   async findAll(): Promise<User[]> {
     return this.userRepository.findAll();
   }
