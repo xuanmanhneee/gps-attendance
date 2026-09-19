@@ -1,8 +1,14 @@
-import { PlaceholderPage } from './PlaceholderPage';
-
 /**
- * Route `/units` — chưa có nghiệp vụ, chỉ giữ chỗ để navigation không chết.
+ * Route `/units` — quản lý đơn vị cho Admin, nối trực tiếp Units API backend.
+ * Route đã nằm trong `RoleGuard allowedRoles={['admin']}` nên giữ nguyên.
  */
-const UnitsPage = () => <PlaceholderPage />;
+import { UnitsPanel } from '../components/units/UnitsPanel';
+import { useUnits } from '../hooks/useUnits';
+
+const UnitsPage = () => {
+  const unitsState = useUnits();
+
+  return <UnitsPanel unitsState={unitsState} />;
+};
 
 export default UnitsPage;

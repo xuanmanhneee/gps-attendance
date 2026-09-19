@@ -8,6 +8,13 @@ import { tokenService } from '../services/token.service';
 import { AuthContext } from './auth-context-value';
 import type { AuthContextValue } from './auth-context-value';
 
+/**
+ * Cung cấp trạng thái xác thực cho admin dashboard.
+ *
+ * AuthProvider chịu trách nhiệm khôi phục user từ access token, đăng nhập và
+ * đăng xuất. Context object và type được đặt riêng trong
+ * `auth-context-value.ts` để tách state contract khỏi provider component.
+ */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthContextValue['user']>(null);
   const [isLoading, setIsLoading] = useState(true);
