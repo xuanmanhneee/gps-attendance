@@ -8,9 +8,10 @@ import {
   MdOutlineTitle,
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
+
 import type { CreateSessionFormData } from '../types/attendance-session';
-import { CreateSessionModalActions } from './CreateSessionModalActions';
-import { CreateSessionModalHeader } from './CreateSessionModalHeader';
+
+export type { CreateSessionFormData };
 
 interface CreateSessionFormValues {
   title: string;
@@ -143,17 +144,36 @@ export const CreateSessionModal = ({
       toast.success('Tạo phiên điểm danh thành công!');
       reset();
       onClose();
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'Có lỗi xảy ra khi tạo phiên';
-      toast.error(message);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Có lỗi xảy ra khi tạo phiên',
+      );
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
-        <CreateSessionModalHeader onClose={onClose} />
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">
+              Tạo phiên điểm danh mới
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Cấu hình phạm vi GPS, thời gian và sinh viên áp dụng
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            type="button"
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+          >
+            <IoClose className="text-xl" />
+          </button>
+        </div>
 
         {/* Modal Body */}
         <form
@@ -354,10 +374,23 @@ export const CreateSessionModal = ({
             </div>
           </div>
 
-          <CreateSessionModalActions
-            isSubmitting={isSubmitting}
-            onClose={onClose}
-          />
+          {/* Modal Actions */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-base font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {isSubmitting ? 'Đang tạo...' : 'Tạo phiên điểm danh'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

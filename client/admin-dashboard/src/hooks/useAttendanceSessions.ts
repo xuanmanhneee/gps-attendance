@@ -5,37 +5,55 @@ import type { AttendanceSessionResponse } from '@gps-attendance/shared';
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
 import type { CreateSessionFormData } from '../types/attendance-session';
 
-export const useAttendanceSessions = () => {
+/**
+ * `all` — toàn bộ phiên (route admin, mặc định).
+ * `created-by-me` — chỉ phiên do user hiện tại tạo; chỉ dùng ở page lecturer vì
+ * endpoint phía sau yêu cầu role lecturer.
+ */
+type AttendanceSessionScope = 'all' | 'created-by-me';
+
+interface UseAttendanceSessionsOptions {
+  scope?: AttendanceSessionScope;
+}
+
+export const useAttendanceSessions = (
+  options: UseAttendanceSessionsOptions = {},
+) => {
+  const { scope = 'all' } = options;
+
   const [sessions, setSessions] = useState<AttendanceSessionResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  const fetchSessions = useCallback(
-    () => attendanceSessionsApi.getAll(),
-    [],
-  );
+  const [hasError, setHasError] = useState(false);
 
   const loadSessions = useCallback(async () => {
-    setIsLoading(true);
     try {
-      const data = await fetchSessions();
+      const data =
+        scope === 'created-by-me'
+          ? await attendanceSessionsApi.getCreatedByMe()
+          : await attendanceSessionsApi.getAll();
+
       setSessions(data);
+      setHasError(false);
+    } catch {
+      // Không giữ lại dữ liệu cũ và không im lặng bỏ qua lỗi.
+      setSessions([]);
+      setHasError(true);
     } finally {
       setIsLoading(false);
     }
-  }, [fetchSessions]);
+  }, [scope]);
 
   useEffect(() => {
-    const initializeSessions = async () => {
-      try {
-        const data = await fetchSessions();
-        setSessions(data);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    // Fetch khi mount; setState trong loadSessions nằm sau `await` nên không
+    // gây cascading render như rule suy đoán.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadSessions();
+  }, [loadSessions]);
 
-    void initializeSessions();
-  }, [fetchSessions]);
+  const reload = useCallback(async () => {
+    setIsLoading(true);
+    await loadSessions();
+  }, [loadSessions]);
 
   const createSession = async (data: CreateSessionFormData) => {
     const created = await attendanceSessionsApi.create(data);
@@ -47,5 +65,11 @@ export const useAttendanceSessions = () => {
     setSessions((prev) => [created, ...prev]);
   };
 
-  return { sessions, isLoading, createSession, reload: loadSessions };
+  return {
+    sessions,
+    isLoading,
+    hasError,
+    createSession,
+    reload,
+  };
 };

@@ -1,8 +1,9 @@
 import { createContext } from 'react';
-import type { LoginRequest, UserProfileDto } from '@gps-attendance/shared';
+
+import type { LoginRequest, UserProfileResponse } from '@gps-attendance/shared';
 
 export interface AuthContextValue {
-  user: UserProfileDto | null;
+  user: UserProfileResponse | null;
   isLoading: boolean;
   login: (request: LoginRequest) => Promise<void>;
   logout: () => void;
