@@ -17,6 +17,8 @@ export interface IUserRepository {
     ctx?: ITransactionContext,
   ): Promise<User | undefined>;
 
+  findByUnitIds(unitIds: number[]): Promise<User[]>;
+
   findAll(ctx?: ITransactionContext): Promise<User[]>;
 
   create(data: CreateUserDto, ctx?: ITransactionContext): Promise<User>;

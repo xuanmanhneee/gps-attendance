@@ -55,6 +55,16 @@ export class PrismaUserRepository implements IUserRepository {
     return account?.user ?? undefined;
   }
 
+  async findByUnitIds(unitIds: number[]): Promise<User[]> {
+    return this.prisma.user.findMany({
+      where: {
+        unitId: {
+          in: unitIds,
+        },
+      },
+    });
+  }
+
   async findAll(ctx?: ITransactionContext): Promise<User[]> {
     return this.client(ctx).user.findMany();
   }

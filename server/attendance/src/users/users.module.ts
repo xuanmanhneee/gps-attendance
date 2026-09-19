@@ -6,10 +6,12 @@ import { UserController } from './user.controller';
 import { PrismaUserRepository } from './infra/prisma/prisma-user.repository';
 import { InMemoryUserRepository } from './infra/in-memory/in-memory-user.repository';
 import { TagModule } from '../tags/tag.module';
+import { UnitService } from '#units/units.service';
+import { UnitModule } from '#units/units.module';
 
 @Module({
   controllers: [UserController],
-  imports: [TagModule],
+  imports: [TagModule, UnitModule],
   providers: [
     {
       provide: USER_REPOSITORY,

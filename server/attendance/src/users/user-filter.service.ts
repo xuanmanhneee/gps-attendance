@@ -1,62 +1,78 @@
 // users/user-filter.service.ts
-import { Injectable, NotImplementedException } from '@nestjs/common';
+
+import { Injectable } from '@nestjs/common';
 import type { UserFilterCriteria } from '@gps-attendance/shared';
 
 import { UsersService } from './users.service';
 import { TagService } from '../tags/tag.service';
+import { UnitService } from '#units/units.service';
 
 @Injectable()
 export class UserFilterService {
   constructor(
     private readonly usersService: UsersService,
     private readonly tagService: TagService,
+    private readonly unitService: UnitService,
   ) {}
 
   async resolveUserIds(criteria: UserFilterCriteria): Promise<number[]> {
     const result = new Set<number>();
 
+    // Include: Unit
     if (criteria.unitFilter) {
-      const unitUserIds = await this.resolveUnitFilter(criteria.unitFilter);
-      unitUserIds.forEach((id) => result.add(id));
+      const unitIds = await this.resolveUnitFilter(criteria.unitFilter);
+      const users = await this.usersService.findByUnitIds(unitIds);
+
+      users.forEach((user) => result.add(user.id));
     }
 
-    if (criteria.tagFilter) {
-      const tagUserIds = await this.resolveTagFilter(criteria.tagFilter);
-      tagUserIds.forEach((id) => result.add(id));
+    // Include: Tag
+    if (criteria.tagFilter?.include.length) {
+      const userIds = await this.resolveTags(criteria.tagFilter.include);
+
+      userIds.forEach((id) => result.add(id));
     }
 
-    if (criteria.codeFilter?.addCodes?.length) {
-      const codeUserIds = await this.resolveCodes(
-        criteria.codeFilter.addCodes,
+    // Include: Code
+    if (criteria.codeFilter?.include?.length) {
+      const userIds = await this.resolveCodes(criteria.codeFilter.include);
+
+      userIds.forEach((id) => result.add(id));
+    }
+
+    // Exclude: Unit
+    if (criteria.unitFilter?.exclude.length) {
+      const unitIds = await this.resolveUnitLeafIds(
+        criteria.unitFilter.exclude,
       );
-      codeUserIds.forEach((id) => result.add(id));
+
+      const users = await this.usersService.findByUnitIds(unitIds);
+
+      users.forEach((user) => result.delete(user.id));
     }
 
-    // exclude luôn áp dụng sau cùng, trên toàn bộ tập kết quả đã gộp
-    if (criteria.codeFilter?.excludeCodes?.length) {
-      const excludeIds = await this.resolveCodes(
-        criteria.codeFilter.excludeCodes,
-      );
-      excludeIds.forEach((id) => result.delete(id));
+    // Exclude: Tag
+    if (criteria.tagFilter?.exclude.length) {
+      const userIds = await this.resolveTags(criteria.tagFilter.exclude);
+
+      userIds.forEach((id) => result.delete(id));
+    }
+
+    // Exclude: Code
+    if (criteria.codeFilter?.exclude?.length) {
+      const userIds = await this.resolveCodes(criteria.codeFilter.exclude);
+
+      userIds.forEach((id) => result.delete(id));
     }
 
     return Array.from(result);
   }
 
-  private async resolveTagFilter(
-    tagFilter: NonNullable<UserFilterCriteria['tagFilter']>,
-  ): Promise<number[]> {
-    if (!tagFilter.tagIds?.length) {
-      return [];
-    }
-
+  private async resolveTags(tagIds: number[]): Promise<number[]> {
     const userIdsPerTag = await Promise.all(
-      tagFilter.tagIds.map((tagId) =>
-        this.tagService.findUserIdsByTag(tagId),
-      ),
+      tagIds.map((tagId) => this.tagService.findUserIdsByTag(tagId)),
     );
 
-    // union, dedup tự nhiên nhờ Set ở resolveUserIds
     return userIdsPerTag.flat();
   }
 
@@ -70,16 +86,38 @@ export class UserFilterService {
       .map((user) => user.id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async resolveUnitFilter(
     unitFilter: NonNullable<UserFilterCriteria['unitFilter']>,
   ): Promise<number[]> {
-    // TODO: cần UnitService/UnitRepository để:
-    // 1. Expand includedUnitIds -> toàn bộ unit con (đệ quy theo cây unit)
-    // 2. Expand excludedUnitIds -> toàn bộ unit con của nó, validate là con của includedUnitIds
-    // 3. Lấy userIds thuộc (included units) - (excluded units)
-    throw new NotImplementedException(
-      'unitFilter chưa được hỗ trợ, cần UnitService trước khi triển khai',
+    const includedLeafIds = new Set(
+      await this.resolveUnitLeafIds(unitFilter.include),
     );
+
+    const excludedLeafIds = await this.resolveUnitLeafIds(unitFilter.exclude);
+
+    excludedLeafIds.forEach((id) => includedLeafIds.delete(id));
+
+    return Array.from(includedLeafIds);
+  }
+
+  private async resolveUnitLeafIds(unitIds: number[]): Promise<number[]> {
+    if (!unitIds.length) {
+      return [];
+    }
+
+    const forest = await this.unitService.getForest();
+    const leafIds = new Set<number>();
+
+    for (const unitId of unitIds) {
+      const node = forest.find(unitId);
+
+      if (!node) {
+        continue;
+      }
+
+      node.getLeafIds().forEach((id) => leafIds.add(id));
+    }
+
+    return Array.from(leafIds);
   }
 }

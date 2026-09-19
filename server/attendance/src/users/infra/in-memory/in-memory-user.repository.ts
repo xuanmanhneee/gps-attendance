@@ -43,6 +43,21 @@ export class InMemoryUserRepository implements IUserRepository {
     return this.users.find((user) => user.id === account.userId);
   }
 
+  async findByUnitIds(
+    unitIds: number[],
+    _ctx?: ITransactionContext,
+  ): Promise<User[]> {
+    if (!unitIds.length) {
+      return [];
+    }
+
+    const unitIdSet = new Set(unitIds);
+
+    return this.users.filter(
+      (user) => user.unitId !== null && unitIdSet.has(user.unitId),
+    );
+  }
+
   async findAll(_ctx?: ITransactionContext): Promise<User[]> {
     return [...this.users];
   }
@@ -54,6 +69,7 @@ export class InMemoryUserRepository implements IUserRepository {
       id: this.nextId++,
       code: data.code,
       role: data.role,
+      unitId: data.unitId,
       fullname: data.fullname,
       createdAt: now,
       updatedAt: now,

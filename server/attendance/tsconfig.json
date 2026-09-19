@@ -20,6 +20,7 @@
     "strictNullChecks": true,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
+    "types": ["node", "jest"],
     "paths": {
       "@gps-attendance/shared": ["../../packages/shared/dist"],
       "#account/*": ["./src/account/*"],
@@ -28,7 +29,8 @@
       "#attendance-sessions/*": ["./src/attendance-sessions/*"],
       "#attendance-validation/*": ["./src/attendance-validation/*"],
       "#auth/*": ["./src/auth/*"],
-      "#unit/*": ["./src/units/*"],
+      "#tag/*": ["./src/tags"],
+      "#units/*": ["./src/units/*"],
       "#common/*": ["./src/common/*"],
       "#geo/*": ["./src/geo/*"],
       "#prisma/*": ["./src/prisma/*"],
