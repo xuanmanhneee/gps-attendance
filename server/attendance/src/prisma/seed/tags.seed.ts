@@ -10,23 +10,39 @@ export async function seedTags(prisma: PrismaClient, users: UserSeed) {
     },
   });
 
-  const jobFairKinhTe = await prisma.tag.create({
+  const scholarship = await prisma.tag.create({
     data: {
-      name: 'jobfair-2026-kinh-te',
+      name: 'hoc-bong-2026',
       ownerId: users.lecturers[1].id,
     },
   });
 
-  const jobFairDoanhNghiep = await prisma.tag.create({
+  const internship = await prisma.tag.create({
     data: {
-      name: 'jobfair-2026-doanh-nghiep',
+      name: 'thuc-tap-2026',
       ownerId: users.lecturers[2].id,
+    },
+  });
+
+  const studentClub = await prisma.tag.create({
+    data: {
+      name: 'clb-sinh-vien',
+      ownerId: users.lecturers[0].id,
+    },
+  });
+
+  const event = await prisma.tag.create({
+    data: {
+      name: 'su-kien-2026',
+      ownerId: users.lecturers[1].id,
     },
   });
 
   return {
     jobFairCntt,
-    jobFairKinhTe,
-    jobFairDoanhNghiep,
+    scholarship,
+    internship,
+    studentClub,
+    event,
   };
 }

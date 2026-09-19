@@ -22,6 +22,7 @@ export interface CreateAccountWithUserInput {
   code: string;
   fullname: string;
   role: Role;
+  unitId: number;
   username: string;
   password: string;
 }

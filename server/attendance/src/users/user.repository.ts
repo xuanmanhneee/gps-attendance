@@ -1,5 +1,6 @@
-import type { User, CreateUserInput } from './user.model';
+import type { User } from './user.model';
 import type { ITransactionContext } from '#common/unit-of-work/unit-of-work.interface';
+import { CreateUserDto } from './dto/create-user.dto';
 
 export interface IUserRepository {
   findById(id: number, ctx?: ITransactionContext): Promise<User | undefined>;
@@ -18,5 +19,5 @@ export interface IUserRepository {
 
   findAll(ctx?: ITransactionContext): Promise<User[]>;
 
-  create(data: CreateUserInput, ctx?: ITransactionContext): Promise<User>;
+  create(data: CreateUserDto, ctx?: ITransactionContext): Promise<User>;
 }

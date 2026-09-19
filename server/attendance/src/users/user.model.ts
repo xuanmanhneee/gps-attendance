@@ -1,4 +1,4 @@
-import type { Role } from '@gps-attendance/shared';
+import type { CreateUserRequest, Role } from '@gps-attendance/shared';
 
 export interface User {
   id: number;
@@ -9,8 +9,4 @@ export interface User {
   updatedAt: Date;
 }
 
-export interface CreateUserInput {
-  code: string;
-  role: 'admin' | 'lecturer' | 'student';
-  fullname: string;
-}
+

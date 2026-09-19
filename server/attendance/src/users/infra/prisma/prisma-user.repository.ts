@@ -2,9 +2,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '#prisma/prisma.service';
 import type { IUserRepository } from '../../user.repository';
-import type { User, CreateUserInput } from '../../user.model';
+import type { User } from '../../user.model';
 import type { ITransactionContext } from '#common/unit-of-work/unit-of-work.interface';
 import { PrismaTransactionContext } from '#common/unit-of-work/prisma-transaction-context';
+import { CreateUserDto } from '#user/dto/create-user.dto';
 
 @Injectable()
 export class PrismaUserRepository implements IUserRepository {
@@ -58,10 +59,7 @@ export class PrismaUserRepository implements IUserRepository {
     return this.client(ctx).user.findMany();
   }
 
-  async create(
-    data: CreateUserInput,
-    ctx?: ITransactionContext,
-  ): Promise<User> {
+  async create(data: CreateUserDto, ctx?: ITransactionContext): Promise<User> {
     return this.client(ctx).user.create({ data });
   }
 }

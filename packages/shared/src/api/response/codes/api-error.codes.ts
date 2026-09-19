@@ -2,6 +2,7 @@
 import { CommonErrorCode } from './common.codes';
 import { AuthErrorCode } from './auth.codes';
 import { AttendanceSessionErrorCode } from './attendance-session.codes';
+import { UnitErrorCode } from './units.codes';
 
 export type ApiErrorCode =
-  CommonErrorCode | AuthErrorCode | AttendanceSessionErrorCode;
+  CommonErrorCode | AuthErrorCode | AttendanceSessionErrorCode | UnitErrorCode;

@@ -1,9 +1,10 @@
 // src/users/infra/in-memory/in-memory-user.repository.ts
 import type { IUserRepository } from '../../user.repository';
-import type { CreateUserInput, User } from '../../user.model';
+import type { User } from '../../user.model';
 import type { ITransactionContext } from '#common/unit-of-work/unit-of-work.interface';
 import { mockUsers } from '#common/mock-data/users.mock';
 import { mockAccounts } from '#common/mock-data/accounts.mock';
+import { CreateUserDto } from '#user/dto/create-user.dto';
 
 export class InMemoryUserRepository implements IUserRepository {
   private users = [...mockUsers];
@@ -46,10 +47,7 @@ export class InMemoryUserRepository implements IUserRepository {
     return [...this.users];
   }
 
-  async create(
-    data: CreateUserInput,
-    _ctx?: ITransactionContext,
-  ): Promise<User> {
+  async create(data: CreateUserDto, _ctx?: ITransactionContext): Promise<User> {
     const now = new Date();
 
     const user: User = {

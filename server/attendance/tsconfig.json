@@ -28,6 +28,7 @@
       "#attendance-sessions/*": ["./src/attendance-sessions/*"],
       "#attendance-validation/*": ["./src/attendance-validation/*"],
       "#auth/*": ["./src/auth/*"],
+      "#unit/*": ["./src/units/*"],
       "#common/*": ["./src/common/*"],
       "#geo/*": ["./src/geo/*"],
       "#prisma/*": ["./src/prisma/*"],

@@ -14,6 +14,7 @@ import { TagModule } from './tags/tag.module';
 import { APP_FILTER } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/filters/all-exception.filter';
 import { UnitOfWorkModule } from '#common/unit-of-work/unit-of-work.module';
+import { UnitModule } from '#unit/units.module';
 
 @Module({
   imports: [
@@ -29,7 +30,8 @@ import { UnitOfWorkModule } from '#common/unit-of-work/unit-of-work.module';
     LoggingModule,
     PrismaModule,
     TagModule,
-    UnitOfWorkModule
+    UnitOfWorkModule,
+    UnitModule,
   ],
   controllers: [AppController],
   providers: [

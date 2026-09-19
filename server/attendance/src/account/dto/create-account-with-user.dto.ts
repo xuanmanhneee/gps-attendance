@@ -3,6 +3,7 @@ import {
   IsString,
   IsNotEmpty,
   IsIn,
+  IsInt,
   MinLength,
   MaxLength,
 } from 'class-validator';
@@ -19,6 +20,9 @@ export class CreateAccountWithUserDto {
 
   @IsIn(ROLES)
   role!: Role;
+
+  @IsInt()
+  unitId!: number;
 
   @IsString()
   @IsNotEmpty()
