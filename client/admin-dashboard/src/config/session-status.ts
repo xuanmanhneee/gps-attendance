@@ -14,3 +14,15 @@ export const SESSION_STATUS_LABEL_KEYS: Record<SessionStatus, TranslationKey> = 
   pending: 'sessions.status.pending',
   closed: 'sessions.status.closed',
 };
+
+/**
+ * Chấm màu trạng thái trong bảng phiên.
+ *
+ * Chỉ là lớp nhấn thêm: nhãn chữ của `StatusBadge` vẫn là nguồn thông tin chính
+ * nên trạng thái không bị phân biệt chỉ bằng màu.
+ */
+export const SESSION_STATUS_DOT_CLASS: Record<SessionStatus, string> = {
+  open: 'bg-positive',
+  pending: 'bg-warning',
+  closed: 'bg-muted-soft',
+};

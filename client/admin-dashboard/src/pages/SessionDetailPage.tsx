@@ -5,21 +5,54 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { AttendanceSessionDetailResponse } from '@gps-attendance/shared';
 
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
-import { LoadingState } from '../components/ui/DataState';
+import {
+  ATTENDANCE_STATUS_LABEL_KEYS,
+  ATTENDANCE_STATUS_TONE_CLASS,
+  PARTICIPANT_ROLE_LABEL_KEYS,
+} from '../config/attendance-status';
+import { EmptyState, LoadingState } from '../components/ui/DataState';
 import { Panel, PanelHeader } from '../components/ui/Panel';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { LOCALE_TAGS } from '../i18n';
 import type { TranslationKey } from '../i18n/translation-keys';
 import { useLocale } from '../hooks/useLocale';
+import { useRole } from '../hooks/useRole';
 import { useTranslation } from '../hooks/useTranslation';
 import { ROUTE_PATHS } from '../routes/paths';
+import {
+  isAttendanceSessionDetail,
+  parseSessionId,
+} from '../types/attendance-session';
+import {
+  logSessionError,
+  resolveSessionErrorKey,
+} from '../components/sessions/session-errors';
 import { MessagePage } from './MessagePage';
+
+const formatDateTime = (iso: string, localeTag: string) =>
+  new Date(iso).toLocaleString(localeTag, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
 const SessionDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { locale } = useLocale();
+  const role = useRole();
+
+  /**
+   * Admin không có route `/sessions` riêng nên quay về overview của mình;
+   * lecturer quay về danh sách phiên của mình. Cả hai route đều thuộc role.
+   */
+  const backPath =
+    role === 'lecturer'
+      ? ROUTE_PATHS.attendanceSessions
+      : ROUTE_PATHS.overview;
 
   const [session, setSession] =
     useState<AttendanceSessionDetailResponse | null>(null);
@@ -36,9 +69,16 @@ const SessionDetailPage = () => {
     setHasRefreshError(false);
 
     try {
-      const data = await attendanceSessionsApi.getDetail(session.id);
+      const data: unknown = await attendanceSessionsApi.getDetail(session.id);
+
+      // Chỉ nhận payload đúng shape detail, tránh ghi đè state bằng dữ liệu lạ.
+      if (!isAttendanceSessionDetail(data)) {
+        throw new Error('Unexpected attendance session detail response');
+      }
+
       setSession((current) => (current?.id === data.id ? data : current));
-    } catch {
+    } catch (refreshError) {
+      logSessionError('detail', refreshError);
       setHasRefreshError(true);
     } finally {
       setIsRefreshing(false);
@@ -47,19 +87,27 @@ const SessionDetailPage = () => {
 
   useEffect(() => {
     const loadSession = async () => {
-      const sessionId = Number(id);
+      const sessionId = parseSessionId(id);
 
-      if (!id || !Number.isInteger(sessionId) || sessionId <= 0) {
+      if (sessionId === null) {
         setErrorKey('sessionDetail.invalidId');
         setIsLoading(false);
         return;
       }
 
       try {
-        const data = await attendanceSessionsApi.getDetail(sessionId);
-        setSession(data);
-      } catch {
-        setErrorKey('sessionDetail.loadError');
+        const fetched: unknown =
+          await attendanceSessionsApi.getDetail(sessionId);
+
+        // Không ghi state "thành công giả" khi backend trả payload khác contract.
+        if (!isAttendanceSessionDetail(fetched)) {
+          throw new Error('Unexpected attendance session detail response');
+        }
+
+        setSession(fetched);
+      } catch (loadError) {
+        logSessionError('detail', loadError);
+        setErrorKey(resolveSessionErrorKey(loadError, 'detail'));
       } finally {
         setIsLoading(false);
       }
@@ -85,7 +133,7 @@ const SessionDetailPage = () => {
         title={t('common.errorTitle')}
         description={t(errorKey ?? 'sessionDetail.loadError')}
         actionLabel={t('sessionDetail.backToList')}
-        onAction={() => navigate(ROUTE_PATHS.attendanceSessions)}
+        onAction={() => navigate(backPath)}
       />
     );
   }
@@ -93,11 +141,11 @@ const SessionDetailPage = () => {
   const details = [
     {
       label: t('sessionDetail.openTime'),
-      value: new Date(session.openAt).toLocaleString(localeTag),
+      value: formatDateTime(session.openAt, localeTag),
     },
     {
       label: t('sessionDetail.closeTime'),
-      value: new Date(session.closeAt).toLocaleString(localeTag),
+      value: formatDateTime(session.closeAt, localeTag),
     },
     {
       label: t('sessionDetail.radius'),
@@ -113,7 +161,7 @@ const SessionDetailPage = () => {
     <>
       <button
         type="button"
-        onClick={() => navigate(ROUTE_PATHS.attendanceSessions)}
+        onClick={() => navigate(backPath)}
         className="mb-4 text-[12px] font-bold text-muted transition-colors hover:text-accent-strong"
       >
         ← {t('sessionDetail.backToList')}
@@ -187,9 +235,7 @@ const SessionDetailPage = () => {
         )}
 
         {session.participants.length === 0 ? (
-          <p className="px-5 py-6 text-[12px] text-muted">
-            {t('sessionDetail.emptyParticipants')}
-          </p>
+          <EmptyState description={t('sessionDetail.emptyParticipants')} />
         ) : (
           <ul className="divide-y divide-line">
             {session.participants.map((participant) => (
@@ -203,20 +249,15 @@ const SessionDetailPage = () => {
                   </p>
 
                   <p className="mt-0.5 text-[11px] text-muted">
-                    {t('sessionDetail.studentCode')}: {participant.user.code}
+                    {t('sessionDetail.studentCode')}: {participant.user.code} ·{' '}
+                    {t(PARTICIPANT_ROLE_LABEL_KEYS[participant.user.role])}
                   </p>
                 </div>
 
                 <span
-                  className={`rounded-[5px] px-2 py-1 text-[10px] font-extrabold ${
-                    participant.status === 'present'
-                      ? 'bg-positive-soft text-positive'
-                      : 'bg-surface-subtle text-muted'
-                  }`}
+                  className={`rounded-[5px] px-2 py-1 text-[10px] font-extrabold ${ATTENDANCE_STATUS_TONE_CLASS[participant.status]}`}
                 >
-                  {participant.status === 'present'
-                    ? t('sessionDetail.present')
-                    : t('sessionDetail.absent')}
+                  {t(ATTENDANCE_STATUS_LABEL_KEYS[participant.status])}
                 </span>
               </li>
             ))}

@@ -1,74 +1,196 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AttendanceSessionResponse } from '@gps-attendance/shared';
 
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
+import {
+  isAttendanceSession,
+  isAttendanceSessionList,
+} from '../types/attendance-session';
 import type { CreateSessionFormData } from '../types/attendance-session';
+import { createLoadTracker } from '../utils/attendance-sessions/session-filter';
+import {
+  applySessionCreated,
+  toError,
+} from '../utils/attendance-sessions/session-list';
 
 /**
  * `all` — toàn bộ phiên (route admin, mặc định).
  * `created-by-me` — chỉ phiên do user hiện tại tạo; chỉ dùng ở page lecturer vì
  * endpoint phía sau yêu cầu role lecturer.
+ * `created-by` — phiên do một lecturer cụ thể tạo; chỉ dùng khi UI admin cần
+ * lọc theo lecturer vì endpoint phía sau yêu cầu role admin.
  */
-type AttendanceSessionScope = 'all' | 'created-by-me';
+type AttendanceSessionScope = 'all' | 'created-by-me' | 'created-by';
 
 interface UseAttendanceSessionsOptions {
   scope?: AttendanceSessionScope;
+  /** Bắt buộc khi `scope` là `created-by`: id của lecturer cần lọc. */
+  createdByUserId?: number;
+  /**
+   * `false` khi bộ lọc chưa hợp lệ: hook không gọi API nào và tắt loading.
+   * Mặc định `true` để giữ nguyên behavior cũ cho các nơi dùng hiện tại.
+   */
+  enabled?: boolean;
 }
 
 export const useAttendanceSessions = (
   options: UseAttendanceSessionsOptions = {},
 ) => {
-  const { scope = 'all' } = options;
+  const {
+    scope = 'all',
+    createdByUserId,
+    enabled = true,
+  } = options;
 
   const [sessions, setSessions] = useState<AttendanceSessionResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const createInFlightRef = useRef<Promise<void> | null>(null);
+  /** Chỉ request mới nhất được phép ghi state (chặn stale response). */
+  const loadTrackerRef = useRef(createLoadTracker());
+  /** Nhận diện phạm vi hiện tại để xoá dữ liệu cũ khi đổi scope/lecturer. */
+  const scopeKeyRef = useRef(`${scope}:${createdByUserId ?? ''}`);
 
-  const loadSessions = useCallback(async () => {
-    try {
-      const data =
-        scope === 'created-by-me'
-          ? await attendanceSessionsApi.getCreatedByMe()
-          : await attendanceSessionsApi.getAll();
+  const loadSessions = useCallback(async (): Promise<
+    AttendanceSessionResponse[]
+  > => {
+    if (scope === 'created-by-me') {
+      const data: unknown = await attendanceSessionsApi.getCreatedByMe();
 
-      setSessions(data);
-      setHasError(false);
-    } catch {
-      // Không giữ lại dữ liệu cũ và không im lặng bỏ qua lỗi.
-      setSessions([]);
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
+      // Kiểm tra shape trước khi ghi state: không biến payload lạ thành thành công.
+      if (!isAttendanceSessionList(data)) {
+        throw new Error('Unexpected attendance session list response');
+      }
+
+      return [...data];
     }
-  }, [scope]);
 
-  useEffect(() => {
-    // Fetch khi mount; setState trong loadSessions nằm sau `await` nên không
-    // gây cascading render như rule suy đoán.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadSessions();
-  }, [loadSessions]);
+    if (scope === 'created-by') {
+      if (
+        createdByUserId === undefined ||
+        !Number.isInteger(createdByUserId) ||
+        createdByUserId <= 0
+      ) {
+        throw new Error('Missing lecturer user id for attendance session filter');
+      }
+
+      const data: unknown =
+        await attendanceSessionsApi.getCreatedBy(createdByUserId);
+
+      // Kiểm tra shape trước khi ghi state: không biến payload lạ thành thành công.
+      if (!isAttendanceSessionList(data)) {
+        throw new Error('Unexpected attendance session list response');
+      }
+
+      return [...data];
+    }
+
+    const data: unknown = await attendanceSessionsApi.getAll();
+
+    // Kiểm tra shape trước khi ghi state: không biến payload lạ thành thành công.
+    if (!isAttendanceSessionList(data)) {
+      throw new Error('Unexpected attendance session list response');
+    }
+
+    return [...data];
+  }, [scope, createdByUserId]);
 
   const reload = useCallback(async () => {
-    setIsLoading(true);
-    await loadSessions();
-  }, [loadSessions]);
+    const tracker = loadTrackerRef.current;
+    const requestId = tracker.begin();
 
-  const createSession = async (data: CreateSessionFormData) => {
-    const created = await attendanceSessionsApi.create(data);
+    // Đổi phạm vi (vd chọn lecturer khác): xoá dữ liệu phạm vi cũ ngay từ đầu
+    // để request mới thất bại không bị nhìn nhầm là dữ liệu của lecturer cũ.
+    const scopeKey = `${scope}:${createdByUserId ?? ''}`;
 
-    if (!created || typeof created.id !== 'number') {
-      throw new Error('Server không trả về dữ liệu session hợp lệ sau khi tạo');
+    if (scopeKeyRef.current !== scopeKey) {
+      scopeKeyRef.current = scopeKey;
+      setSessions([]);
     }
 
-    setSessions((prev) => [created, ...prev]);
-  };
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const data = await loadSessions();
+
+      // Request cũ hoàn thành sau khi đã đổi phạm vi: bỏ qua, không ghi state.
+      if (!tracker.isActive(requestId)) return;
+
+      setSessions(data);
+    } catch (unknownError) {
+      if (!tracker.isActive(requestId)) return;
+
+      // Giữ danh sách hiện có của phạm vi hiện tại; lỗi không được biến thành
+      // dữ liệu của phạm vi khác (đã xoá khi đổi phạm vi ở trên).
+      setError(
+        toError(
+          unknownError,
+          new Error('Unable to load attendance sessions'),
+        ),
+      );
+    } finally {
+      // Request cũ kết thúc muộn không được tắt loading của request mới.
+      if (tracker.isActive(requestId)) setIsLoading(false);
+    }
+  }, [loadSessions, scope, createdByUserId]);
+
+  useEffect(() => {
+    // Bộ lọc chưa hợp lệ: không gọi API nào (yêu cầu task), tắt loading.
+    if (!enabled) {
+      setIsLoading(false);
+
+      return;
+    }
+
+    // Fetch khi mount/đổi scope; setState trong reload nằm trong async nên
+    // không gây cascading render như rule suy đoán.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void reload();
+  }, [reload, enabled]);
+
+  const createSession = useCallback(
+    async (data: CreateSessionFormData): Promise<void> => {
+      // Chặn submit lặp: nếu request đang chạy thì dùng lại chính request đó
+      // thay vì POST thêm một phiên trùng.
+      const inFlight = createInFlightRef.current;
+
+      if (inFlight) return inFlight;
+
+      const request = (async () => {
+        setIsCreating(true);
+
+        try {
+          const created: unknown = await attendanceSessionsApi.create(data);
+
+          if (!isAttendanceSession(created)) {
+            throw new Error('Unexpected attendance session response');
+          }
+
+          setSessions((previous) => applySessionCreated(previous, created));
+        } finally {
+          setIsCreating(false);
+        }
+      })();
+
+      createInFlightRef.current = request;
+
+      try {
+        await request;
+      } finally {
+        createInFlightRef.current = null;
+      }
+    },
+    [],
+  );
 
   return {
     sessions,
     isLoading,
-    hasError,
+    error,
+    isCreating,
     createSession,
     reload,
   };

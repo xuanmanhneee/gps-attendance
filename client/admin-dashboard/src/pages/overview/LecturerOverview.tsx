@@ -39,7 +39,7 @@ export const LecturerOverview = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
 
-  const { sessions, isLoading, hasError, createSession, reload } =
+  const { sessions, isLoading, error, createSession, reload } =
     useAttendanceSessions({ scope: 'created-by-me' });
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -48,7 +48,7 @@ export const LecturerOverview = () => {
     0,
     RECENT_SESSION_LIMIT,
   );
-  const hasSummaryData = !isLoading && !hasError;
+  const hasSummaryData = !isLoading && !error;
   const todayCount = countSessionsOpenedOn(sessions, new Date());
 
   const sessionsSubtitle = t('dashboard.recentSessionsSubtitle.lecturer');
@@ -118,7 +118,7 @@ export const LecturerOverview = () => {
           <SessionTable
             sessions={recentSessions}
             isLoading={isLoading}
-            hasError={hasError}
+            error={error}
             onRetry={reload}
           />
         </Panel>

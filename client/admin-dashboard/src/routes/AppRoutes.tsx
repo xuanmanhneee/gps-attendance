@@ -51,14 +51,12 @@ const AppRoutes = () => (
           <Route path={ROUTE_PATHS.tags} element={<TagsPage />} />
         </Route>
 
-        <Route element={<RoleGuard allowedRoles={['lecturer']} />}>
+        {/* Danh sách phiên: lecturer xem của mình, admin xem toàn bộ + lọc theo lecturer
+            (endpoint `created-by` phía sau yêu cầu role admin). */}
+        <Route element={<RoleGuard allowedRoles={['admin', 'lecturer']} />}>
           <Route
             path={ROUTE_PATHS.attendanceSessions}
             element={<SessionsPage />}
-          />
-          <Route
-            path={ROUTE_PATHS.attendanceSessionDetail}
-            element={<SessionDetailPage />}
           />
           <Route
             path={ROUTE_PATHS.attendanceRecords}
@@ -67,6 +65,14 @@ const AppRoutes = () => (
           <Route
             path={ROUTE_PATHS.statistics}
             element={<StatisticsPage />}
+          />
+        </Route>
+
+        {/* Chi tiết phiên: cả admin và lecturer đều được xem (backend chỉ yêu cầu đăng nhập). */}
+        <Route element={<RoleGuard allowedRoles={['admin', 'lecturer']} />}>
+          <Route
+            path={ROUTE_PATHS.attendanceSessionDetail}
+            element={<SessionDetailPage />}
           />
         </Route>
 

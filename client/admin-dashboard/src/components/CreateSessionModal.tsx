@@ -1,5 +1,4 @@
 import { useForm, useWatch } from 'react-hook-form';
-import { IoClose } from 'react-icons/io5';
 import {
   MdMyLocation,
   MdLocationOn,
@@ -9,7 +8,10 @@ import {
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
 
+import { useTranslation } from '../hooks/useTranslation';
 import type { CreateSessionFormData } from '../types/attendance-session';
+import { CreateSessionModalActions } from './CreateSessionModalActions';
+import { CreateSessionModalHeader } from './CreateSessionModalHeader';
 
 export type { CreateSessionFormData };
 
@@ -59,6 +61,7 @@ export const CreateSessionModal = ({
   onClose,
   onSubmitSuccess,
 }: CreateSessionModalProps) => {
+  const { t } = useTranslation();
   const now = new Date();
   const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 
@@ -93,7 +96,7 @@ export const CreateSessionModal = ({
   // Lấy tọa độ GPS hiện tại từ trình duyệt
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
-      toast.error('Trình duyệt không hỗ trợ định vị GPS');
+      toast.error(t('sessions.form.locationError'));
       return;
     }
 
@@ -101,10 +104,10 @@ export const CreateSessionModal = ({
       (position) => {
         setValue('latitude', parseFloat(position.coords.latitude.toFixed(6)));
         setValue('longitude', parseFloat(position.coords.longitude.toFixed(6)));
-        toast.success('Đã lấy tọa độ hiện tại thành công!');
+        toast.success(t('sessions.form.locationSuccess'));
       },
-      (error) => {
-        toast.error('Không thể lấy vị trí: ' + error.message);
+      (_error) => {
+        toast.error(t('sessions.form.locationError'));
       },
       { enableHighAccuracy: true },
     );
@@ -116,13 +119,13 @@ export const CreateSessionModal = ({
       const closeAt = `${values.closeDate}T${values.closeTime}`;
 
       if (new Date(openAt) >= new Date(closeAt)) {
-        toast.error('Thời gian kết thúc phải sau thời gian bắt đầu');
+        toast.error(t('sessions.form.timeRangeInvalid'));
         return;
       }
 
       const codes = parseStudentCodes(values.studentCodesText);
       if (codes.length === 0) {
-        toast.error('Vui lòng nhập ít nhất một mã sinh viên');
+        toast.error(t('sessions.form.participantCodesRequired'));
         return;
       }
 
@@ -141,39 +144,22 @@ export const CreateSessionModal = ({
       if (onSubmitSuccess) {
         await onSubmitSuccess(data);
       }
-      toast.success('Tạo phiên điểm danh thành công!');
+      toast.success(t('sessions.createSuccess'));
       reset();
       onClose();
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : 'Có lỗi xảy ra khi tạo phiên',
+          : t('sessions.createError'),
       );
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-200">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">
-              Tạo phiên điểm danh mới
-            </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Cấu hình phạm vi GPS, thời gian và sinh viên áp dụng
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            type="button"
-            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-          >
-            <IoClose className="text-xl" />
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-surface shadow-panel animate-in fade-in zoom-in duration-200">
+        <CreateSessionModalHeader onClose={onClose} />
 
         {/* Modal Body */}
         <form
@@ -182,214 +168,251 @@ export const CreateSessionModal = ({
         >
           {/* Section 1: Tên phiên */}
           <div>
-            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
-              <MdOutlineTitle className="text-blue-600 text-sm" />
-              Tên phiên điểm danh / Môn học{' '}
-              <span className="text-red-500">*</span>
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-ink mb-1.5">
+              <MdOutlineTitle className="text-accent-strong text-sm" />
+              {t('sessions.form.title')} <span className="text-danger">*</span>
             </label>
             <input
               type="text"
-              placeholder="VD: Lập trình Web - Tiết 1,2 (Thứ 2)"
+              placeholder={t('sessions.form.titlePlaceholder')}
+              aria-invalid={Boolean(errors.title)}
               {...register('title', {
-                required: 'Vui lòng nhập tên phiên điểm danh',
+                required: t('sessions.form.titleRequired'),
               })}
-              className="w-full px-3.5 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              className="w-full rounded-lg border border-line bg-surface px-3.5 py-2 text-base text-ink placeholder:text-muted-soft focus:border-accent-strong focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:opacity-60"
             />
             {errors.title && (
-              <p className="text-red-500 text-xs mt-1">
+              <p className="text-danger text-xs mt-1">
                 {errors.title.message}
               </p>
             )}
           </div>
 
           {/* Section 2: Tọa độ GPS & Bán kính */}
-          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
+          <div className="space-y-3 rounded-xl border border-line bg-surface-subtle p-4">
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
-                <MdLocationOn className="text-blue-600 text-sm" />
-                Vị trí & Bán kính GPS cho phép{' '}
-                <span className="text-red-500">*</span>
+              <label className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                <MdLocationOn className="text-accent-strong text-sm" />
+                {t('sessions.form.locationSection')} <span className="text-danger">*</span>
               </label>
               <button
                 type="button"
                 onClick={handleGetCurrentLocation}
-                className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200 cursor-pointer"
+                className="flex items-center gap-1 text-sm font-medium text-accent-strong transition-colors hover:text-accent-strong bg-accent-soft px-2.5 py-1 rounded-md border border-accent-strong cursor-pointer"
               >
                 <MdMyLocation />
-                Lấy vị trí hiện tại
+                {t('sessions.form.useCurrentLocation')}
               </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Vĩ độ (Latitude)
+                <label className="text-xs text-muted mb-1 block">
+                  {t('sessions.form.latitude')}
                 </label>
                 <input
                   type="number"
                   step="any"
                   placeholder="21.028511"
                   {...register('latitude', {
-                    required: 'Thiếu vĩ độ',
+                    required: t('sessions.form.latitudeRequired'),
                     valueAsNumber: true,
+                    validate: (value) => {
+                      if (value === null || value === undefined || isNaN(value)) return t('sessions.form.latitudeRequired');
+                      if (value < -90 || value > 90) return t('sessions.form.latitudeInvalid');
+                      return true;
+                    },
                   })}
-                  className="w-full px-3 py-1.5 text-base bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-ink placeholder:text-muted-soft focus:border-accent-strong focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:opacity-60"
                 />
+                {errors.latitude && (
+                  <p className="text-danger text-xs mt-1">
+                    {errors.latitude.message}
+                  </p>
+                )}
               </div>
-
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Kinh độ (Longitude)
+                <label className="text-xs text-muted mb-1 block">
+                  {t('sessions.form.longitude')}
                 </label>
                 <input
                   type="number"
                   step="any"
                   placeholder="105.804817"
                   {...register('longitude', {
-                    required: 'Thiếu kinh độ',
+                    required: t('sessions.form.longitudeRequired'),
                     valueAsNumber: true,
+                    validate: (value) => {
+                      if (value === null || value === undefined || isNaN(value)) return t('sessions.form.longitudeRequired');
+                      if (value < -180 || value > 180) return t('sessions.form.longitudeInvalid');
+                      return true;
+                    },
                   })}
-                  className="w-full px-3 py-1.5 text-base bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-ink placeholder:text-muted-soft focus:border-accent-strong focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:opacity-60"
                 />
+                {errors.longitude && (
+                  <p className="text-danger text-xs mt-1">
+                    {errors.longitude.message}
+                  </p>
+                )}
               </div>
-
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Bán kính (mét)
+                <label className="text-xs text-muted mb-1 block">
+                  {t('sessions.form.radius')}
                 </label>
                 <input
                   type="number"
+                  step="any"
                   placeholder="50"
                   {...register('radius', {
-                    required: 'Thiếu bán kính',
-                    min: 5,
+                    required: t('sessions.form.radiusRequired'),
                     valueAsNumber: true,
+                    validate: (value) => {
+                      if (value === null || value === undefined || isNaN(value)) return t('sessions.form.radiusRequired');
+                      if (value <= 0) return t('sessions.form.radiusInvalid');
+                      return true;
+                    },
                   })}
-                  className="w-full px-3 py-1.5 text-base bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+                  className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-ink placeholder:text-muted-soft focus:border-accent-strong focus:outline-none focus:ring-2 focus:ring-accent-soft disabled:opacity-60"
                 />
+                {errors.radius && (
+                  <p className="text-danger text-xs mt-1">
+                    {errors.radius.message}
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
           {/* Section 3: Thời gian */}
-          <div className="rounded-xl border border-gray-200 bg-slate-50 p-4">
+          <div className="space-y-3 rounded-xl border border-line bg-surface-subtle p-4">
             <div className="mb-3 flex items-center gap-1.5">
-              <MdAccessTime className="text-blue-600 text-sm" />
-              <h3 className="text-sm font-semibold text-gray-700">
-                Thời gian điểm danh
+              <MdAccessTime className="text-accent-strong text-sm" />
+              <h3 className="text-sm font-semibold text-ink">
+                {t('sessions.form.timeSection')}
               </h3>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="rounded-lg border border-blue-100 bg-white p-3">
-                <p className="mb-2 text-sm font-semibold text-blue-700">
-                  Bắt đầu
+              <div className="rounded-lg border border-line bg-surface p-3">
+                <p className="mb-2 text-sm font-semibold text-ink">
+                  {t('sessions.form.openTime')}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="text-sm text-gray-500">
-                    Ngày
+                  <label className="text-sm text-muted">
+                    {t('sessions.form.openDate')}
                     <input
                       type="date"
                       {...register('openDate', {
-                        required: 'Vui lòng chọn ngày bắt đầu',
+                        required: t('sessions.form.openTimeRequired'),
                       })}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-2.5 py-2 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                      className="mt-1 w-full rounded-lg border border-line px-2.5 py-2 text-base text-ink outline-none transition focus:border-accent-strong focus:ring-2 focus:ring-accent-soft disabled:opacity-60"
                     />
                   </label>
-                  <label className="text-sm text-gray-500">
-                    Giờ
+                  <label className="text-sm text-muted">
+                    {t('sessions.form.openClock')}
                     <input
                       type="time"
                       {...register('openTime', {
-                        required: 'Vui lòng chọn giờ bắt đầu',
+                        required: t('sessions.form.openTimeRequired'),
                       })}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-2.5 py-2 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                      className="mt-1 w-full rounded-lg border border-line px-2.5 py-2 text-base text-ink outline-none transition focus:border-accent-strong focus:ring-2 focus:ring-accent-soft disabled:opacity-60"
                     />
                   </label>
                 </div>
+                {errors.openDate && (
+                  <p className="text-danger text-xs mt-1">
+                    {errors.openDate.message}
+                  </p>
+                )}
+                {errors.openTime && (
+                  <p className="text-danger text-xs mt-1">
+                    {errors.openTime.message}
+                  </p>
+                )}
               </div>
 
-              <div className="rounded-lg border border-amber-100 bg-white p-3">
-                <p className="mb-2 text-sm font-semibold text-amber-700">
-                  Kết thúc
+              <div className="rounded-lg border border-line bg-surface p-3">
+                <p className="mb-2 text-sm font-semibold text-ink">
+                  {t('sessions.form.closeTime')}
                 </p>
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="text-sm text-gray-500">
-                    Ngày
+                  <label className="text-sm text-muted">
+                    {t('sessions.form.closeDate')}
                     <input
                       type="date"
                       {...register('closeDate', {
-                        required: 'Vui lòng chọn ngày kết thúc',
+                        required: t('sessions.form.closeTimeRequired'),
                       })}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-2.5 py-2 text-base outline-none transition focus:border-amber-600 focus:ring-2 focus:ring-amber-100"
+                      className="mt-1 w-full rounded-lg border border-line px-2.5 py-2 text-base text-ink outline-none transition focus:border-accent-strong focus:ring-2 focus:ring-accent-soft disabled:opacity-60"
                     />
                   </label>
-                  <label className="text-sm text-gray-500">
-                    Giờ
+                  <label className="text-sm text-muted">
+                    {t('sessions.form.closeClock')}
                     <input
                       type="time"
                       {...register('closeTime', {
-                        required: 'Vui lòng chọn giờ kết thúc',
+                        required: t('sessions.form.closeTimeRequired'),
                       })}
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-2.5 py-2 text-base outline-none transition focus:border-amber-600 focus:ring-2 focus:ring-amber-100"
+                      className="mt-1 w-full rounded-lg border border-line px-2.5 py-2 text-base text-ink outline-none transition focus:border-accent-strong focus:ring-2 focus:ring-accent-soft disabled:opacity-60"
                     />
                   </label>
                 </div>
+                {errors.closeDate && (
+                  <p className="text-danger text-xs mt-1">
+                    {errors.closeDate.message}
+                  </p>
+                )}
+                {errors.closeTime && (
+                  <p className="text-danger text-xs mt-1">
+                    {errors.closeTime.message}
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
           {/* Section 4: Mã sinh viên tham gia (tạm thời: nhập tay, phân cách bằng dấu phẩy) */}
           <div>
-            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
-              <MdGroup className="text-blue-600 text-sm" />
-              Mã sinh viên được tham gia <span className="text-red-500">*</span>
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-ink mb-1.5">
+              <MdGroup className="text-accent-strong text-sm" />
+              {t('sessions.form.participantCodes')} <span className="text-danger">*</span>
             </label>
             <textarea
               rows={3}
-              placeholder="VD: SV001, SV002, SV003"
+              placeholder={t('sessions.form.titlePlaceholder')}
               {...register('studentCodesText', {
-                required: 'Vui lòng nhập ít nhất một mã sinh viên',
+                required: t('sessions.form.participantCodesRequired'),
                 validate: (value) =>
                   parseStudentCodes(value).length > 0 ||
-                  'Vui lòng nhập ít nhất một mã sinh viên',
+                  t('sessions.form.participantCodesRequired'),
               })}
-              className="w-full px-3.5 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 resize-none"
+              className="w-full rounded-lg border border-line bg-surface px-3.5 py-2 text-base text-ink placeholder:text-muted-soft focus:border-accent-strong focus:outline-none focus:ring-2 focus:ring-accent-soft resize-none disabled:opacity-60"
             />
             <div className="mt-1.5 flex items-center justify-between">
               {errors.studentCodesText ? (
-                <p className="text-red-500 text-xs">
+                <p className="text-danger text-xs">
                   {errors.studentCodesText.message}
                 </p>
               ) : (
-                <span className="text-xs text-gray-400">
-                  Phân cách các mã bằng dấu phẩy
+                <span className="text-xs text-muted-soft">
+                  {t('sessions.form.participantCodesHint')}
                 </span>
               )}
               {studentCodesPreviewCount > 0 && (
-                <span className="text-xs text-green-600">
-                  {studentCodesPreviewCount} mã hợp lệ
+                <span className="text-xs text-positive">
+                  {t('sessions.form.participantCodesValid', { count: studentCodesPreviewCount })}
                 </span>
               )}
             </div>
           </div>
 
           {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-base font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-5 py-2 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? 'Đang tạo...' : 'Tạo phiên điểm danh'}
-            </button>
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-line">
+            <CreateSessionModalActions
+              isSubmitting={isSubmitting}
+              onClose={onClose}
+            />
           </div>
         </form>
       </div>

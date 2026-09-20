@@ -1,0 +1,372 @@
+1 d0 import { useForm, useWatch } from 'react-hook-form';
+2 d0 import { IoLocationSharp } from 'react-icons/io5';
+3 d0 import {
+4 d0   MdAccessTime,
+5 d0   MdGroup,
+6 d0   MdMyLocation,
+7 d0   MdOutlineTitle,
+8 d0 } from 'react-icons/md';
+9 d0 import { toast } from 'react-toastify';
+10 d0 
+11 d0 import { useTranslation } from '../hooks/useTranslation';
+12 d0 import type { CreateSessionFormData } from '../types/attendance-session';
+13 d0 import {
+14 d0   buildCreateSessionRequest,
+15 d0   createDefaultSessionFormValues,
+16 d0   parseStudentCodes,
+17 d0   resolveGeolocationErrorKey,
+18 d0   validateSessionForm,
+19 d0   type SessionFormErrors,
+20 d0   type SessionFormField,
+21 d0   type SessionFormValues,
+22 d0 } from '../utils/attendance-sessions/session-form';
+23 d0 import { logSessionError, resolveSessionErrorKey } from './sessions/session-errors';
+24 d0 import { CreateSessionModalActions } from './CreateSessionModalActions';
+25 d0 import { CreateSessionModalHeader } from './CreateSessionModalHeader';
+26 d0 import { Dialog } from './ui/Dialog';
+27 d0 
+28 d0 /** Map field -> id của phần tử lỗi, dùng cho `aria-describedby`. */
+29 d0 const FIELD_ERROR_ID: Record<SessionFormField, string> = {
+30 d0   title: 'create-session-title-error',
+31 d0   latitude: 'create-session-latitude-error',
+32 d0   longitude: 'create-session-longitude-error',
+33 d0   radius: 'create-session-radius-error',
+34 d0   closeTime: 'create-session-close-time-error',
+35 d0   studentCodesText: 'create-session-codes-error',
+36 d0 };
+37 d0 
+38 d0 interface CreateSessionModalProps {
+39 d0   isOpen: boolean;
+40 d0   onClose: () => void;
+41 d0   onSubmitSuccess?: (data: CreateSessionFormData) => void;
+42 d0 }
+43 d0 
+44 d0 // Giữ behavior cũ: Date mặc định tính tại thời điểm mount.
+45 d0 export const CreateSessionModal = ({
+46 d0   isOpen,
+47 d0   onClose,
+48 d0   onSubmitSuccess,
+49 d0 }: CreateSessionModalProps) => {
+50 d0   const { t } = useTranslation();
+51 d0 
+52 d0   const {
+53 d0     register,
+54 d0     handleSubmit,
+55 d0     setValue,
+56 d0     reset,
+57 d0     setError,
+58 d0     clearErrors,
+59 d0     control,
+60 d0     formState: { errors, isSubmitting },
+61 d0   } = useForm<SessionFormValues>({
+62 d0     defaultValues: createDefaultSessionFormValues(),
+63 d0   });
+64 d0 
+65 d0   const studentCodesText = useWatch({
+66 d0     control,
+67 d0     name: 'studentCodesText',
+68 d0   });
+69 d0 
+70 d0   if (!isOpen) return null;
+71 d0 
+72 d0   const studentCodesPreviewCount = parseStudentCodes(studentCodesText).length;
+73 d0 
+74 d0   const close = () => {
+75 d0     // Chặn đóng khi đang submit để không mất trạng thái xử lý.
+76 d0     if (isSubmitting) return;
+77 d0 
+78 d0     reset(createDefaultSessionFormValues());
+79 d0     clearErrors();
+80 d0     onClose();
+81 d0   };
+82 d0 
+83 d0   // Lấy tọa độ GPS hiện tại từ trình duyệt, giữ nguyên behavior cũ.
+84 d0   const handleGetCurrentLocation = () => {
+85 d0     if (!navigator.geolocation) {
+86 d0       toast.error(t('sessions.form.locationError'));
+87 d0       return;
+88 d0     }
+89 d0 
+90 d0     navigator.geolocation.getCurrentPosition(
+91 d0       (position) => {
+92 d0         setValue('latitude', parseFloat(position.coords.latitude.toFixed(6)));
+93 d0         setValue('longitude', parseFloat(position.coords.longitude.toFixed(6)));
+94 d0         toast.success(t('sessions.form.locationSuccess'));
+95 d0       },
+96 d0       (geoError) => {
+97 d0         toast.error(t(resolveGeolocationErrorKey(geoError)));
+98 d0       },
+99 d0       { enableHighAccuracy: true },
+100 d0     );
+101 d0   };
+102 d0 
+103 d0   const applyFormErrors = (formErrors: SessionFormErrors) => {
+104 d0     (Object.keys(formErrors) as SessionFormField[]).forEach((field) => {
+105 d0       const key = formErrors[field];
+106 d0       if (key) setError(field, { type: 'manual', message: t(key) });
+107 d0     });
+108 d0   };
+109 d0 
+110 d0   const handleFormSubmit = async (values: SessionFormValues) => {
+111 d0     const formErrors = validateSessionForm(values);
+112 d0 
+113 d0     if (Object.keys(formErrors).length > 0) {
+114 d0       applyFormErrors(formErrors);
+115 d0       return;
+116 d0     }
+117 d0 
+118 d0     clearErrors();
+119 d0 
+120 d0     try {
+121 d0       // Payload khớp CreateAttendanceSessionRequest, codeFilter từ text phân cách phẩy.
+122 d0       const request = buildCreateSessionRequest(values);
+123 d0 
+124 d0       if (onSubmitSuccess) {
+125 d0         await onSubmitSuccess(request);
+126 d0       }
+127 d0       toast.success(t('sessions.createSuccess'));
+128 d0       reset(createDefaultSessionFormValues());
+129 d0       onClose();
+130 d0     } catch (error) {
+131 d0       // Hiển thị lỗi API rõ ràng qua i18n, không nuốt lỗi / lộ raw message.
+132 d0       logSessionError('create', error);
+133 d0       toast.error(t(resolveSessionErrorKey(error, 'create')));
+134 d0     }
+135 d0   };
+136 d0 
+137 d0   const renderError = (field: SessionFormField) =>
+138 d0     errors[field]?.message ? (
+139 d0       <p id={FIELD_ERROR_ID[field]} role="alert" className="mt-1 text-xs text-red-500">
+140 d0         {errors[field]?.message}
+141 d0       </p>
+142 d0     ) : null;
+143 d0 
+144 d0   return (
+145 d0     <Dialog
+146 d0       ariaLabel={t('sessions.form.heading')}
+147 d0       canClose={!isSubmitting}
+148 d0       onClose={close}
+149 d0       panelClassName="w-full max-w-xl"
+150 d0     >
+151 d1       <div className="flex flex-col overflow-hidden rounded-b-xl bg-surface shadow-panel">
+152 d1         <CreateSessionModalHeader onClose={close} />
+153 d1         {/* Modal Body */}
+154 d1         <form
+155 d1           onSubmit={handleSubmit(handleFormSubmit)}
+156 d1           className="flex-1 overflow-y-auto p-6"
+157 d1         >
+158 d2           <div className="space-y-5">
+159 d2             {/* Section 1: Tên phiên */}
+160 d3             <div>
+161 d3               <label htmlFor="create-session-title" className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+162 d3               <MdOutlineTitle aria-hidden="true" className="text-sm text-blue-600" />
+163 d3               {t('sessions.form.title')} <span aria-hidden="true" className="text-red-500">*</span>
+164 d3             </label>
+165 d3             <input
+166 d3               id="create-session-title"
+167 d3               type="text"
+168 d3               placeholder={t('sessions.form.titlePlaceholder')}
+169 d3               aria-invalid={Boolean(errors.title)}
+170 d3               aria-describedby={errors.title ? FIELD_ERROR_ID.title : undefined}
+171 d3               {...register('title')}
+172 d3               className="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-base focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:outline-none"
+173 d3             />
+174 d3             {renderError('title')}
+175 d2           </div>
+176 d2 
+177 d2           {/* Section 2: Tọa độ GPS & Bán kính */}
+178 d3           <div className="space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+179 d4             <div className="flex items-center justify-between">
+180 d4               <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+181 d4                 <IoLocationSharp aria-hidden="true" className="text-sm text-blue-600" />
+182 d4                 {t('sessions.form.locationSection')}
+183 d4               </span>
+184 d4               <button
+185 d4                 type="button"
+186 d4                 onClick={handleGetCurrentLocation}
+187 d4                 className="flex cursor-pointer items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+188 d4               >
+189 d4                 <MdMyLocation aria-hidden="true" />
+190 d4                 {t('sessions.form.useCurrentLocation')}
+191 d4               </button>
+192 d3             </div>
+193 d3 
+194 d4             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+195 d5               <div>
+196 d5                 <label htmlFor="create-session-latitude" className="text-xs text-gray-500 mb-1 block">
+197 d5                   {t('sessions.form.latitude')}
+198 d5                 </label>
+199 d5                 <input
+200 d5                   id="create-session-latitude"
+201 d5                   type="number"
+202 d5                   step="any"
+203 d5                   placeholder="21.028511"
+204 d5                   aria-invalid={Boolean(errors.latitude)}
+205 d5                   aria-describedby={errors.latitude ? FIELD_ERROR_ID.latitude : undefined}
+206 d5                   {...register('latitude', { valueAsNumber: true })}
+207 d5                   className="w-full px-3 py-1.5 text-base bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+208 d5                 />
+209 d5                 {renderError('latitude')}
+210 d4               </div>
+211 d4 
+212 d5               <div>
+213 d5                 <label htmlFor="create-session-longitude" className="text-xs text-gray-500 mb-1 block">
+214 d5                   {t('sessions.form.longitude')}
+215 d5                 </label>
+216 d5                 <input
+217 d5                   id="create-session-longitude"
+218 d5                   type="number"
+219 d5                   step="any"
+220 d5                   placeholder="105.804817"
+221 d5                   aria-invalid={Boolean(errors.longitude)}
+222 d5                   aria-describedby={errors.longitude ? FIELD_ERROR_ID.longitude : undefined}
+223 d5                   {...register('longitude', { valueAsNumber: true })}
+224 d5                   className="w-full px-3 py-1.5 text-base bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+225 d5                 />
+226 d5                 {renderError('longitude')}
+227 d4               </div>
+228 d4 
+229 d5               <div>
+230 d5                 <label htmlFor="create-session-radius" className="text-xs text-gray-500 mb-1 block">
+231 d5                   {t('sessions.form.radius')}
+232 d5                 </label>
+233 d5                 <input
+234 d5                   id="create-session-radius"
+235 d5                   type="number"
+236 d5                   placeholder="50"
+237 d5                   aria-invalid={Boolean(errors.radius)}
+238 d5                   aria-describedby={errors.radius ? FIELD_ERROR_ID.radius : undefined}
+239 d5                   {...register('radius', { valueAsNumber: true })}
+240 d5                   className="w-full px-3 py-1.5 text-base bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
+241 d5                 />
+242 d5                 {renderError('radius')}
+243 d4               </div>
+244 d3             </div>
+245 d2           </div>
+246 d2 
+247 d2           {/* Section 3: Thời gian */}
+248 d3           <div className="rounded-xl border border-gray-200 bg-slate-50 p-4">
+249 d4             <div className="mb-3 flex items-center gap-1.5">
+250 d4               <MdAccessTime aria-hidden="true" className="text-sm text-blue-600" />
+251 d4               <h3 className="text-sm font-semibold text-gray-700">
+252 d4                 {t('sessions.form.timeSection')}
+253 d4               </h3>
+254 d3             </div>
+255 d3 
+256 d4             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+257 d5               <div className="rounded-lg border border-blue-100 bg-white p-3">
+258 d5                 <p className="mb-2 text-sm font-semibold text-blue-700">
+259 d5                   {t('sessions.form.openTime')}
+260 d5                 </p>
+261 d6                 <div className="grid grid-cols-2 gap-2">
+262 d6                   <label className="text-sm text-gray-500">
+263 d6                     {t('sessions.form.openDate')}
+264 d6                     <input
+265 d6                       type="date"
+266 d6                       aria-label={t('sessions.form.openDate')}
+267 d6                       {...register('openDate', {
+268 d6                         required: t('sessions.form.openTimeRequired'),
+269 d6                       })}
+270 d6                       className="mt-1 w-full rounded-lg border border-gray-300 px-2.5 py-2 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+271 d6                     />
+272 d6                   </label>
+273 d6                   <label className="text-sm text-gray-500">
+274 d6                     {t('sessions.form.openClock')}
+275 d6                     <input
+276 d6                       type="time"
+277 d6                       aria-label={t('sessions.form.openClock')}
+278 d6                       {...register('openTime', {
+279 d6                         required: t('sessions.form.openTimeRequired'),
+280 d6                       })}
+281 d6                       className="mt-1 w-full rounded-lg border border-gray-300 px-2.5 py-2 text-base outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+282 d6                     />
+283 d6                   </label>
+284 d5                 </div>
+285 d4               </div>
+286 d4 
+287 d5               <div className="rounded-lg border border-amber-100 bg-white p-3">
+288 d5                 <p className="mb-2 text-sm font-semibold text-amber-700">
+289 d5                   {t('sessions.form.closeTime')}
+290 d5                 </p>
+291 d6                 <div className="grid grid-cols-2 gap-2">
+292 d6                   <label className="text-sm text-gray-500">
+293 d6                     {t('sessions.form.closeDate')}
+294 d6                     <input
+295 d6                       type="date"
+296 d6                       aria-label={t('sessions.form.closeDate')}
+297 d6                       {...register('closeDate', {
+298 d6                         required: t('sessions.form.closeTimeRequired'),
+299 d6                       })}
+300 d6                       className="mt-1 w-full rounded-lg border border-gray-300 px-2.5 py-2 text-base outline-none transition focus:border-amber-600 focus:ring-2 focus:ring-amber-100"
+301 d6                     />
+302 d6                   </label>
+303 d6                   <label className="text-sm text-gray-500">
+304 d6                     {t('sessions.form.closeClock')}
+305 d6                     <input
+306 d6                       type="time"
+307 d6                       aria-label={t('sessions.form.closeClock')}
+308 d6                       {...register('closeTime', {
+309 d6                         required: t('sessions.form.closeTimeRequired'),
+310 d6                       })}
+311 d6                       className="mt-1 w-full rounded-lg border border-gray-300 px-2.5 py-2 text-base outline-none transition focus:border-amber-600 focus:ring-2 focus:ring-amber-100"
+312 d6                     />
+313 d6                   </label>
+314 d5                 </div>
+315 d4               </div>
+316 d3             </div>
+317 d3             {renderError('closeTime')}
+318 d2           </div>
+319 d2 
+320 d2           {/* Section 4: Mã sinh viên tham gia (tạm thời: nhập tay, phân cách bằng dấu phẩy) */}
+321 d3           <div>
+322 d3             <label
+323 d3               htmlFor="create-session-codes"
+324 d3               className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-gray-700"
+325 d3             >
+326 d3               <MdGroup aria-hidden="true" className="text-sm text-blue-600" />
+327 d3               {t('sessions.form.participantCodes')}{' '}
+328 d3               <span aria-hidden="true" className="text-red-500">*</span>
+329 d3             </label>
+330 d3             <textarea
+331 d3               id="create-session-codes"
+332 d3               rows={3}
+333 d3               placeholder={t('sessions.form.participantCodesHint')}
+334 d3               aria-invalid={Boolean(errors.studentCodesText)}
+335 d3               aria-describedby={
+336 d3                 errors.studentCodesText
+337 d3                   ? FIELD_ERROR_ID.studentCodesText
+338 d3                   : undefined
+339 d3               }
+340 d3               {...register('studentCodesText', {
+341 d3                 validate: (value) =>
+342 d3                   parseStudentCodes(value).length > 0 ||
+343 d3                   t('sessions.form.participantCodesRequired'),
+344 d3               })}
+345 d3               className="w-full resize-none rounded-lg border border-gray-300 px-3.5 py-2 text-base focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+346 d3             />
+347 d4             <div className="mt-1.5 flex items-center justify-between">
+348 d4               {renderError('studentCodesText') ?? (
+349 d4                 <span className="text-xs text-gray-400">
+350 d4                   {t('sessions.form.participantCodesHint')}
+351 d4                 </span>
+352 d4               )}
+353 d4               {studentCodesPreviewCount > 0 && (
+354 d4                 <span className="text-xs text-green-600">
+355 d4                   {t('sessions.form.participantCodesValid', {
+356 d4                     count: studentCodesPreviewCount,
+357 d4                   })}
+358 d4                 </span>
+359 d4               )}
+360 d3             </div>
+361 d2           </div>
+362 d2 
+363 d2           <CreateSessionModalActions
+364 d2             isSubmitting={isSubmitting}
+365 d2             onClose={close}
+366 d2           />
+367 d2         </form>
+368 d1       </div>
+369 d1     </Dialog>
+370 d1   );
+371 d1 };
+372 d1 

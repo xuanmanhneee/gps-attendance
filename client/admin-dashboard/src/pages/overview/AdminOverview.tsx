@@ -33,14 +33,14 @@ const RECENT_SESSION_LIMIT = 5;
 export const AdminOverview = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { sessions, isLoading, hasError, reload } = useAttendanceSessions();
+  const { sessions, isLoading, error, reload } = useAttendanceSessions();
 
   const counts = countSessionsByStatus(sessions);
   const recentSessions = sortSessionsByOpenAtDesc(sessions).slice(
     0,
     RECENT_SESSION_LIMIT,
   );
-  const hasSummaryData = !isLoading && !hasError;
+  const hasSummaryData = !isLoading && !error;
 
   return (
     <>
@@ -94,7 +94,7 @@ export const AdminOverview = () => {
           <SessionTable
             sessions={recentSessions}
             isLoading={isLoading}
-            hasError={hasError}
+            error={error}
             onRetry={reload}
           />
         </Panel>
@@ -108,7 +108,7 @@ export const AdminOverview = () => {
 
             {isLoading ? (
               <DataState variant="loading" title={t('common.loading')} />
-            ) : hasError ? (
+            ) : error ? (
               <DataState
                 variant="error"
                 title={t('common.errorTitle')}
