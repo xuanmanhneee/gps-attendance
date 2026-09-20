@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { MdAdd, MdEdit } from 'react-icons/md';
+import { MdAdd } from 'react-icons/md';
 import { toast } from 'react-toastify';
 
 import { useTranslation } from '../../hooks/useTranslation';
@@ -95,12 +95,6 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
     setIsModalOpen(true);
   };
 
-  const openEditFromList = (unit: UnitListItemViewModel) => {
-    setEditingUnit(unit);
-    setFormError(null);
-    setIsModalOpen(true);
-  };
-
   const closeModal = () => {
     if (isSubmitting) return;
     setIsModalOpen(false);
@@ -167,10 +161,8 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
     }
   };
 
-  const handleRetry = () => {
-    void reload();
-    void reloadTree();
-  };
+  const listErrorMessage = error ? toLoadErrorMessage(error, t('units.loadError')) : null;
+  const showListWarning = Boolean(listErrorMessage) && !isLoading;
 
   return (
     <>
@@ -181,19 +173,19 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
           <PrimaryButton label={t('units.create')} icon={MdAdd} onClick={openCreate} />
         }
       />
-      {(error ?? treeError) && !isLoading && !isTreeLoading && (
+      {showListWarning && (
         <div className="mb-4">
           <Panel>
             <ErrorState
               title={t('common.errorTitle')}
-              description={toLoadErrorMessage(error ?? treeError!, t('units.loadError'))}
-              onRetry={handleRetry}
+              description={listErrorMessage!}
+              onRetry={() => void reload()}
             />
           </Panel>
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="mx-auto w-full max-w-3xl">
         <Panel>
           <PanelHeader title={t('units.treeTitle')} subtitle={t('units.treeSubtitle')} />
           <div className="border-b border-line px-5 py-3">
@@ -206,7 +198,7 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
               className="w-full rounded-lg border border-line bg-surface-subtle px-3 py-2 text-[12px] text-ink outline-none transition focus:border-accent-strong"
             />
           </div>
-          <div className="max-h-[480px] overflow-y-auto px-3 py-3">
+          <div className="max-h-[560px] overflow-y-auto px-3 py-3">
             {isTreeLoading ? (
               <LoadingState />
             ) : treeError ? (
@@ -238,43 +230,6 @@ export const UnitsPanel = ({ unitsState }: UnitsPanelProps) => {
                     childrenLabel={t('units.children')}
                     levelLabel={(level) => t('units.level', { level })}
                   />
-                ))}
-              </ul>
-            )}
-          </div>
-        </Panel>
-
-        <Panel>
-          <PanelHeader title={t('units.listTitle')} subtitle={t('units.listSubtitle')} />
-          <div className="max-h-[536px] overflow-y-auto">
-            {isLoading ? (
-              <LoadingState />
-            ) : error ? (
-              <ErrorState
-                description={toLoadErrorMessage(error, t('units.loadError'))}
-                onRetry={() => void reload()}
-              />
-            ) : unitItems.length === 0 ? (
-              <EmptyState description={t('units.empty')} />
-            ) : (
-              <ul className="m-0 list-none divide-y divide-line p-0">
-                {unitItems.map((unit) => (
-                  <li key={unit.id} className="flex items-center gap-3 px-5 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-bold text-ink">{unit.label}</p>
-                      <p className="mt-0.5 text-[11px] text-muted">
-                        {t('units.level', { level: unit.level })}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => openEditFromList(unit)}
-                      aria-label={t('units.editUnit', { name: unit.label })}
-                      className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-transparent text-muted transition-colors hover:border-accent-strong/40 hover:bg-accent-soft hover:text-accent-strong"
-                    >
-                      <MdEdit aria-hidden="true" className="text-[15px]" />
-                    </button>
-                  </li>
                 ))}
               </ul>
             )}
