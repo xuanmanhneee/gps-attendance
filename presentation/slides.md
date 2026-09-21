@@ -23,7 +23,7 @@ mermaid:
 Nhóm 9 · 20/09/2026
 
 ---
-class: cards cols-3 center team
+class: cards cols-3 center
 ---
 
 ## Đội ngũ
@@ -311,7 +311,10 @@ class: cards cols-3 center
 
 <div>
 
-<img src="/screens/create-session.jpg" class="rounded-xl border border-white/10 mx-auto" style="height:300px; box-shadow:0 12px 30px rgba(0,0,0,0.4);">
+<div class="flex items-center justify-center gap-4">
+<img src="/screens/moblie.jpg" class="rounded-xl border border-white/10" style="width:48%; height:300px; object-fit:contain; box-shadow:0 12px 30px rgba(0,0,0,0.4);">
+<img src="/screens/mobile1.jpg" class="rounded-xl border border-white/10" style="width:48%; height:300px; object-fit:contain; box-shadow:0 12px 30px rgba(0,0,0,0.4);">
+</div>
 
 ### Mobile client
 - Xem các phiên đang mở
@@ -321,9 +324,6 @@ class: cards cols-3 center
 </div>
 
 </div>
-
----
-
 
 ---
 class: cards cols-3
