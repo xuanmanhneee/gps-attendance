@@ -10,6 +10,7 @@ import { AttendanceValidationModule } from './attendance-validation/attendance-v
 import { AttendanceCheckInModule } from './attendance-check-in/attendance-check-in.module';
 import { LoggingModule } from './common/logging/logging.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
 import { TagModule } from './tags/tag.module';
 import { APP_FILTER } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/filters/all-exception.filter';
@@ -29,6 +30,7 @@ import { UnitModule } from '#units/units.module';
     AttendanceCheckInModule,
     LoggingModule,
     PrismaModule,
+    RedisModule,
     TagModule,
     UnitOfWorkModule,
     UnitModule,

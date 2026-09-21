@@ -10,11 +10,7 @@ import type { UserProfileResponse } from '@gps-attendance/shared';
 
 import { authApi } from '../api/auth.api';
 import { userApi } from '../api/user.api';
-import {
-  removeToken,
-  restoreToken,
-  saveToken,
-} from '../services/token-storage';
+import { removeToken, restoreToken, saveToken } from '../services/token';
 
 interface AuthContextType {
   user: UserProfileResponse | null;

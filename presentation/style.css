@@ -1,0 +1,341 @@
+/* ===== Biến màu ===== */
+:root {
+  --bg: #0b1020;
+  --indigo: #818cf8;
+  --cyan: #22d3ee;
+  --pink: #f472b6;
+  --green: #34d399;
+  --card: rgba(255, 255, 255, 0.05);
+  --card-border: rgba(255, 255, 255, 0.12);
+}
+
+/* ===== Nền mỗi slide ===== */
+.slidev-layout {
+  background:
+    radial-gradient(900px 500px at 92% -10%, rgba(99, 102, 241, 0.28), transparent 60%),
+    radial-gradient(700px 450px at -10% 110%, rgba(34, 211, 238, 0.20), transparent 60%),
+    var(--bg);
+  color: #e5e7eb;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Thanh màu mảnh trên cùng */
+.slidev-layout::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--indigo), var(--cyan), var(--pink));
+}
+
+/* Lưới chấm trang trí */
+.slidev-layout::after {
+  content: '';
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  width: 140px;
+  height: 90px;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.22) 1.5px, transparent 1.5px);
+  background-size: 14px 14px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ===== Tiêu đề ===== */
+.slidev-layout h1 {
+  background: linear-gradient(90deg, var(--indigo), var(--cyan));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* Dòng "## ..." đứng ngay trước "# ..." thành nhãn nhỏ phía trên tiêu đề */
+.slidev-layout h2:has(+ h1) {
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--pink);
+  font-weight: 700;
+  margin: 0 0 0.4rem;
+  opacity: 1;
+}
+
+.slidev-layout ul > li::marker,
+.slidev-layout ol > li::marker {
+  color: var(--cyan);
+}
+
+/* ===== class "cards": danh sách -> lưới card =====
+   Dùng: class: cards cols-3   (cols-2 / cols-3 / cols-4)
+         thêm "center" để căn giữa chữ                          */
+.cards        { --cols: 3; }
+.cards.cols-2 { --cols: 2; }
+.cards.cols-3 { --cols: 3; }
+.cards.cols-4 { --cols: 4; }
+
+.cards > ul {
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 1fr);
+  gap: 1.25rem;
+}
+
+.cards > ul > li {
+  --accent: var(--indigo);
+  margin: 0;
+  padding: 1.25rem;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 18px;
+  box-shadow: inset 0 3px 0 var(--accent), 0 10px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  animation: rise 0.6s ease both;
+  transition: transform 0.25s ease, border-color 0.25s ease;
+}
+
+.cards > ul > li:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.cards > ul > li:nth-child(4n + 2) { --accent: var(--cyan); }
+.cards > ul > li:nth-child(4n + 3) { --accent: var(--pink); }
+.cards > ul > li:nth-child(4n + 4) { --accent: var(--green); }
+
+.cards > ul > li:nth-child(1) { animation-delay: 0.05s; }
+.cards > ul > li:nth-child(2) { animation-delay: 0.15s; }
+.cards > ul > li:nth-child(3) { animation-delay: 0.25s; }
+.cards > ul > li:nth-child(4) { animation-delay: 0.35s; }
+
+/* Chữ đậm đầu tiên = tiêu đề card (kể cả khi có logo đứng trước) */
+.cards > ul > li > strong:first-child,
+.cards > ul > li > img + strong {
+  display: block;
+  font-size: 1.1rem;
+  color: #fff;
+  margin-bottom: 0.35rem;
+}
+
+/* Ảnh trong card = logo (có thể đặt nhiều logo cạnh nhau) */
+.cards > ul > li > img {
+  display: inline-block;
+  height: 48px;
+  width: auto;
+  margin: 0 0.4rem 0.7rem 0;
+  vertical-align: middle;
+}
+.cards.center > ul > li > img { margin-inline: 0.2rem; }
+
+/* Chữ nghiêng = huy hiệu nhỏ (vd: vai trò) */
+.cards > ul > li em {
+  display: block;
+  width: fit-content;
+  margin: 0.7rem 0 0;
+  padding: 0.15rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--accent);
+}
+
+.cards.center > ul > li { text-align: center; }
+.cards.center > ul > li em { margin-inline: auto; }
+
+/* Danh sách con bên trong card */
+.cards > ul > li ul {
+  list-style: disc;
+  padding-left: 1.2rem;
+  margin: 0.6rem 0 0;
+  font-size: 0.95rem;
+}
+
+/* "> câu chữ" trong slide cards = banner nổi bật phía trên lưới */
+.slidev-layout.cards > blockquote {
+  display: inline-block;
+  margin: 1.2rem 0 0;
+  padding: 0.7rem 1.4rem;
+  color: inherit;
+  font-size: 1.05rem;
+  background: linear-gradient(90deg, rgba(244, 114, 182, 0.18), rgba(129, 140, 248, 0.10));
+  border: 1px solid rgba(244, 114, 182, 0.35);
+  border-left: 5px solid var(--pink);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(244, 114, 182, 0.15);
+}
+
+.slidev-layout.cards > blockquote strong {
+  color: #fff;
+  font-size: 1.25rem;
+  margin-left: 0.3rem;
+}
+
+.cards > blockquote + ul { margin-top: 1.75rem; }
+
+/* Đoạn văn dưới lưới card */
+.cards > p {
+  margin-top: 2rem;
+  text-align: center;
+  opacity: 0.7;
+  font-size: 0.9rem;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== class "team": thêm avatar chữ cái A, B, C... ===== */
+.team > ul { counter-reset: member; }
+.team > ul > li { counter-increment: member; }
+.team > ul > li::before {
+  content: counter(member, upper-alpha);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 0.8rem;
+  border-radius: 50%;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0b1020;
+  background: linear-gradient(135deg, var(--indigo), var(--cyan));
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(99, 102, 241, 0.45);
+}
+.team > ul > li:nth-child(2)::before { background: linear-gradient(135deg, var(--cyan), var(--green)); }
+.team > ul > li:nth-child(3)::before { background: linear-gradient(135deg, var(--pink), var(--indigo)); }
+.team > ul > li:nth-child(4)::before { background: linear-gradient(135deg, var(--green), var(--indigo)); }
+
+/* ===== class "steps": danh sách số -> các bước tròn ===== */
+.steps > ol {
+  list-style: none;
+  padding: 0;
+  margin: 2.5rem 0 0;
+  counter-reset: step;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  max-width: 36rem;
+}
+.steps > ol > li {
+  counter-increment: step;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 1.15rem;
+  margin: 0;
+}
+.steps > ol > li::before {
+  content: counter(step);
+  flex: none;
+  width: 2.3rem;
+  height: 2.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 800;
+  color: #0b1020;
+  background: linear-gradient(135deg, var(--indigo), var(--cyan));
+}
+
+/* ===== class "hero": trang bìa / kết thúc ===== */
+.slidev-layout.hero {
+  background:
+    radial-gradient(420px 320px at 8% 8%, rgba(129, 140, 248, 0.40), transparent 70%),
+    radial-gradient(380px 300px at 92% 92%, rgba(244, 114, 182, 0.35), transparent 70%),
+    radial-gradient(300px 260px at 100% 40%, rgba(34, 211, 238, 0.28), transparent 70%),
+    var(--bg);
+}
+
+.hero h1 {
+  font-size: 3.2rem;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+/* "> câu chữ" = phụ đề */
+.slidev-layout.hero blockquote {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0.6rem auto;
+  color: inherit;
+  font-size: 1.25rem;
+  opacity: 0.85;
+}
+
+/* `chữ trong dấu backtick` = huy hiệu */
+.slidev-layout.hero code {
+  background: rgba(34, 211, 238, 0.12);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  color: var(--cyan);
+  border-radius: 999px;
+  padding: 0.2rem 0.8rem;
+  margin: 0 0.25rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.hero p { opacity: 0.75; }
+
+/* ===== Mermaid ===== */
+.mermaid svg {
+  filter: none;
+}
+.slidev-layout .mermaid { display: flex; justify-content: center; }
+
+/* ===== class "agenda": danh sách số -> lưới 2 cột, đánh số 01-06 chạy dọc từng cột ===== */
+.agenda > ol {
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0 0;
+  counter-reset: item;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  gap: 1rem 1.5rem;
+}
+
+.agenda > ol > li {
+  --accent: var(--indigo);
+  counter-increment: item;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: inset 4px 0 0 var(--accent), 0 8px 24px rgba(0, 0, 0, 0.3);
+  animation: rise 0.6s ease both;
+}
+
+.agenda > ol > li:nth-child(6n + 2) { --accent: var(--cyan); }
+.agenda > ol > li:nth-child(6n + 3) { --accent: var(--pink); }
+.agenda > ol > li:nth-child(6n + 4) { --accent: var(--green); }
+.agenda > ol > li:nth-child(6n + 5) { --accent: var(--indigo); }
+.agenda > ol > li:nth-child(6n + 6) { --accent: var(--cyan); }
+
+.agenda > ol > li::before {
+  content: counter(item, decimal-leading-zero);
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
