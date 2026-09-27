@@ -26,7 +26,7 @@ enum UserRole {
 }
 
 enum SessionStatus {
-  draft
+  pending
   open
   closed
   cancelled
@@ -123,7 +123,7 @@ model AttendanceSession {
   radius    Decimal       @db.Decimal(8, 2)
   openAt    DateTime      @map("open_at")
   closeAt   DateTime      @map("close_at")
-  status    SessionStatus @default(draft)
+  status    SessionStatus @default(pending)
   createdBy Int           @map("created_by")
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt @map("updated_at")
