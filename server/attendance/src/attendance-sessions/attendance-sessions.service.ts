@@ -1,23 +1,29 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { SessionStatus } from '@gps-attendance/shared';
 
-import { AttendanceSession } from './attendance-session.model';
-import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
-import { UserFilterService } from '../users/user-filter.service';
+import { IJobScheduler } from '#job-scheduler/job-scheduler.interface';
+import { JOB_SCHEDULER } from '#job-scheduler/job-scheduler.token';
 
-import { LOGGER_FACTORY } from '../common/logging/logger.token';
+import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
 import { ILogger } from '../common/logging/logger.interface';
 import { ILoggerFactory } from '../common/logging/logger.factory';
-import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
+import { LOGGER_FACTORY } from '../common/logging/logger.token';
+import { UserFilterService } from '../users/user-filter.service';
+
+import { AttendanceSession } from './attendance-session.model';
 import { IAttendanceSessionRepository } from './attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
-import {
-  AttendanceSessionResponse,
-  SessionStatus,
-} from '@gps-attendance/shared';
+import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
 
 @Injectable()
 export class AttendanceSessionsService {
   private readonly logger: ILogger;
+  private static readonly ROSTER_INIT_BUFFER_MS = 5 * 60 * 1000;
 
   constructor(
     @Inject(ATTENDANCE_SESSION_REPOSITORY)
@@ -25,10 +31,24 @@ export class AttendanceSessionsService {
     private readonly userFilterService: UserFilterService,
     private readonly attendanceRecordsService: AttendanceRecordsService,
 
+    @Inject(JOB_SCHEDULER)
+    private readonly jobScheduler: IJobScheduler,
+
     @Inject(LOGGER_FACTORY)
     loggerFactory: ILoggerFactory,
   ) {
     this.logger = loggerFactory.create(AttendanceSessionsService.name);
+  }
+
+  onModuleInit() {
+    this.jobScheduler.onJob<{ sessionId: number; userIds: number[] }>(
+      'attendance:init-roster',
+      (payload) =>
+        this.attendanceRecordsService.initializeForSession(
+          payload.sessionId,
+          payload.userIds,
+        ),
+    );
   }
 
   async create(
@@ -53,12 +73,55 @@ export class AttendanceSessionsService {
       updatedAt: now,
     });
 
-    await this.attendanceRecordsService.initializeForSession(
-      session.id,
-      userIds,
+    const initAt = new Date(
+      session.openAt.getTime() -
+        AttendanceSessionsService.ROSTER_INIT_BUFFER_MS,
+    );
+
+    await this.jobScheduler.schedule(
+      'attendance:init-roster',
+      initAt,
+      { sessionId: session.id, userIds },
+      `init-roster:${session.id}`,
+    );
+    await this.jobScheduler.schedule(
+      'attendance:flush',
+      session.closeAt,
+      { sessionId: session.id },
+      `flush:${session.id}`,
     );
 
     return this.withComputedStatus(session);
+  }
+
+  // Huỷ session — chỉ cho phép khi chưa đóng (pending hoặc open), chưa từng
+  // bị huỷ trước đó. Nếu đang open, dọn luôn buffer để không lẫn dữ liệu
+  // check-in dở dang vào lần flush kế (dù job flush đã bị cancel, phòng
+  // trường hợp job đã trót chạy trước khi cancel kịp tới nơi).
+  async cancel(sessionId: number): Promise<AttendanceSession> {
+    const session = await this.findById(sessionId);
+
+    if (session.status === 'closed' || session.status === 'cancelled') {
+      throw new ConflictException(
+        `Không thể huỷ session ${sessionId} vì đang ở trạng thái "${session.status}"`,
+      );
+    }
+
+    const wasOpen = session.status === 'open';
+
+    await this.attendanceSessionRepository.updateStatus(
+      sessionId,
+      'cancelled',
+    );
+
+    await this.jobScheduler.cancel(`init-roster:${sessionId}`);
+    await this.jobScheduler.cancel(`flush:${sessionId}`);
+
+    if (wasOpen) {
+      await this.attendanceRecordsService.clearSessionBuffer(sessionId);
+    }
+
+    return { ...session, status: 'cancelled' };
   }
 
   async findAll(): Promise<AttendanceSession[]> {
@@ -102,6 +165,13 @@ export class AttendanceSessionsService {
   }
 
   private withComputedStatus(session: AttendanceSession): AttendanceSession {
+    // 'cancelled' là stored state (sự kiện rời rạc do giảng viên set), phải
+    // kiểm tra và giữ nguyên TRƯỚC khi tính theo giờ — nếu không, session đã
+    // huỷ nhưng qua closeAt sẽ bị tính đè thành 'closed', mất thông tin huỷ.
+    if (session.status === 'cancelled') {
+      return session;
+    }
+
     const now = new Date();
 
     let status: SessionStatus = 'pending';
@@ -115,19 +185,6 @@ export class AttendanceSessionsService {
     return {
       ...session,
       status,
-    };
-  }
-
-  private toResponse(session: AttendanceSession): AttendanceSessionResponse {
-    return {
-      id: session.id,
-      title: session.title,
-      latitude: session.latitude,
-      longitude: session.longitude,
-      radius: session.radius,
-      openAt: session.openAt.toISOString(),
-      closeAt: session.closeAt.toISOString(),
-      status: session.status,
     };
   }
 }

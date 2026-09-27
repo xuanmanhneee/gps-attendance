@@ -5,10 +5,10 @@ import { GeoModule } from '../geo/geo.module';
 import { UsersModule } from '../users/users.module';
 import { LoggingModule } from '../common/logging/logging.module';
 import { AttendanceRecordModule } from '../attendance-record/attendance-record.module';
-import { InMemoryAttendanceSessionRepository } from './repository/in-memory-attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
 import { AttendanceSessionSeeder } from './attendance-session.seeder';
 import { AttendanceSessionQueryService } from './attendance-session-query.service';
+import { PrismaAttendanceSessionRepository } from './infra/prisma/prisma-attendance-session.repository';
 
 @Module({
   imports: [UsersModule, GeoModule, AttendanceRecordModule, LoggingModule],
@@ -19,7 +19,7 @@ import { AttendanceSessionQueryService } from './attendance-session-query.servic
     AttendanceSessionSeeder,
     {
       provide: ATTENDANCE_SESSION_REPOSITORY,
-      useClass: InMemoryAttendanceSessionRepository,
+      useClass: PrismaAttendanceSessionRepository,
     },
     AttendanceSessionQueryService
   ],

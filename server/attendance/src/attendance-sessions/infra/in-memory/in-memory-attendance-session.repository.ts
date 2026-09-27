@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import {
   AttendanceSession,
   CreateAttendanceSessionRecord,
-} from '../attendance-session.model';
-import { IAttendanceSessionRepository } from '../attendance-session.repository';
+} from '../../attendance-session.model';
+import { IAttendanceSessionRepository } from '../../attendance-session.repository';
 
 @Injectable()
 export class InMemoryAttendanceSessionRepository implements IAttendanceSessionRepository {
@@ -20,6 +20,10 @@ export class InMemoryAttendanceSessionRepository implements IAttendanceSessionRe
     };
     this.sessions.set(session.id, session);
     return session;
+  }
+
+  async updateStatus(id: number, status: 'cancelled'): Promise<void>{
+    
   }
 
   async findAll(): Promise<AttendanceSession[]> {

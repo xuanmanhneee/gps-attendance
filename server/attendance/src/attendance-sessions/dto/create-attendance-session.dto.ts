@@ -1,17 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsDateString,
   IsLatitude,
   IsLongitude,
   IsNotEmpty,
   IsNumber,
-  IsObject,
   IsPositive,
   IsString,
+  ValidateNested,
 } from 'class-validator';
-import type { CreateAttendanceSessionRequest } from '@gps-attendance/shared';
 
-export class CreateAttendanceSessionDto implements CreateAttendanceSessionRequest {
+import { UserFilterCriteriaDto } from './user-filter-criteria.dto';
+
+export class CreateAttendanceSessionDto {
   @ApiProperty({ example: 'Điểm danh buổi sáng - Lớp CNTT K20' })
   @IsString()
   @IsNotEmpty()
@@ -25,10 +27,7 @@ export class CreateAttendanceSessionDto implements CreateAttendanceSessionReques
   @IsLongitude()
   longitude!: number;
 
-  @ApiProperty({
-    example: 50,
-    description: 'Bán kính hợp lệ, đơn vị mét',
-  })
+  @ApiProperty({ example: 50, description: 'Bán kính hợp lệ, đơn vị mét' })
   @IsNumber()
   @IsPositive()
   radius!: number;
@@ -41,13 +40,8 @@ export class CreateAttendanceSessionDto implements CreateAttendanceSessionReques
   @IsDateString()
   closeAt!: string;
 
-  @ApiProperty({
-    example: {
-      codeFilter: {
-        addCodes: ['2312686', '2312682', '2312716'],
-      },
-    },
-  })
-  @IsObject()
-  participantCriteria!: CreateAttendanceSessionRequest['participantCriteria'];
+  @ApiProperty({ type: () => UserFilterCriteriaDto })
+  @ValidateNested()
+  @Type(() => UserFilterCriteriaDto)
+  participantCriteria!: UserFilterCriteriaDto;
 }
