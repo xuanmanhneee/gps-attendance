@@ -123,11 +123,22 @@ export class AttendanceSessionsService {
     await this.attendanceSessionRepository.delete(id);
   }
 
+<<<<<<< HEAD
   async close(
     id: number,
     user: { userId: number; role: string },
   ): Promise<AttendanceSession> {
     const session = await this.attendanceSessionRepository.findById(id);
+=======
+  async findByIds(ids: number[]): Promise<AttendanceSession[]> {
+    const sessions = await this.attendanceSessionRepository.findByIds(ids);
+    return sessions.map((session) => this.withComputedStatus(session));
+  }
+
+  async findByUser(userId: number): Promise<AttendanceSession[]> {
+    const records = await this.attendanceRecordsService.findByUser(userId);
+    const sessionIds = records.map((r) => r.sessionId);
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
     if (!session) {
       throw new NotFoundException(`Không tìm thấy session id=${id}`);

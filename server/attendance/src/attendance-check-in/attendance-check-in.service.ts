@@ -10,8 +10,13 @@ import { AttendanceValidationService } from '../attendance-validation/attendance
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
 import { CheckInRequestDto } from './attendance-check-in.dto';
 import {
+<<<<<<< HEAD
   AttendanceCheckInErrorCode,
   AttendanceCheckInResult,
+=======
+  CheckInRequest,
+  CheckInResponse,
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
   AttendanceSessionErrorCode,
 } from '@gps-attendance/shared';
 import { AttemptCheck } from './checks/attempt.check';
@@ -38,10 +43,15 @@ export class AttendanceCheckInService {
   async checkIn(
     dto: CheckInRequestDto,
     userId: number,
+<<<<<<< HEAD
   ): Promise<AttendanceCheckInResult> {
     // -------------------------------------------------------------------------
     // 1. Guard layer: kiểm tra phiên điểm danh
     // -------------------------------------------------------------------------
+=======
+  ): Promise<CheckInResponse> {
+    // --- Guard layer ---
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
     const session = await this.attendanceSessionsService.findById(
       dto.sessionId,
     );

@@ -5,9 +5,12 @@ build/
 .env.*
 !.env.example
 .expo/
+.pnpm-store/
 .expo-shared/
 .vscode
 .github/*
 *.log
 *.tsbuildinfo
 *.code-workspace
+
+server/attendance/src/prisma/generated/

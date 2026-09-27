@@ -20,7 +20,7 @@ export class AttendanceSessionSeeder implements OnModuleInit {
 
         participantCriteria: {
           codeFilter: {
-            addCodes: ['2312686', '2312716', '2312718'],
+            include: ['2312686', '2312716', '2312718'],
           },
         },
       },

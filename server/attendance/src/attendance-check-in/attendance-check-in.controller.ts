@@ -10,9 +10,13 @@ import { Throttle } from '@nestjs/throttler';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
+<<<<<<< HEAD
 @ApiTags('attendance-check-in')
 @ApiBearerAuth()
 @Controller(['attendance', 'v0/attendance'])
+=======
+@Controller('v0/attendance')
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 export class AttendanceCheckInController {
   constructor(
     private readonly attendanceCheckInService: AttendanceCheckInService,

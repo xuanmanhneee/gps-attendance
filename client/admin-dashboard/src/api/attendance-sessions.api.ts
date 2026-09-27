@@ -20,17 +20,18 @@ export const attendanceSessionsApi = {
     );
   },
 
-  getDetail(id: number) {
-    return httpClient.get<AttendanceSessionDetailResponse>(
-      `/v0/attendance-sessions/${id}/detail`,
+  getCreatedByMe() {
+    return httpClient.get<AttendanceSessionResponse[]>(
+      '/v0/attendance-sessions/created-by-me',
     );
   },
 
-  getByUser(userId: number) {
-    return httpClient.get<AttendanceSessionResponse[]>(
-      `/v0/attendance-sessions/by-user/${userId}`,
+  getDetail(id: number) {
+    return httpClient.get<AttendanceSessionDetailResponse>(
+      `/v0/attendance-sessions/${id}`,
     );
   },
+<<<<<<< HEAD
 
   close(id: number) {
     return httpClient.post<AttendanceSessionResponse>(
@@ -42,3 +43,6 @@ export const attendanceSessionsApi = {
     return httpClient.delete<null>(`/v0/attendance-sessions/${id}`);
   },
 };
+=======
+};
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917

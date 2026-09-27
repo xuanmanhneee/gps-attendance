@@ -12,6 +12,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-gps_attendance}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+<<<<<<< HEAD
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-gps_attendance}"]
       interval: 5s
@@ -54,6 +55,16 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+=======
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
 volumes:
   postgres_data:
+  redis_data:

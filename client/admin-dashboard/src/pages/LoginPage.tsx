@@ -35,6 +35,9 @@ const LoginPage = () => {
 
       navigate('/dashboard', { replace: true });
     } catch (error) {
+      console.error('LOGIN ERROR:', error);
+      console.error('instanceof ApiError:', error instanceof ApiError);
+
       if (error instanceof ApiError) {
         switch (error.code) {
           case AuthErrorCode.INVALID_CREDENTIALS:
@@ -58,11 +61,16 @@ const LoginPage = () => {
         toast.error(error.message);
         return;
       }
+<<<<<<< HEAD
       const message = error instanceof Error ? error.message : 'Lỗi không xác định.';
       setLoginError(
         `Không thể kết nối tới máy chủ. Kiểm tra backend và địa chỉ API. Chi tiết: ${message}`,
       );
       toast.error('Không thể kết nối tới máy chủ');
+=======
+
+      toast.error('Đăng nhập thất bại');
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
     }
   };
 

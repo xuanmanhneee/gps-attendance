@@ -55,6 +55,7 @@ Mỗi phiên điểm danh có **tâm GPS**, **bán kính (mét)** và **cửa s�
                                  PostgreSQL 16
                                  (docker-compose)
 ```
+<<<<<<< HEAD
 
 Docker Compose (`docker-compose.yml`):
 
@@ -100,6 +101,19 @@ gps-attendance-main/
 | `client/admin-dashboard` | `@gps-attendance/admin-dashboard` | Web giảng viên/admin |
 | `client/mobile-client` | `@gps-attendance/mobile-client` | App sinh viên |
 | `packages/shared` | `@gps-attendance/shared` | Types, DTO, error codes, HTTP client |
+=======
+gps-attendance/
+├── server/
+│   └── attendance/                # Backend API (NestJS) — @gps-attendance/attendance
+├── client/
+│   ├── admin-dashboard/           # Web dashboard cho giảng viên/quản trị (React + Vite)
+│   └── mobile-client/             # Ứng dụng di động cho sinh viên (Expo / React Native)
+└── packages/
+    └── shared/                    # Type/DTO dùng chung giữa server, admin, mobile — @gps-attendance/shared
+```
+
+Đây là **pnpm workspace monorepo** — các project (`server/attendance`, `admin-dashboard`, `mobile-client`) và `shared` được quản lý cùng nhau qua **1** `pnpm-lock.yaml` duy nhất ở root, không cài dependency riêng lẻ từng thư mục.
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
 ---
 
@@ -107,19 +121,39 @@ gps-attendance-main/
 
 | Thành phần | Công nghệ |
 |---|---|
+<<<<<<< HEAD
 | Backend | NestJS 11, Passport JWT/Local, Prisma 7, PostgreSQL 16, Winston, Swagger, Throttler |
 | Dashboard | React 19, Vite, React Router 7, Tailwind 4, Axios, react-toastify, react-hook-form |
 | Mobile | Expo SDK 54, React Native 0.81, Expo Router, expo-location, expo-secure-store, expo-device |
 | Shared | TypeScript workspace `@gps-attendance/shared` |
 | Vận hành | Docker Compose, Dockerfile backend + dashboard (nginx) |
 | Package manager | pnpm 11.x, Node `>= 20` |
+=======
+| Backend | NestJS + Prisma ORM 7 (PostgreSQL) |
+| Admin Dashboard | React + Vite + TypeScript |
+| Mobile Client | Expo SDK 54 (React Native) |
+| Package manager | pnpm workspace |
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
 ---
 
+<<<<<<< HEAD
 ## 5. Backend (`server/attendance`)
+=======
+- **Node.js** >= 20.x (khuyến nghị dùng qua [nvm](https://github.com/nvm-sh/nvm))
+- **pnpm** — bật qua corepack (đã có sẵn từ Node 16.13+):
+  ```bash
+  corepack enable
+  ```
+  Repo đã pin sẵn version pnpm trong `package.json` (`packageManager`), corepack sẽ tự dùng đúng version, không cần cài thủ công.
+- App **Expo Go** trên điện thoại (Android/iOS) để chạy thử `mobile-client` mà không cần build native
+  > Dự án đang dùng **Expo SDK 54** để đảm bảo tương thích với bản Expo Go hiện có trên CH Play/App Store. Nếu bản Expo Go trên máy bạn không khớp SDK, vào store cập nhật Expo Go lên bản mới nhất hoặc kiểm tra lại version SDK của project trong `client/mobile-client/package.json`.
+- **Docker** — bắt buộc để chạy PostgreSQL cho `server/attendance`.
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
 Bootstrap (`src/main.ts`): Winston JSON logger, CORS mở, `ValidationPipe` (whitelist + transform), `ApiExceptionFilter`, Swagger tại `http://localhost:3000/api-docs`, listen `0.0.0.0` cổng `PORT` hoặc `3000`.
 
+<<<<<<< HEAD
 `AppModule` import: Config (global), Throttler (5 req / 60s toàn cục), Database, Auth, Users, AttendanceSessions, Geo, AttendanceValidation, AttendanceCheckIn, Logging, Health.
 
 - Middleware: `RequestIdMiddleware` mọi route.
@@ -386,6 +420,13 @@ Hạn chế:
 
 ```bash
 cd gps-attendance-main
+=======
+Cài đặt duy nhất ở root bằng `pnpm install` — không cần (và không nên) chạy lại trong từng thư mục con, vì root đã cài đủ dependency cho toàn bộ workspace.
+
+```bash
+git clone https://github.com/xuanmanhneee/gps-attendance.git
+cd gps-attendance
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 pnpm install
 ```
 
@@ -435,16 +476,74 @@ pnpm build:admin
 pnpm clean
 ```
 
+<<<<<<< HEAD
 Test backend:
+=======
+`pnpm install` sẽ tự động chạy `prisma generate` cho `server/attendance` (qua script `postinstall`) — không cần chạy thủ công.
+
+## Database (PostgreSQL + Prisma)
+
+`server/attendance` dùng PostgreSQL, chạy qua Docker, và Prisma ORM 7 để quản lý schema/migration.
+
+### 1. Cấu hình biến môi trường
+
+Copy file mẫu và điền giá trị thật:
+
+```bash
+cd server/attendance
+cp .env.example .env
+```
+
+Đảm bảo `.env` có dòng `DATABASE_URL`, ví dụ:
+
+```
+DATABASE_URL="postgresql://user:password@localhost:5432/gps_attendance"
+```
+
+### 2. Khởi động Postgres qua Docker
+
+```bash
+docker compose up -d
+```
+
+Kiểm tra container đã chạy: `docker ps`.
+
+### 3. Chạy migration
+
+```bash
+pnpm --filter @gps-attendance/attendance prisma migrate dev
+```
+
+Lệnh này áp dụng schema vào database và tự sinh lại Prisma Client.
+
+### 4. (Tuỳ chọn) Xem dữ liệu trực quan
+
+```bash
+pnpm --filter @gps-attendance/attendance prisma studio
+```
+
+> **Lưu ý cấu hình Prisma:** project dùng generator `prisma-client` với `moduleFormat = "cjs"` (trong `server/attendance/prisma/schema.prisma`) vì NestJS build theo CommonJS, không phải ESM. Đây là chủ đích — nhiều tutorial Prisma 7 trên mạng hướng dẫn theo ESM mặc định, **không áp dụng cho project này**. Code sinh ra nằm ở `server/attendance/src/prisma/generated/` (đã `.gitignore`, không commit), và biến kết nối `DATABASE_URL` được đọc qua `server/attendance/prisma.config.ts`, không nằm trong `schema.prisma`.
+
+## Chạy project
+
+Sau khi cài xong (và đã setup Database ở trên với `server/attendance`), chạy từng project bằng script ở root:
+
+### 1. Server (NestJS)
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
 ```bash
 pnpm --filter @gps-attendance/attendance test
 pnpm --filter @gps-attendance/attendance test:e2e
 ```
+<<<<<<< HEAD
+=======
+Mặc định chạy tại `http://localhost:3000`. Lệnh này tự build `shared` trước khi khởi động.
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
 ### Docker toàn stack (trừ mobile)
 
 ```bash
+<<<<<<< HEAD
 docker compose up --build
 ```
 
@@ -453,6 +552,35 @@ docker compose up --build
 - Postgres: localhost:5432
 
 ---
+=======
+pnpm dev:admin
+```
+Mặc định chạy tại `http://localhost:5173`.
+
+### 3. Mobile Client (Expo)
+
+```bash
+pnpm dev:mobile
+```
+Quét mã QR hiện trên terminal bằng app **Expo Go** để chạy thử trên điện thoại thật (khuyến nghị dùng thiết bị thật thay vì emulator, vì tính năng GPS/anti-spoofing cần thiết bị thật để hoạt động và kiểm thử chính xác).
+
+> Nếu điện thoại và máy tính không cùng mạng WiFi, dùng `expo start --tunnel` (chạy trong `client/mobile-client`), hoặc kết nối qua USB bằng `adb reverse tcp:8081 tcp:8081`.
+
+## Build & dọn cache
+
+```bash
+pnpm build          # build shared, server, admin-dashboard
+pnpm clean           # dọn cache/output khi gặp lỗi build lạ
+```
+
+### Lưu ý khi sửa `packages/shared`
+
+Server dùng bản đã build sẵn (`dist/`) của `shared`, không đọc trực tiếp file `.ts` nguồn. Nếu sửa `shared` trong lúc `server` đang chạy dev, mở thêm terminal chạy:
+```bash
+pnpm dev:attendance
+```
+để tự động build lại mỗi khi lưu file. (Admin dashboard và mobile không cần bước này — 2 project đó dùng bundler nên đọc thẳng file `.ts` nguồn, thay đổi có hiệu lực ngay khi lưu.)
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
 ## 13. Scripts gốc
 

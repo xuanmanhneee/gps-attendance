@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // import * as Device from 'expo-device';
 // import { Platform, StyleSheet } from 'react-native';
 // import { SafeAreaView } from 'react-native-safe-area-context';
@@ -101,20 +102,45 @@ import { Redirect } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useAuth } from '../context/auth-context';
 
+=======
+import { Redirect } from 'expo-router';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useAuth } from '../context/auth-context';
+
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 export default function Index() {
   const { isLoading, isSignedIn } = useAuth();
 
   if (isLoading) {
+<<<<<<< HEAD
     return <View style={styles.container}><ActivityIndicator /></View>;
   }
 
   return <Redirect href={isSignedIn ? '/(tabs)' : '/login'} />;
+=======
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  return <Redirect href={isSignedIn ? '/home' : '/login'} />;
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 }
 
 const styles = StyleSheet.create({
   container: {
+<<<<<<< HEAD
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
 });
+=======
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917

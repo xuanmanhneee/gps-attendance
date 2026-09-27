@@ -1,0 +1,44 @@
+import { useCallback, useEffect, useState } from 'react';
+import type { Device, DeviceIntegrity, Location } from '@gps-attendance/shared';
+import { collectCheckInContext } from '../services/attendance';
+import { resetDeviceId } from '../services/device-id';
+
+type State = {
+  location: Location | null;
+  device: Device | null;
+  integrity: DeviceIntegrity | null;
+  error: string | null;
+};
+
+const EMPTY: State = {
+  location: null,
+  device: null,
+  integrity: null,
+  error: null,
+};
+
+export function useCheckInContext() {
+  const [state, setState] = useState<State>(EMPTY);
+
+  const refresh = useCallback(async () => {
+    try {
+      setState({ ...(await collectCheckInContext()), error: null });
+    } catch (e) {
+      setState({
+        ...EMPTY,
+        error: e instanceof Error ? e.message : 'Không lấy được dữ liệu',
+      });
+    }
+  }, []);
+
+  const reset = useCallback(async () => {
+    await resetDeviceId();
+    await refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { ...state, refresh, reset };
+}

@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 export const ACCOUNT_REPOSITORY = 'ACCOUNT_REPOSITORY';
+=======
+export const ACCOUNT_REPOSITORY = Symbol('ACCOUNT_REPOSITORY');
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917

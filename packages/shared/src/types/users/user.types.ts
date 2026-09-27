@@ -6,8 +6,15 @@ export interface UserResponse {
   fullname: string;
 }
 
-export interface UserProfileDto {
+export interface UserProfileResponse {
   code: string;
   role: Role;
   fullname: string;
+}
+
+export interface CreateUserRequest {
+  code: string;
+  role: 'admin' | 'lecturer' | 'student';
+  fullname: string;
+  unitId: number;
 }

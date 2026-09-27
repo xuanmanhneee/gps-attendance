@@ -6,8 +6,11 @@ module.exports = defineConfig([
   expoConfig,
   {
     ignores: ["dist/*"],
+<<<<<<< HEAD
     rules: {
       "import/namespace": "off",
     },
+=======
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
   }
 ]);

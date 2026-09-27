@@ -1,9 +1,13 @@
 import React from 'react';
+<<<<<<< HEAD
 import {
   View,
   StyleSheet,
   ViewStyle,
 } from 'react-native';
+=======
+import { View, StyleSheet, ViewStyle } from 'react-native';
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 import { COLORS } from '../../constants/theme';
 
 interface CardProps {
@@ -37,6 +41,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     padding: 16,
   },
+<<<<<<< HEAD
   shadow: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -44,6 +49,14 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+=======
+
+  shadow: {
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.1)',
+    elevation: 5,
+  },
+
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
   header: {
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,

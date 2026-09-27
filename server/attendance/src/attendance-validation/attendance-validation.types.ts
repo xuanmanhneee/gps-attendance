@@ -1,7 +1,7 @@
 import {
-  LocationPayload,
-  DevicePayload,
-  DeviceIntegrityPayload,
+  Location,
+  Device,
+  DeviceIntegrity,
   AttendanceValidationStatus,
   AttendanceValidationReason,
 } from '@gps-attendance/shared';
@@ -26,9 +26,9 @@ export interface AttendanceValidationInput {
   checkedInAt: Date;
 
   // Client payload
-  location: LocationPayload;
-  device: DevicePayload;
-  integrity: DeviceIntegrityPayload;
+  location: Location;
+  device: Device;
+  integrity: DeviceIntegrity;
 }
 
 // -----------------------------------------------------------------------------

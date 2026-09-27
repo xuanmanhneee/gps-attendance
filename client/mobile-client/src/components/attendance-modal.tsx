@@ -1,4 +1,5 @@
 import React from 'react';
+<<<<<<< HEAD
 import {
   View,
   Modal,
@@ -9,6 +10,13 @@ import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { COLORS } from '../constants/theme';
 import type { ValidationResult } from '../api/attendance.api';
+=======
+import { View, Modal, StyleSheet, Text } from 'react-native';
+import { Card } from './ui/card';
+import { Button } from './ui/button';
+import { COLORS } from '../constants/theme';
+import type { ValidationResult } from '../api/attendance-session.api';
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
 interface AttendanceModalProps {
   visible: boolean;
@@ -28,6 +36,7 @@ export const AttendanceModal = ({
   const isApproved = result.status === 'VALID';
   const isFlagged = result.status === 'REVIEW';
   const isRejected = result.status === 'REJECTED';
+<<<<<<< HEAD
   const reasons = result.reasons ?? [];
 
   const getReasonMessage = (reason: string) => {
@@ -42,6 +51,8 @@ export const AttendanceModal = ({
 
     return mapped[reason] ?? reason;
   };
+=======
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
   const getStatusIcon = () => {
     if (isApproved) return '✅';
@@ -56,9 +67,15 @@ export const AttendanceModal = ({
   };
 
   const getStatusText = () => {
+<<<<<<< HEAD
     if (isApproved) return 'Check-in thành công';
     if (isFlagged) return 'Cần xem xét (Review)';
     return 'Điểm danh bị từ chối';
+=======
+    if (isApproved) return 'Điểm danh thành công';
+    if (isFlagged) return 'Điểm danh với cảnh báo';
+    return 'Điểm danh không được phép';
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
   };
 
   return (
@@ -67,12 +84,16 @@ export const AttendanceModal = ({
         <Card style={styles.modal}>
           <View style={styles.header}>
             <Text style={styles.icon}>{getStatusIcon()}</Text>
+<<<<<<< HEAD
             <Text
               style={[
                 styles.title,
                 { color: getStatusColor() },
               ]}
             >
+=======
+            <Text style={[styles.title, { color: getStatusColor() }]}>
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
               {getStatusText()}
             </Text>
           </View>
@@ -81,9 +102,15 @@ export const AttendanceModal = ({
             <View style={styles.scoreContainer}>
               <Text style={styles.scoreLabel}>Kết quả:</Text>
               <Text style={[styles.scoreValue, { color: getStatusColor() }]}>
+<<<<<<< HEAD
                 {reasons.length === 0
                   ? 'Hợp lệ'
                   : reasons.map(getReasonMessage).join(' ')}
+=======
+                {result.reasons.length === 0
+                  ? 'Hợp lệ'
+                  : result.reasons.join(', ')}
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
               </Text>
             </View>
 
@@ -91,8 +118,13 @@ export const AttendanceModal = ({
               <View style={styles.warningBox}>
                 <Text style={styles.warningText}>
                   ⚠️ Điểm danh của bạn đã được ghi nhận nhưng có những dấu hiệu
+<<<<<<< HEAD
                   bất thường. Vui lòng liên hệ quản trị viên nếu bạn cho rằng
                   có lỗi.
+=======
+                  bất thường. Vui lòng liên hệ quản trị viên nếu bạn cho rằng có
+                  lỗi.
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
                 </Text>
               </View>
             )}
@@ -100,19 +132,28 @@ export const AttendanceModal = ({
             {isRejected && (
               <View style={styles.errorBox}>
                 <Text style={styles.errorText}>
+<<<<<<< HEAD
                   {reasons.includes('TOO_MANY_ATTEMPTS')
                     ? '❌ Bạn đã vượt quá số lần thử cho phép. Vui lòng liên hệ giảng viên nếu cần mở lại phiên.'
                     : '❌ Vui lòng kiểm tra nguyên nhân ở trên, điều chỉnh điều kiện điểm danh và thử lại.'}
+=======
+                  ❌ Điểm danh không được phép. Vui lòng đảm bảo bạn ở đúng vị
+                  trí và thử lại.
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
                 </Text>
               </View>
             )}
           </View>
 
+<<<<<<< HEAD
           <Button
             title="Đóng"
             onPress={onClose}
             variant="primary"
           />
+=======
+          <Button title="Đóng" onPress={onClose} variant="primary" />
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
         </Card>
       </View>
     </Modal>

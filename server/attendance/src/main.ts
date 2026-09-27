@@ -34,8 +34,12 @@ async function bootstrap() {
     logger: new WinstonJsonLogger('Nest'),
   });
 
+<<<<<<< HEAD
   app.useGlobalFilters(new ApiExceptionFilter());
 
+=======
+  app.useGlobalInterceptors(new ResponseInterceptor());
+>>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
   app.enableCors();
 
   app.useGlobalPipes(
