@@ -7,5 +7,5 @@ export interface IAttendanceRecordRepository {
   ): Promise<AttendanceRecord | null>;
   findByUser(userId: number): Promise<AttendanceRecord[]>;
   findBySession(sessionId: number): Promise<AttendanceRecord[]>;
-  upsertRecord(record: Omit<AttendanceRecord, 'updatedAt'>): Promise<void>;
+  bulkUpsert(records: AttendanceRecord[]): Promise<void>;
 }
