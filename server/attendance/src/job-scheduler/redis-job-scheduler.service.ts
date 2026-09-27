@@ -9,6 +9,7 @@ import { LOGGER_FACTORY } from '../common/logging/logger.token';
 import { ILogger } from '../common/logging/logger.interface';
 import { ILoggerFactory } from '../common/logging/logger.factory';
 import { Inject } from '@nestjs/common';
+import { RedisService } from '#redis/redis.service';
 
 const INDEX_KEY = 'scheduler:index'; // ZSET: member = job id, score = runAt (epoch ms)
 const DATA_KEY = 'scheduler:data'; // HASH: field = job id, value = JobEnvelope JSON
@@ -17,9 +18,7 @@ const MAX_ATTEMPTS = 5;
 const RETRY_BACKOFF_MS = 60_000; // retry cố định 1 phút; đủ dùng cho quy mô hiện tại
 
 @Injectable()
-export class RedisJobSchedulerService
-  implements IJobScheduler, OnApplicationBootstrap
-{
+export class RedisJobSchedulerService implements IJobScheduler {
   private readonly logger: ILogger;
   private readonly handlers = new Map<
     string,
@@ -28,14 +27,10 @@ export class RedisJobSchedulerService
   private ticking = false; // chặn tick chồng tick nếu 1 lượt xử lý lâu hơn interval
 
   constructor(
-    private readonly redis: Redis,
+    private readonly redisService: RedisService,
     @Inject(LOGGER_FACTORY) loggerFactory: ILoggerFactory,
   ) {
     this.logger = loggerFactory.create(RedisJobSchedulerService.name);
-  }
-
-  onApplicationBootstrap() {
-    this.logger.log('RedisJobSchedulerService started');
   }
 
   onJob<T>(type: string, handler: (payload: T) => Promise<void>): void {
@@ -55,13 +50,13 @@ export class RedisJobSchedulerService
     const envelope: JobEnvelope<T> = { id: jobId, type, payload, attempts: 0 };
 
     // HSET trước, ZADD sau: nếu crash giữa 2 lệnh, index không trỏ tới data rác (tick sẽ tự bỏ qua vì HGET null)
-    await this.redis.hset(DATA_KEY, jobId, JSON.stringify(envelope));
-    await this.redis.zadd(INDEX_KEY, runAt.getTime(), jobId);
+    await this.redisService.hset(DATA_KEY, jobId, JSON.stringify(envelope));
+    await this.redisService.zadd(INDEX_KEY, runAt.getTime(), jobId);
   }
 
   async cancel(id: string): Promise<void> {
-    await this.redis.zrem(INDEX_KEY, id);
-    await this.redis.hdel(DATA_KEY, id);
+    await this.redisService.zrem(INDEX_KEY, id);
+    await this.redisService.hdel(DATA_KEY, id);
   }
 
   @Interval(10_000)
@@ -80,22 +75,21 @@ export class RedisJobSchedulerService
   }
 
   private async processDueJobs(): Promise<void> {
-    const dueIds = await this.redis.zrangebyscore(
+    const dueIds = await this.redisService.zrangebyscore(
       INDEX_KEY,
       '-inf',
       Date.now(),
-      'LIMIT',
       0,
       TICK_BATCH_SIZE,
     );
 
     for (const jobId of dueIds) {
       // ZREM atomic: instance nào rem thành công (=1) mới được xử lý, instance khác nhận 0 và bỏ qua
-      const removed = await this.redis.zrem(INDEX_KEY, jobId);
+      const removed = await this.redisService.zrem(INDEX_KEY, jobId);
       if (removed === 0) continue;
 
-      const raw = await this.redis.hget(DATA_KEY, jobId);
-      await this.redis.hdel(DATA_KEY, jobId);
+      const raw = await this.redisService.hget(DATA_KEY, jobId);
+      await this.redisService.hdel(DATA_KEY, jobId);
       if (!raw) continue; // job đã bị cancel giữa lúc zrangebyscore và zrem
 
       await this.runJob(JSON.parse(raw) as JobEnvelope);
@@ -135,8 +129,12 @@ export class RedisJobSchedulerService
     const retryEnvelope: JobEnvelope = { ...envelope, attempts };
     const retryAt = Date.now() + RETRY_BACKOFF_MS;
 
-    await this.redis.hset(DATA_KEY, envelope.id, JSON.stringify(retryEnvelope));
-    await this.redis.zadd(INDEX_KEY, retryAt, envelope.id);
+    await this.redisService.hset(
+      DATA_KEY,
+      envelope.id,
+      JSON.stringify(retryEnvelope),
+    );
+    await this.redisService.zadd(INDEX_KEY, retryAt, envelope.id);
   }
 
   private generateId(type: string): string {
