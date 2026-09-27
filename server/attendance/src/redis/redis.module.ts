@@ -8,7 +8,7 @@ import { RedisService } from './redis.service';
   providers: [
     {
       provide: 'REDIS',
-      useFactory: () => new Redis({ host: 'localhost', port: 6379 }),
+      useFactory: () => new Redis({ host: 'localhost', port: 6370 }),
     },
     RedisService,
   ],

@@ -4,24 +4,104 @@ import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
-  constructor(@Inject('REDIS') private readonly redis: Redis) {}
+  constructor(
+    @Inject('REDIS')
+    private readonly redis: Redis,
+  ) {}
 
-  async setJson(key: string, value: object, ttlSec?: number) {
-    const raw = JSON.stringify(value);
-    if (ttlSec) await this.redis.set(key, raw, 'EX', ttlSec);
-    else await this.redis.set(key, raw);
+  get(key: string): Promise<string | null> {
+    return this.redis.get(key);
   }
 
-  async getJson<T>(key: string): Promise<T | null> {
-    const raw = await this.redis.get(key);
-    return raw ? (JSON.parse(raw) as T) : null;
+  set(
+    key: string,
+    value: string,
+    options?: { ttlSec?: number; ifNotExists?: boolean },
+  ): Promise<string | null> {
+    const { ttlSec, ifNotExists } = options ?? {};
+
+    if (ttlSec !== undefined && ifNotExists) {
+      return this.redis.set(key, value, 'EX', ttlSec, 'NX');
+    }
+    if (ttlSec !== undefined) {
+      return this.redis.set(key, value, 'EX', ttlSec);
+    }
+    if (ifNotExists) {
+      return this.redis.set(key, value, 'NX');
+    }
+    return this.redis.set(key, value);
   }
 
-  async del(key: string) {
-    await this.redis.del(key);
+  del(key: string): Promise<number> {
+    return this.redis.del(key);
   }
 
-  async onModuleDestroy() {
+  exists(key: string): Promise<number> {
+    return this.redis.exists(key);
+  }
+
+  expire(key: string, ttlSec: number): Promise<number> {
+    return this.redis.expire(key, ttlSec);
+  }
+
+  ttl(key: string): Promise<number> {
+    return this.redis.ttl(key);
+  }
+
+  incr(key: string): Promise<number> {
+    return this.redis.incr(key);
+  }
+
+  hget(key: string, field: string): Promise<string | null> {
+    return this.redis.hget(key, field);
+  }
+
+  hset(key: string, field: string, value: string): Promise<number> {
+    return this.redis.hset(key, field, value);
+  }
+
+  hdel(key: string, field: string): Promise<number> {
+    return this.redis.hdel(key, field);
+  }
+
+  hgetall(key: string): Promise<Record<string, string>> {
+    return this.redis.hgetall(key);
+  }
+
+  scan(
+    cursor: string,
+    matchPattern: string,
+    count: number,
+  ): Promise<[string, string[]]> {
+    return this.redis.scan(cursor, 'MATCH', matchPattern, 'COUNT', count);
+  }
+
+  zadd(key: string, score: number, member: string): Promise<number> {
+    return this.redis.zadd(key, score, member);
+  }
+
+  zrem(key: string, member: string): Promise<number> {
+    return this.redis.zrem(key, member);
+  }
+
+  zrangebyscore(
+    key: string,
+    min: number | '-inf',
+    max: number | '+inf',
+    limitOffset: number,
+    limitCount: number,
+  ): Promise<string[]> {
+    return this.redis.zrangebyscore(
+      key,
+      min,
+      max,
+      'LIMIT',
+      limitOffset,
+      limitCount,
+    );
+  }
+
+  async onModuleDestroy(): Promise<void> {
     await this.redis.quit();
   }
 }
