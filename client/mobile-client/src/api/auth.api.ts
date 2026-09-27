@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { http } from './api';
 import type { ApiResponse, LoginResponse } from '@gps-attendance/shared';
 
@@ -8,24 +7,15 @@ export const AuthAPI = {
    */
   async login(username: string, password: string): Promise<ApiResponse<LoginResponse>> {
     return http.post<ApiResponse<LoginResponse>>('/v0/user/auth/login', {
-=======
-import { httpClient } from './http';
-import type { LoginResponse } from '@gps-attendance/shared';
-
-export const authApi = {
-  login(username: string, password: string) {
-    return httpClient.post<LoginResponse>('/v0/user/auth/login', {
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
       username,
       password,
     });
   },
 
-<<<<<<< HEAD
   /**
    * Đăng xuất (nếu cần invalidate token trên server)
    */
-  async logout(token: string): Promise<ApiResponse<null>> {
+  async logout(token?: string): Promise<ApiResponse<null>> {
     return http.post<ApiResponse<null>>('/v0/user/auth/logout', {}, token);
   },
 
@@ -38,14 +28,24 @@ export const authApi = {
       { refreshToken: token },
     );
   },
+};
 
-=======
-  logout() {
-    return httpClient.post<null>('/v0/user/auth/logout');
+export const authApi = {
+  async login(username: string, password: string): Promise<LoginResponse> {
+    const res = await AuthAPI.login(username, password);
+    if (!res.success) {
+      throw new Error(res.message || 'Login failed');
+    }
+    return res.data;
   },
-
-  refreshToken() {
-    return httpClient.post<{ accessToken: string }>('/v0/user/auth/refresh');
+  async logout(token?: string): Promise<void> {
+    await AuthAPI.logout(token);
   },
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
+  async refreshToken(token: string) {
+    const res = await AuthAPI.refreshToken(token);
+    if (!res.success) {
+      throw new Error(res.message || 'Failed to refresh token');
+    }
+    return res.data;
+  },
 };

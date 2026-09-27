@@ -2,7 +2,8 @@
 import { Injectable } from '@nestjs/common';
 import { Tag, CreateTagRecord, UpdateTagRecord } from '../tag.model';
 import { ITagRepository } from '../tag.repository';
-import { TagModel as PrismaTag } from '#prisma/generated/models';
+import type { Tag as PrismaTag } from '@prisma/client';
+
 import { PrismaService } from '#prisma/prisma.service';
 
 @Injectable()

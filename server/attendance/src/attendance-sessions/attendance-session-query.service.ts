@@ -5,16 +5,13 @@ import { UsersService } from '../users/users.service';
 import { AttendanceSession } from './attendance-session.model';
 import { AttendanceRecord } from '../attendance-record/attendance-record.model';
 import { User } from '../users/user.model';
-<<<<<<< HEAD
-import { AttendanceSessionDetailResponse, AttendanceAttemptDto } from '@gps-attendance/shared';
-import { PrismaService } from '../common/database/prisma.service';
-=======
 import {
   AttendanceSessionResponse,
   AttendanceSessionDetailResponse,
+  AttendanceAttemptDto,
   MyAttendanceSessionResponse,
 } from '@gps-attendance/shared';
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
+import { PrismaService } from '../common/database/prisma.service';
 
 @Injectable()
 export class AttendanceSessionQueryService {
@@ -25,17 +22,13 @@ export class AttendanceSessionQueryService {
     private readonly prisma: PrismaService,
   ) {}
 
-<<<<<<< HEAD
   async getDetail(
     sessionId: number,
-    user: { userId: number; role: string },
+    user?: { userId: number; role: string },
   ): Promise<AttendanceSessionDetailResponse> {
-    const session =
-      await this.attendanceSessionsService.findByIdForUser(sessionId, user);
-=======
-  async getDetail(sessionId: number): Promise<AttendanceSessionDetailResponse> {
-    const session = await this.attendanceSessionsService.findById(sessionId);
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
+    const session = user
+      ? await this.attendanceSessionsService.findByIdForUser(sessionId, user)
+      : await this.attendanceSessionsService.findById(sessionId);
 
     const records =
       await this.attendanceRecordsService.findBySessionId(sessionId);
@@ -52,7 +45,7 @@ export class AttendanceSessionQueryService {
       orderBy: { createdAt: 'desc' },
     });
 
-    const mappedAttempts: AttendanceAttemptDto[] = attempts.map(attempt => ({
+    const mappedAttempts: AttendanceAttemptDto[] = attempts.map((attempt) => ({
       id: attempt.id,
       userId: attempt.userId,
       userCode: attempt.user.code,
@@ -101,6 +94,8 @@ export class AttendanceSessionQueryService {
           updatedAt: record.updatedAt.toISOString(),
         };
       }),
+
+      attempts,
     };
   }
 
@@ -151,30 +146,6 @@ export class AttendanceSessionQueryService {
       openAt: session.openAt.toISOString(),
       closeAt: session.closeAt.toISOString(),
       status: session.status,
-<<<<<<< HEAD
-
-      participants: records.map(record => {
-        const user = usersById.get(record.userId);
-
-        if (!user) {
-          throw new Error(`User ${record.userId} not found`);
-        }
-
-        return {
-          user: {
-            code: user.code,
-            role: user.role,
-            fullname: user.fullname,
-          },
-          status: record.status,
-          checkinAt: record.checkedInAt?.toISOString() ?? null,
-          updatedAt: record.updatedAt?.toISOString() ?? null,
-        };
-      }),
-
-      attempts,
-=======
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
     };
   }
 }

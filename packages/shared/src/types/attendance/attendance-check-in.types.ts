@@ -50,7 +50,10 @@ export interface DeviceIntegrity {
 export type AttendanceValidationStatus = 'VALID' | 'REVIEW' | 'REJECTED';
 
 export type AttendanceValidationReason =
-  'LOW_CONFIDENCE_SCORE' | 'MOCK_LOCATION' | 'OUT_OF_RANGE';
+  | 'LOW_CONFIDENCE_SCORE'
+  | 'MOCK_LOCATION'
+  | 'OUT_OF_RANGE'
+  | 'LOW_LOCATION_ACCURACY';
 
 // -----------------------------------------------------------------------------
 // Attendance Check-in
@@ -76,3 +79,11 @@ export type CheckInResponse =
       status: 'REVIEW' | 'REJECTED';
       reasons: [AttendanceCheckInReason, ...AttendanceCheckInReason[]];
     };
+
+export type LocationPayload = Location;
+export type DevicePayload = Device;
+export type DeviceIntegrityPayload = DeviceIntegrity;
+export type AttendanceCheckInResult = CheckInResponse;
+export type CheckInRequestPayload = CheckInRequest;
+export type CheckInResponsePayload = CheckInResponse;
+

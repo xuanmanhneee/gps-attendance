@@ -7,8 +7,10 @@ export interface AttendanceParticipantResponse {
   user: UserResponse;
   status: AttendanceStatus;
   checkedInAt: string | null;
+  checkinAt?: string | null;
   updatedAt: string;
 }
+
 
 export interface StudentAttendanceHistoryItemDto {
   id: number;

@@ -1,15 +1,8 @@
-<<<<<<< HEAD
-import { Inject, Injectable } from '@nestjs/common';
-import { Account } from './account.model';
-import { IAccountRepository } from './account.repository';
-import { ACCOUNT_REPOSITORY } from './account.repository.token';
-=======
-// src/account/account.service.ts
 import { Injectable, Inject } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-import { UNIT_OF_WORK } from '#common/unit-of-work/unit-of-work.token';
-import { IUnitOfWork } from '#common/unit-of-work/unit-of-work.interface';
-import { USER_REPOSITORY } from '#user/user.repository.token';
+import * as bcrypt from 'bcryptjs';
+import { UNIT_OF_WORK } from '../common/unit-of-work/unit-of-work.token';
+import type { IUnitOfWork } from '../common/unit-of-work/unit-of-work.interface';
+import { USER_REPOSITORY } from '../users/user.repository.token';
 import { ACCOUNT_REPOSITORY } from './account.repository.token';
 import type { IAccountRepository } from './account.repository';
 
@@ -19,18 +12,11 @@ import type {
   CreateAccountWithUserInput,
 } from './account.model';
 import type { User } from '../users/user.model';
-import { IUserRepository } from '#user/user.repository';
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
+import type { IUserRepository } from '../users/user.repository';
 
 @Injectable()
 export class AccountService {
   constructor(
-<<<<<<< HEAD
-    @Inject(ACCOUNT_REPOSITORY)
-    private readonly accountRepository: IAccountRepository,
-  ) {}
-
-=======
     @Inject(UNIT_OF_WORK)
     private readonly unitOfWork: IUnitOfWork,
 
@@ -66,7 +52,6 @@ export class AccountService {
     });
   }
 
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
   async findByUsername(username: string): Promise<Account | undefined> {
     return this.accountRepository.findByUsername(username);
   }

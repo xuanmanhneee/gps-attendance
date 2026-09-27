@@ -17,10 +17,12 @@ export interface TagFilterStep {
 export interface CodeFilterStep {
   /** Cộng thêm user có các code này vào tập kết quả. */
   include?: string[];
+  addCodes?: string[];
 
   /** Loại bỏ user có các code này khỏi tập kết quả. */
   exclude?: string[];
 }
+
 
 type RequireAtLeastOne<T, K extends keyof T = keyof T> = Omit<T, K> &
   {

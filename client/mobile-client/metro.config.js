@@ -1,6 +1,6 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
 
-<<<<<<< HEAD
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
 
@@ -22,8 +22,5 @@ config.resolver.disableHierarchicalLookup = false;
 config.resolver.extraNodeModules = {
   '@gps-attendance/shared': path.resolve(workspaceRoot, 'packages/shared/src'),
 };
-=======
-const config = getDefaultConfig(__dirname);
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
 module.exports = config;

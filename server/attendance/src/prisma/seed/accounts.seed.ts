@@ -1,5 +1,6 @@
-import bcrypt from "bcrypt";
-import { PrismaClient } from "#prisma/generated/client";
+import * as bcrypt from 'bcryptjs';
+import { PrismaClient } from '@prisma/client';
+
 
 type UserSeed = Awaited<
   ReturnType<typeof import("./users.seed").seedUsers>

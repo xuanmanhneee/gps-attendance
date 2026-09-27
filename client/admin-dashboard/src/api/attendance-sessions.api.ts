@@ -31,8 +31,6 @@ export const attendanceSessionsApi = {
       `/v0/attendance-sessions/${id}`,
     );
   },
-<<<<<<< HEAD
-
   close(id: number) {
     return httpClient.post<AttendanceSessionResponse>(
       `/v0/attendance-sessions/${id}/close`,
@@ -43,6 +41,4 @@ export const attendanceSessionsApi = {
     return httpClient.delete<null>(`/v0/attendance-sessions/${id}`);
   },
 };
-=======
-};
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
+

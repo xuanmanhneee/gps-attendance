@@ -1,19 +1,15 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AccountService } from './account.service';
 import { ACCOUNT_REPOSITORY } from './account.repository.token';
-<<<<<<< HEAD
-import { PrismaAccountRepository } from './repositories/prisma-account.repository';
-
-@Module({
-=======
 import { PrismaAccountRepository } from './infra/prisma/prisma-account.repository';
 import { UsersModule } from '../users/users.module';
 import { AccountController } from './account.controller';
+import { PrismaModule } from '../prisma/prisma.module';
+import { UnitOfWorkModule } from '../common/unit-of-work/unit-of-work.module';
 
 @Module({
-  imports: [UsersModule],
+  imports: [forwardRef(() => UsersModule), PrismaModule, UnitOfWorkModule],
   controllers: [AccountController],
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
   providers: [
     AccountService,
     {
@@ -21,10 +17,6 @@ import { AccountController } from './account.controller';
       useClass: PrismaAccountRepository,
     },
   ],
-<<<<<<< HEAD
   exports: [AccountService, ACCOUNT_REPOSITORY],
-=======
-  exports: [AccountService],
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 })
 export class AccountModule {}

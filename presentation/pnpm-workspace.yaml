@@ -1,9 +1,6 @@
-<<<<<<< HEAD
 packages:
   - '.'
 
-=======
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 shamefullyHoist: true
 
 # `playwright-chromium` is needed for `slidev export` (PDF/PNG/PPTX) and has a

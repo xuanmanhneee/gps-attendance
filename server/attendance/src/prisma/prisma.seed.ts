@@ -1,7 +1,8 @@
 import 'dotenv/config';
 
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '#prisma/generated/client';
+import { PrismaClient } from '@prisma/client';
+
 
 import { seedUsers } from './seed/users.seed';
 import { seedAccounts } from './seed/accounts.seed';

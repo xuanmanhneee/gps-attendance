@@ -13,13 +13,9 @@
     "dev:admin": "pnpm --filter @gps-attendance/admin-dashboard dev",
     "predev:mobile": "pnpm build:shared",
     "dev:mobile": "pnpm --filter @gps-attendance/mobile-client dev",
-<<<<<<< HEAD
     "dev:mobile:clear": "pnpm dev:mobile -- --clear",
     "dev:mobile:offline": "pnpm --filter @gps-attendance/mobile-client exec expo start --offline --clear",
     "dev:shared": "pnpm --filter @gps-attendance/shared build -- --watch",
-=======
-    "dev:shared": "pnpm --filter @gps-attendance/shared dev",
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
     "build:shared": "pnpm --filter @gps-attendance/shared build",
     "build:attendance": "pnpm build:shared && pnpm --filter @gps-attendance/attendance build",
     "build:admin": "pnpm build:shared && pnpm --filter @gps-attendance/admin-dashboard build",

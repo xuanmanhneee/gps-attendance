@@ -1,6 +1,6 @@
 import { setStored, getStored, deleteStored } from './storage';
 
-const TOKEN_KEY = 'token';
+const TOKEN_KEY = 'accessToken';
 let token: string | null = null;
 
 export async function saveToken(value: string) {

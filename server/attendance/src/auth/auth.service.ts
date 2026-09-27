@@ -5,15 +5,10 @@ import { AccountService } from '../account/account.service';
 import { UsersService } from '../users/users.service';
 import type { AuthenticatedUser } from './types/authenticated-user.type';
 import { JwtPayload } from './strategies/jwt.strategy';
-<<<<<<< HEAD
 import { AuthErrorCode, LoginResponse } from '@gps-attendance/shared';
 import { ConfigService } from '@nestjs/config';
 import type { SignOptions } from 'jsonwebtoken';
 
-=======
-import { LoginResponse } from '@gps-attendance/shared';
-import * as bcrypt from 'bcrypt';
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 @Injectable()
 export class AuthService {
   constructor(
@@ -33,7 +28,6 @@ export class AuthService {
   ): Promise<AuthenticatedUser> {
     const account = await this.accountService.findByUsername(username);
 
-<<<<<<< HEAD
     if (!account) {
       throw new UnauthorizedException({
         code: AuthErrorCode.INVALID_CREDENTIALS,
@@ -41,20 +35,13 @@ export class AuthService {
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, account.password);
+    const isPasswordValid = await bcrypt.compare(password, account.passwordHash);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException({
         code: AuthErrorCode.INVALID_CREDENTIALS,
         message: 'Invalid credentials',
       });
-=======
-    const isPasswordValid =
-      account && (await bcrypt.compare(password, account.passwordHash));
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu');
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
     }
 
     const user = await this.usersService.findById(account.userId);

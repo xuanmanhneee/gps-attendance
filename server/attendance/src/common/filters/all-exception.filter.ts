@@ -1,9 +1,4 @@
 import {
-<<<<<<< HEAD
-=======
-  ExceptionFilter,
-  Catch,
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
   ArgumentsHost,
   Catch,
   ExceptionFilter,
@@ -11,10 +6,6 @@ import {
   HttpStatus,
   Inject,
 } from '@nestjs/common';
-<<<<<<< HEAD
-import type { Response } from 'express';
-import { CommonErrorCode, type ApiErrorResponse } from '@gps-attendance/shared';
-=======
 import { Request, Response } from 'express';
 import {
   CommonErrorCode,
@@ -27,9 +18,8 @@ import { LOGGER_FACTORY } from '../logging/logger.token';
 
 interface ErrorPayload {
   code?: ApiErrorCode;
-  message?: string;
+  message?: string | string[];
 }
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -40,23 +30,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 
   catch(exception: unknown, host: ArgumentsHost) {
-<<<<<<< HEAD
-    const response = host.switchToHttp().getResponse<Response>();
-=======
     const ctx = host.switchToHttp();
     const res = ctx.getResponse<Response>();
     const req = ctx.getRequest<Request>();
     const requestInfo = `${req.method} ${req.originalUrl}`;
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
     if (exception instanceof HttpException) {
+      const status = exception.getStatus();
       const raw = exception.getResponse();
-<<<<<<< HEAD
-      const payload = typeof raw === 'object' && raw !== null
-        ? raw as { message?: string | string[]; code?: ApiErrorResponse['code'] }
-        : {};
-      return response.status(exception.getStatus()).json({
-=======
 
       const payload: ErrorPayload =
         typeof raw === 'object' && raw !== null
@@ -72,31 +53,30 @@ export class AllExceptionsFilter implements ExceptionFilter {
         this.logger.warn(`[${status}] ${requestInfo} - ${exception.message}`);
       }
 
+      const message = Array.isArray(payload.message)
+        ? payload.message.join(', ')
+        : typeof payload.message === 'string'
+        ? payload.message
+        : exception.message;
+
       return res.status(status).json({
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
         success: false,
-        code: payload.code ?? CommonErrorCode.UNKNOWN_ERROR,
-        message: typeof payload.message === 'string' ? payload.message : exception.message,
+        code: payload.code ?? this.defaultCodeFor(status),
+        message,
       } satisfies ApiErrorResponse);
     }
 
-<<<<<<< HEAD
-    return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-=======
     this.logger.error(
       `[500] ${requestInfo} - ${(exception as Error)?.message ?? 'Unknown error'}`,
       (exception as Error)?.stack,
     );
 
     return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
       success: false,
       code: CommonErrorCode.UNKNOWN_ERROR,
       message: 'Đã có lỗi xảy ra, vui lòng thử lại sau',
     } satisfies ApiErrorResponse);
   }
-<<<<<<< HEAD
-=======
 
   private defaultCodeFor(status: number): CommonErrorCode {
     const map: Record<number, CommonErrorCode> = {
@@ -109,5 +89,4 @@ export class AllExceptionsFilter implements ExceptionFilter {
     };
     return map[status] ?? CommonErrorCode.UNKNOWN_ERROR;
   }
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 }

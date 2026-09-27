@@ -61,18 +61,14 @@ const LoginPage = () => {
         toast.error(error.message);
         return;
       }
-<<<<<<< HEAD
       const message = error instanceof Error ? error.message : 'Lỗi không xác định.';
       setLoginError(
         `Không thể kết nối tới máy chủ. Kiểm tra backend và địa chỉ API. Chi tiết: ${message}`,
       );
       toast.error('Không thể kết nối tới máy chủ');
-=======
-
-      toast.error('Đăng nhập thất bại');
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
     }
   };
+
 
   return (
     <div className="w-full h-screen flex items-center justify-center bg-white text-[#ddd]">

@@ -4,8 +4,9 @@ export interface User {
   id: number;
   code: string;
   role: Role;
-  unitId: number;
+  unitId: number | null;
   fullname: string;
+
   createdAt: Date;
   updatedAt: Date;
 }

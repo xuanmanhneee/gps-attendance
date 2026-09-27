@@ -1,10 +1,9 @@
-<<<<<<< HEAD
 import React, {
   createContext,
   useContext,
   useState,
   useEffect,
-  ReactNode,
+  type ReactNode,
 } from 'react';
 import { AuthAPI } from '../api/auth.api';
 import {
@@ -12,6 +11,15 @@ import {
   removeToken,
   saveSession,
 } from '../services/token-storage';
+import { saveToken as saveInMemoryToken } from '../services/token';
+
+export interface User {
+  id: number;
+  code: string;
+  role: 'student' | 'lecturer' | 'admin';
+  name: string;
+  accountId: number;
+}
 
 const decodeTokenPayload = (token: string): Partial<User> => {
   try {
@@ -41,51 +49,19 @@ const isTokenExpired = (token: string): boolean => {
   }
 };
 
-export interface User {
-  id: number;
-  code: string;
-  role: 'student' | 'lecturer' | 'admin';
-  name: string;
-  accountId: number;
-}
-
 interface AuthContextType {
   user: User | null;
   token: string | null;
   lastLoginAt: string | null;
-=======
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react';
-
-import type { UserProfileResponse } from '@gps-attendance/shared';
-
-import { authApi } from '../api/auth.api';
-import { userApi } from '../api/user.api';
-import { removeToken, restoreToken, saveToken } from '../services/token';
-
-interface AuthContextType {
-  user: UserProfileResponse | null;
-  token: string | null;
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
   isLoading: boolean;
   isSignedIn: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-<<<<<<< HEAD
   setUser: (user: User | null) => void;
-=======
-  setUser: (user: UserProfileResponse | null) => void;
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-<<<<<<< HEAD
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -101,12 +77,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const session = await getSession();
       const savedToken = session.accessToken;
-      const savedUser = session.user;
+      const savedUser = session.user as User | null;
       const savedLastLoginAt = session.lastLoginAt;
 
       if (savedToken && savedUser && !isTokenExpired(savedToken)) {
         setToken(savedToken);
         setUser(savedUser);
+        await saveInMemoryToken(savedToken);
       } else if (savedToken || savedUser) {
         await removeToken();
       }
@@ -116,33 +93,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error('Failed to restore token:', error);
-=======
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfileResponse | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    restoreAuth();
-  }, []);
-
-  const restoreAuth = async () => {
-    try {
-      const savedToken = await restoreToken();
-
-      if (savedToken) {
-        setToken(savedToken);
-
-        const profile = await userApi.getProfile();
-        setUser(profile);
-      }
-    } catch (error) {
-      console.error('Failed to restore auth:', error);
-
-      await removeToken();
-      setToken(null);
-      setUser(null);
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
     } finally {
       setIsLoading(false);
     }
@@ -151,48 +101,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (username: string, password: string) => {
     try {
       setIsLoading(true);
-<<<<<<< HEAD
       const response = await AuthAPI.login(username, password);
 
       if (response.success && response.data) {
         const { accessToken, refreshToken } = response.data;
         const loginAt = new Date().toISOString();
+        const payload = decodeTokenPayload(accessToken);
         const userData: User = {
-          id: decodeTokenPayload(accessToken).id ?? 0,
+          id: payload.id ?? 0,
           accountId: 0,
-          code: decodeTokenPayload(accessToken).code ?? username,
-          name: decodeTokenPayload(accessToken).name ?? username,
-          role: decodeTokenPayload(accessToken).role ?? 'student',
+          code: payload.code ?? username,
+          name: payload.name ?? username,
+          role: (payload.role as 'student' | 'lecturer' | 'admin') ?? 'student',
         };
 
         setUser(userData);
         setToken(accessToken);
         setLastLoginAt(loginAt);
 
-        // Save to persistent storage
+        // Save to persistent storage and in-memory token
+        await saveInMemoryToken(accessToken);
         await saveSession(accessToken, refreshToken, userData, loginAt);
       } else {
-        throw new Error('Login failed');
+        throw new Error((!response.success && response.message) || 'Login failed');
       }
     } catch (error) {
       console.error('Login error:', error);
-=======
-
-      const response = await authApi.login(username, password);
-
-      await saveToken(response.accessToken);
-      setToken(response.accessToken);
-
-      const profile = await userApi.getProfile();
-      setUser(profile);
-    } catch (error) {
-      console.error('Login error:', error);
-
-      await removeToken();
-      setToken(null);
-      setUser(null);
-
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
       throw error;
     } finally {
       setIsLoading(false);
@@ -200,42 +134,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-<<<<<<< HEAD
-    setUser(null);
-    setToken(null);
-    await removeToken();
-=======
     try {
-      setIsLoading(true);
-
-      await authApi.logout();
-
-      setUser(null);
-      setToken(null);
-
-      await removeToken();
-    } catch (error) {
-      console.error('Logout error:', error);
-
-      setUser(null);
-      setToken(null);
-
-      await removeToken();
-
-      throw error;
+      if (token) {
+        await AuthAPI.logout(token).catch(() => {});
+      }
     } finally {
-      setIsLoading(false);
+      setUser(null);
+      setToken(null);
+      setLastLoginAt(null);
+      await removeToken();
     }
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
   };
 
   const value: AuthContextType = {
     user,
     token,
-<<<<<<< HEAD
     lastLoginAt,
-=======
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
     isLoading,
     isSignedIn: !!user,
     login,
@@ -243,7 +157,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser,
   };
 
-<<<<<<< HEAD
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -258,17 +171,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-=======
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
-
-  if (context === undefined) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-
-  return context;
-}
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917

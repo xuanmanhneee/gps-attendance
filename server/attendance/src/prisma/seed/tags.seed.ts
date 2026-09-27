@@ -1,4 +1,5 @@
-import { PrismaClient } from '#prisma/generated/client';
+import { PrismaClient } from '@prisma/client';
+
 
 type UserSeed = Awaited<ReturnType<typeof import('./users.seed').seedUsers>>;
 

@@ -14,6 +14,7 @@ import {
   ApiResponse,
   AttendanceSessionDetailResponse,
   AttendanceSessionResponse,
+  MyAttendanceSessionResponse,
 } from '@gps-attendance/shared';
 import { AttendanceSessionsService } from './attendance-sessions.service';
 import { AttendanceSessionQueryService } from './attendance-session-query.service';
@@ -23,17 +24,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-<<<<<<< HEAD
 import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
-=======
-import { toAttendanceSessionResponse } from './attendance-session.mapper';
-import {
-  AttendanceSessionDetailResponse,
-  AttendanceSessionResponse,
-  MyAttendanceSessionResponse,
-} from '@gps-attendance/shared';
-import { AttendanceSessionQueryService } from './attendance-session-query.service';
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
 
 @ApiTags('attendance-sessions')
 @ApiBearerAuth()
@@ -46,7 +37,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Tạo session điểm danh mới (lecturer)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer')
+  @Roles('lecturer', 'admin')
   @Post()
   async create(
     @Body() dto: CreateAttendanceSessionDto,
@@ -59,18 +50,28 @@ export class AttendanceSessionsController {
     return { success: true, data: toAttendanceSessionResponse(session) };
   }
 
-<<<<<<< HEAD
   // ---- 1. CÁC ROUTE TĨNH (STATIC PATHS) PHẢI KHAI BÁO ĐẦU TIÊN ----
 
   @ApiOperation({ summary: 'Danh sách session của sinh viên hiện tại' })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('student')
+  @UseGuards(JwtAuthGuard)
   @Get('mine')
   async findMine(
     @CurrentUser() user: { userId: number },
   ): Promise<ApiResponse<AttendanceSessionResponse[]>> {
     const sessions = await this.attendanceSessionsService.findByUser(user.userId);
     return { success: true, data: sessions.map(toAttendanceSessionResponse) };
+  }
+
+  @ApiOperation({
+    summary: 'Danh sách session sinh viên tham gia kèm trạng thái điểm danh',
+  })
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  async getMySessions(
+    @CurrentUser() user: { userId: number },
+  ): Promise<ApiResponse<MyAttendanceSessionResponse[]>> {
+    const data = await this.attendanceSessionQueryService.getMySessions(user.userId);
+    return { success: true, data };
   }
 
   @ApiOperation({ summary: 'Danh sách session do chính tôi tạo (lecturer)' })
@@ -100,82 +101,28 @@ export class AttendanceSessionsController {
   @ApiOperation({ summary: 'Danh sách toàn bộ session' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'lecturer')
-=======
-  // ---- Các route tĩnh (static path) PHẢI khai báo trước ':id' ----
-  // Nest match route theo thứ tự khai báo; nếu ':id' đứng trước,
-  // nó sẽ "nuốt" mọi route tĩnh phía sau (vd: me -> id = "me").
-
-  @ApiOperation({ summary: 'Danh sách toàn bộ session' })
-  @UseGuards(JwtAuthGuard)
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
   @Get()
   async findAll(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ApiResponse<AttendanceSessionResponse[]>> {
-    const sessions = user.role === 'admin'
-      ? await this.attendanceSessionsService.findAll()
-      : await this.attendanceSessionsService.findByCreator(user.userId);
+    const sessions =
+      user.role === 'admin'
+        ? await this.attendanceSessionsService.findAll()
+        : await this.attendanceSessionsService.findByCreator(user.userId);
     return { success: true, data: sessions.map(toAttendanceSessionResponse) };
   }
 
-<<<<<<< HEAD
   @ApiOperation({ summary: 'Xóa session và toàn bộ dữ liệu điểm danh liên quan' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'lecturer')
   @Delete(':id')
   async delete(
-=======
-  @ApiOperation({ summary: 'Danh sách session do chính tôi tạo (lecturer)' })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer')
-  @Get('created-by-me')
-  async findMyCreated(
-    @CurrentUser() user: { userId: number },
-  ): Promise<AttendanceSessionResponse[]> {
-    const sessions = await this.attendanceSessionsService.findByCreator(
-      user.userId,
-    );
-    return sessions.map(toAttendanceSessionResponse);
-  }
-
-  @ApiOperation({
-    summary: 'Danh sách session do 1 lecturer bất kỳ tạo (chỉ admin)',
-  })
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  @Get('created-by')
-  async findByCreator(
-    @Query('userId', ParseIntPipe) userId: number,
-  ): Promise<AttendanceSessionResponse[]> {
-    const sessions = await this.attendanceSessionsService.findByCreator(userId);
-    return sessions.map(toAttendanceSessionResponse); 
-  }
-
-  @ApiOperation({
-    summary: 'Danh sách session sinh viên tham gia kèm trạng thái điểm danh',
-  })
-  @UseGuards(JwtAuthGuard)
-  @Get('me')
-  async getMySessions(
-    @CurrentUser() user: { userId: number },
-  ): Promise<MyAttendanceSessionResponse[]> {
-    return this.attendanceSessionQueryService.getMySessions(user.userId);
-  }
-
-  // ---- ':id' luôn đặt CUỐI CÙNG trong nhóm GET ----
-
-  @ApiOperation({ summary: 'Chi tiết 1 session' })
-  @UseGuards(JwtAuthGuard)
-  @Get(':id')
-  async getDetail(
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: { userId: number; role: string },
   ): Promise<ApiResponse<null>> {
     await this.attendanceSessionsService.delete(id, user);
     return { success: true, data: null };
   }
-<<<<<<< HEAD
 
   @ApiOperation({ summary: 'Đóng phiên điểm danh sớm' })
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -234,6 +181,3 @@ export class AttendanceSessionsController {
     };
   }
 }
-=======
-}
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917

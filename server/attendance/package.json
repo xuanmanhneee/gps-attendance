@@ -28,16 +28,10 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.4.6",
-<<<<<<< HEAD
     "@nestjs/throttler": "^6.4.0",
-    "@prisma/adapter-pg": "^7.9.1",
-    "@prisma/client": "^7.9.1",
-    "bcryptjs": "^2.4.3",
-=======
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
-    "bcrypt": "^6.0.0",
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
+    "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "ioredis": "^6.0.0",
@@ -55,11 +49,7 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.1",
-<<<<<<< HEAD
     "@types/bcryptjs": "^2.4.6",
-=======
-    "@types/bcrypt": "^6.0.0",
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^24.0.0",
@@ -71,11 +61,7 @@
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
     "globals": "^17.0.0",
-<<<<<<< HEAD
     "jest": "^29.7.0",
-=======
-    "jest": "^30.5.1",
->>>>>>> 6fd913c335f579fabcfa125705e1b5a16fa99917
     "prettier": "^3.4.2",
     "prisma": "^7.10.0",
     "rimraf": "^6.1.3",
