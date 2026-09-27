@@ -33,7 +33,7 @@ export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepo
       },
     });
 
-    return this.toModel(record);
+    return this.toDomain(record);
   }
 
   async updateStatus(id: number, status: 'cancelled'): Promise<void> {
@@ -45,31 +45,31 @@ export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepo
 
   async findAll(): Promise<AttendanceSession[]> {
     const records = await this.prisma.attendanceSession.findMany();
-    return records.map((r) => this.toModel(r));
+    return records.map((r) => this.toDomain(r));
   }
 
   async findById(id: number): Promise<AttendanceSession | null> {
     const record = await this.prisma.attendanceSession.findUnique({
       where: { id },
     });
-    return record ? this.toModel(record) : null;
+    return record ? this.toDomain(record) : null;
   }
 
   async findByIds(ids: number[]): Promise<AttendanceSession[]> {
     const records = await this.prisma.attendanceSession.findMany({
       where: { id: { in: ids } },
     });
-    return records.map((r) => this.toModel(r));
+    return records.map((r) => this.toDomain(r));
   }
 
   async findByCreator(createdBy: number): Promise<AttendanceSession[]> {
     const records = await this.prisma.attendanceSession.findMany({
       where: { createdBy },
     });
-    return records.map((r) => this.toModel(r));
+    return records.map((r) => this.toDomain(r));
   }
 
-  private toModel(record: PrismaAttendanceSession): AttendanceSession {
+  private toDomain(record: PrismaAttendanceSession): AttendanceSession {
     return {
       id: record.id,
       title: record.title,
@@ -78,14 +78,11 @@ export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepo
       radius: Number(record.radius),
       openAt: record.openAt,
       closeAt: record.closeAt,
-      // Giá trị này sẽ bị withComputedStatus ghi đè ngay sau khi đọc ra
-      // khỏi service, nên chỉ cần map tạm cho đủ kiểu, không ảnh hưởng
-      // logic thật. 'cancelled' hiện chưa có tương đương ở TS SessionStatus
-      // — map tạm về 'pending', cần xem lại nếu sau này dùng tính năng huỷ session.
-      status:
-        record.status === 'open' || record.status === 'closed'
-          ? record.status
-          : 'pending',
+      // Giá trị này sẽ bị withComputedStatus ghi đè lại, TRỪ trường hợp
+      // 'cancelled' (kiểm tra và giữ nguyên trước tiên trong withComputedStatus).
+      // Vì vậy phải map đúng 'cancelled' ở đây — nếu không, thông tin huỷ
+      // session sẽ bị mất trước khi tới tay withComputedStatus.
+      status: record.status === 'cancelled' ? 'cancelled' : 'pending',
       createdBy: record.createdBy,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,

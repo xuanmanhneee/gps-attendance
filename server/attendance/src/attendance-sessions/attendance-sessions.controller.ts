@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -47,6 +48,23 @@ export class AttendanceSessionsController {
     return toAttendanceSessionResponse(session);
   }
 
+  @ApiOperation({
+    summary: 'Huỷ session điểm danh (chỉ lecturer tạo ra session đó)',
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('lecturer')
+  @Patch(':id/cancel')
+  async cancel(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ): Promise<AttendanceSessionResponse> {
+    const cancelled = await this.attendanceSessionsService.cancel(
+      id,
+      user.userId,
+    );
+    return toAttendanceSessionResponse(cancelled);
+  }
+
   // ---- Các route tĩnh (static path) PHẢI khai báo trước ':id' ----
   // Nest match route theo thứ tự khai báo; nếu ':id' đứng trước,
   // nó sẽ "nuốt" mọi route tĩnh phía sau (vd: me -> id = "me").
@@ -82,7 +100,7 @@ export class AttendanceSessionsController {
     @Query('userId', ParseIntPipe) userId: number,
   ): Promise<AttendanceSessionResponse[]> {
     const sessions = await this.attendanceSessionsService.findByCreator(userId);
-    return sessions.map(toAttendanceSessionResponse); 
+    return sessions.map(toAttendanceSessionResponse);
   }
 
   @ApiOperation({

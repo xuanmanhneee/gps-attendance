@@ -6,7 +6,6 @@ import { UsersModule } from '../users/users.module';
 import { LoggingModule } from '../common/logging/logging.module';
 import { AttendanceRecordModule } from '../attendance-record/attendance-record.module';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
-import { AttendanceSessionSeeder } from './attendance-session.seeder';
 import { AttendanceSessionQueryService } from './attendance-session-query.service';
 import { PrismaAttendanceSessionRepository } from './infra/prisma/prisma-attendance-session.repository';
 
@@ -16,7 +15,6 @@ import { PrismaAttendanceSessionRepository } from './infra/prisma/prisma-attenda
   controllers: [AttendanceSessionsController],
   providers: [
     AttendanceSessionsService,
-    AttendanceSessionSeeder,
     {
       provide: ATTENDANCE_SESSION_REPOSITORY,
       useClass: PrismaAttendanceSessionRepository,

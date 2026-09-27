@@ -1,10 +1,14 @@
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SessionStatus } from '@gps-attendance/shared';
+import {
+  AttendanceSessionErrorCode,
+  SessionStatus,
+} from '@gps-attendance/shared';
 
 import { IJobScheduler } from '#job-scheduler/job-scheduler.interface';
 import { JOB_SCHEDULER } from '#job-scheduler/job-scheduler.token';
@@ -98,21 +102,29 @@ export class AttendanceSessionsService {
   // bị huỷ trước đó. Nếu đang open, dọn luôn buffer để không lẫn dữ liệu
   // check-in dở dang vào lần flush kế (dù job flush đã bị cancel, phòng
   // trường hợp job đã trót chạy trước khi cancel kịp tới nơi).
-  async cancel(sessionId: number): Promise<AttendanceSession> {
+  async cancel(
+    sessionId: number,
+    requestedBy: number,
+  ): Promise<AttendanceSession> {
     const session = await this.findById(sessionId);
 
+    if (session.createdBy !== requestedBy) {
+      throw new ForbiddenException({
+        code: AttendanceSessionErrorCode.CANCEL_FORBIDDEN,
+        message: 'Chỉ giảng viên tạo session này mới được huỷ',
+      });
+    }
+
     if (session.status === 'closed' || session.status === 'cancelled') {
-      throw new ConflictException(
-        `Không thể huỷ session ${sessionId} vì đang ở trạng thái "${session.status}"`,
-      );
+      throw new ConflictException({
+        code: AttendanceSessionErrorCode.CANCEL_INVALID_STATUS,
+        message: `Không thể huỷ session ${sessionId} vì đang ở trạng thái "${session.status}"`,
+      });
     }
 
     const wasOpen = session.status === 'open';
 
-    await this.attendanceSessionRepository.updateStatus(
-      sessionId,
-      'cancelled',
-    );
+    await this.attendanceSessionRepository.updateStatus(sessionId, 'cancelled');
 
     await this.jobScheduler.cancel(`init-roster:${sessionId}`);
     await this.jobScheduler.cancel(`flush:${sessionId}`);
@@ -134,7 +146,10 @@ export class AttendanceSessionsService {
     const session = await this.attendanceSessionRepository.findById(id);
 
     if (!session) {
-      throw new NotFoundException(`Không tìm thấy session id=${id}`);
+      throw new NotFoundException({
+        code: AttendanceSessionErrorCode.NOT_FOUND,
+        message: `Không tìm thấy session id=${id}`,
+      });
     }
 
     return this.withComputedStatus(session);
