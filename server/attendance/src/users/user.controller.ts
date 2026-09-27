@@ -17,6 +17,8 @@ import {
 } from '@gps-attendance/shared';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { User } from './user.model';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -52,7 +54,8 @@ export class UserController {
 
   // 2. Route tĩnh danh sách chung
   @ApiOperation({ summary: 'Lấy danh sách tất cả users' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Get()
   async findAll(): Promise<ApiResponse<User[]>> {
     const users = await this.usersService.findAll();
@@ -64,7 +67,8 @@ export class UserController {
 
   // 3. Route tham số động ':id' luôn đặt sau
   @ApiOperation({ summary: 'Lấy thông tin user theo id' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Get(':id')
   async findById(
     @Param('id', ParseIntPipe) id: number,

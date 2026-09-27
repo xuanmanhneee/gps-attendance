@@ -14,6 +14,22 @@ export interface AttendanceSessionResponse {
   status: SessionStatus;
 }
 
+export interface AttendanceAttemptDto {
+  id: number;
+  userId: number;
+  userCode: string;
+  userFullname: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  distanceToCenter: number;
+  deviceId: string;
+  isMockLocation: boolean;
+  serverTimestamp: string;
+  result: 'APPROVED' | 'REVIEW' | 'REJECTED' | null;
+  reasons: string[];
+}
+
 export interface AttendanceSessionDetailResponse {
   id: number;
   title: string;
@@ -25,6 +41,7 @@ export interface AttendanceSessionDetailResponse {
   status: SessionStatus;
 
   participants: AttendanceParticipantResponse[];
+  attempts?: AttendanceAttemptDto[];
 }
 
 export interface CreateAttendanceSessionPayload {

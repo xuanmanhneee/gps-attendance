@@ -1,223 +1,74 @@
-# GPS Attendance System - Quick Reference Guide
+# Quick reference - GPS Attendance
 
-## 🚀 Quick Start
+## 1. Chạy nhanh
 
-### Installation
 ```bash
-git clone <repo-url>
-cd gps-attendance
+cd gps-attendance-main
 pnpm install
-pnpm build:shared
+pnpm dev:attendance
+pnpm dev:admin
+pnpm dev:mobile
 ```
 
-### Run Projects
+## 2. Các URL chính
+
+- Backend API: http://localhost:3000
+- Dashboard: http://localhost:5173
+- Mobile app: Expo Go / simulator
+
+## 3. Các route API chính
+
+```text
+POST /v0/user/auth/login
+POST /v0/admin/auth/login
+GET /v0/attendance-sessions
+GET /v0/attendance-sessions/:id
+POST /v0/attendance-sessions
+POST /attendance/check-in
+GET /attendance/records/mine
+GET /users/me
+```
+
+## 4. Vai trò người dùng
+
+- student
+- lecturer
+- admin
+
+## 5. Quy ước response
+
+```ts
+{ success: true, data: ... }
+```
+
+```ts
+{ success: false, code: 'ERROR_CODE', message: '...' }
+```
+
+## 6. Biến môi trường cần chú ý
+
+```env
+EXPO_PUBLIC_API_URL=http://192.168.1.12:3000
+```
+
+Dashboard dùng `VITE_API_BASE_URL`. Mobile hiện có các hàm client `logout` và
+`refreshToken`, nhưng backend chưa cung cấp hai route tương ứng.
+
+## 7. Lệnh build
+
 ```bash
-# Terminal 1: Backend
-pnpm dev:attendance        # http://localhost:3000
-
-# Terminal 2: Mobile
-pnpm dev:mobile            # Scan QR code with Expo Go
-
-# Terminal 3: Admin Dashboard
-pnpm dev:admin             # http://localhost:5173
-
-# Terminal 4: Watch shared types (if modifying)
-pnpm dev:shared
+pnpm build:shared
+pnpm build:attendance
+pnpm build:admin
 ```
 
----
+## 8. Tham khảo nhanh
 
-## 📁 Project Structure
+- [../README.md](../README.md)
+- [system-overview.md](system-overview.md)
+- [ARCHITECTURE.md](ARCHITECTURE.md)
+- [conventions](conventions)
 
-```
-gps-attendance/
-├── server/attendance/          ← NestJS Backend API
-├── client/mobile-client/       ← Expo App (iOS/Android)
-├── client/admin-dashboard/     ← React Web Dashboard
-├── packages/shared/            ← Shared TypeScript Types
-├── docs/conventions/           ← Code conventions
-└── docs/SYSTEM_OVERVIEW.md     ← Full documentation (this file)
-```
-
----
-
-## 🏗️ Architecture Layers
-
-### Backend Modules
-
-| Module | Purpose | Key Files |
-|--------|---------|-----------|
-| **auth** | JWT authentication | auth.service, jwt.strategy |
-| **users** | User management | users.service, user.model |
-| **attendance-sessions** | Session CRUD | controller, service |
-| **attendance-check-in** | Check-in processing | controller, service |
-| **attendance-validation** | Anti-fraud scoring | validation.service, checks/ |
-| **geo** | Distance calculations | geo.service (Haversine) |
-| **attendance-record** | Storage | record.model, repository |
-
-### Database
-
-**Primary Tables**:
-- `Account` - Login credentials
-- `User` - User profile (links to Account)
-- `AttendanceSession` - Sessions with GPS coordinates
-- `AttendanceRecord` - Check-in records with validation results
-
----
-
-## 🔐 Authentication Flow
-
-```
-Client                          Server
-  │                               │
-  ├─ POST /auth/login ─────────→  │
-  │  (username, password)          │
-  │                                ├─ Verify Account
-  │  ← JWT Token ──────────────── │
-  │                                │
-  ├─ GET /api/resource ─────────→  │
-  │  Authorization: Bearer <JWT>   │
-  │                                ├─ JwtAuthGuard validates
-  │                                ├─ @CurrentUser() extracts userId
-  │  ← API Response ──────────── │
-```
-
-**Key Points**:
-- JWT payload contains `userId` (from User.id, not Account.id)
-- Token stored in secure storage on mobile
-- `JwtAuthGuard` + `RolesGuard` protect routes
-- Roles: `student`, `lecturer`, `admin`
-
----
-
-## 📍 Check-In Process
-
-```
-Student (Mobile App)
-  ↓
-1. Request GPS location
-2. Get device fingerprint
-3. Check mock location flag
-  ↓
-4. POST /attendance/check-in {
-     sessionId, location, device, integrity
-   }
-  ↓
-Server (NestJS)
-  ↓
-5. Validate session is open
-6. Run 3 validation checks in parallel:
-   a) Location: Within radius? (Haversine formula)
-   b) Mock Location: Detected? (system flag + provider type)
-   c) Integrity: Device legitimate? (fingerprint, emulator)
-  ↓
-7. Calculate composite score (0-100):
-   - 80+ = ✅ Approved
-   - 50-79 = ⚠️ Flagged
-   - <50 = ❌ Rejected
-  ↓
-8. Create AttendanceRecord with status & score
-  ↓
-Mobile App
-  ↓
-Display result to student
-```
-
----
-
-## 🛡️ Anti-Fraud Mechanisms
-
-### 1. Location Check
-```typescript
-// Haversine formula: distance between two GPS points
-distance = GeoService.getDistanceInMeters(lat1, lon1, lat2, lon2)
-withinRadius = distance <= session.radius
-
-// Coefficient: 0 (inside) to 1 (outside)
-coefficient = Math.min(1, distance / radiusLimit)
-```
-
-### 2. Mock Location Detection
-- **Android**: Check `isLocationMocked` system flag
-- **Fallback**: Analyze location provider type (GPS vs network)
-- **Supplementary**: Detect impossible movement speeds
-
-### 3. Device Integrity
-- Device fingerprinting (ID, model, OS version)
-- Emulator/simulator detection
-- Device sharing pattern analysis
-
----
-
-## 🔌 API Endpoints Summary
-
-### Authentication
-```
-POST   /auth/login                (❌ auth required)
-POST   /auth/logout               (✅ JWT required)
-POST   /auth/refresh              (✅ JWT required)
-```
-
-### Users
-```
-GET    /users/me                  (✅ JWT required, any role)
-GET    /users/:id                 (✅ JWT required, any role)
-GET    /users                     (✅ JWT required, admin only)
-POST   /users                     (✅ JWT required, admin only)
-```
-
-### Sessions (Lecturer/Admin Create)
-```
-POST   /attendance-sessions       (✅ JWT required, lecturer/admin)
-GET    /attendance-sessions       (✅ JWT required, any role)
-GET    /attendance-sessions/:id   (✅ JWT required, any role)
-PUT    /attendance-sessions/:id   (✅ JWT required, lecturer/admin)
-DELETE /attendance-sessions/:id   (✅ JWT required, lecturer/admin)
-```
-
-### Check-In (Student Only)
-```
-POST   /attendance/check-in       (✅ JWT required, student)
-```
-
-### Records (Lecturer/Admin View)
-```
-GET    /attendance-records        (✅ JWT required, lecturer/admin)
-GET    /attendance-records/:id    (✅ JWT required, lecturer/admin)
-```
-
----
-
-## 📤 API Response Format
-
-**Success**:
-```json
-{
-  "success": true,
-  "data": { /* actual data */ }
-}
-```
-
-**Error**:
-```json
-{
-  "success": false,
-  "code": "ERROR_CODE_HERE",
-  "message": "Human readable message"
-}
-```
-
-**Type Safety** (TypeScript):
-```typescript
-type ApiResponse<T> = 
-  | { success: true; data: T }
-  | { success: false; code: string; message: string };
-
-// Usage
-const response: ApiResponse<SessionData> = await http.post(...)
-if (response.success) {
-  console.log(response.data.title)  // Type-safe access
-}
 ```
 
 ---

@@ -50,10 +50,11 @@ export class ApiExceptionFilter implements ExceptionFilter {
       return;
     }
 
+    console.error('[ApiExceptionFilter Error]:', exception);
     response.status(500).json({
       success: false,
       code: CommonErrorCode.INTERNAL_ERROR,
-      message: 'Internal server error',
+      message: (exception as Error)?.message || 'Internal server error',
     } satisfies ApiErrorResponse);
   }
 

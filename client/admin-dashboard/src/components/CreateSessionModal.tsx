@@ -119,13 +119,16 @@ export const CreateSessionModal = ({
 
   const handleFormSubmit = async (values: CreateSessionFormValues) => {
     try {
-      const openAt = `${values.openDate}T${values.openTime}`;
-      const closeAt = `${values.closeDate}T${values.closeTime}`;
+      const openDateObj = new Date(`${values.openDate}T${values.openTime}`);
+      const closeDateObj = new Date(`${values.closeDate}T${values.closeTime}`);
 
-      if (new Date(openAt) >= new Date(closeAt)) {
+      if (closeDateObj <= openDateObj) {
         toast.error('Thời gian kết thúc phải sau thời gian bắt đầu');
         return;
       }
+
+      const openAt = openDateObj.toISOString();
+      const closeAt = closeDateObj.toISOString();
 
       const codes = parseStudentCodes(values.studentCodesText);
 

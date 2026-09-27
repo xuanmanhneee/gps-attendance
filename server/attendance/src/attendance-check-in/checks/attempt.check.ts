@@ -15,14 +15,18 @@ export class AttemptCheck {
   async evaluate(input: {
     sessionId: number;
     userId: number;
-  }): Promise<{ isTooMany: boolean }> {
-    const count = await this.attemptRepository.incrementAttempt(
-      input.sessionId,
-      input.userId,
-    );
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    distanceToCenter: number;
+    deviceId: string;
+    isMockLocation: boolean;
+  }): Promise<{ attemptId: number; isTooMany: boolean }> {
+    const attempt = await this.attemptRepository.createAttempt(input);
 
     return {
-      isTooMany: count > this.MAX_ATTEMPTS,
+      attemptId: attempt.id,
+      isTooMany: attempt.count > this.MAX_ATTEMPTS,
     };
   }
 }

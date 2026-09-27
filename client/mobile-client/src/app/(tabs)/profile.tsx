@@ -4,44 +4,37 @@ import {
   StyleSheet,
   Text,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/auth-context';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
+import { ConfirmDialog } from '../../components/confirm-dialog';
 import { COLORS } from '../../constants/theme';
+import { appAlert } from '../../utils/app-alert';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const handleLogout = async () => {
-    Alert.alert('Xác nhận', 'Bạn có chắc muốn đăng xuất?', [
-      {
-        text: 'Hủy',
-        onPress: () => {},
-        style: 'cancel',
-      },
-      {
-        text: 'Đăng Xuất',
-        onPress: async () => {
-          try {
-            setIsLoggingOut(true);
-            await logout();
-            router.replace('/login');
-          } catch (error) {
-            Alert.alert('Lỗi', 'Không thể đăng xuất');
-          } finally {
-            setIsLoggingOut(false);
-          }
-        },
-        style: 'destructive',
-      },
-    ]);
+  const handleLogout = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      setShowLogoutConfirm(false);
+      router.replace('/login');
+    } catch {
+      appAlert('Lỗi', 'Không thể đăng xuất');
+      setIsLoggingOut(false);
+    }
   };
 
   if (!user) {
@@ -59,9 +52,10 @@ export default function ProfileScreen() {
         styles.scrollContent,
         {
           paddingTop: Math.max(insets.top, 20) + 16,
-          paddingBottom: Math.max(insets.bottom, 20) + 24,
+          paddingBottom: 64 + insets.bottom + 24,
         },
       ]}
+      keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.centerWrapper}>
@@ -74,7 +68,7 @@ export default function ProfileScreen() {
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {user.name.charAt(0).toUpperCase()}
+              {(user.name ?? user.code ?? '?').charAt(0).toUpperCase()}
             </Text>
           </View>
         </View>
@@ -159,6 +153,17 @@ export default function ProfileScreen() {
         <Text style={styles.footerText}>GPS Attendance System v1.0.0</Text>
       </View>
       </View>
+
+      <ConfirmDialog
+        visible={showLogoutConfirm}
+        title="Xác nhận đăng xuất"
+        message="Bạn có chắc muốn đăng xuất khỏi tài khoản này?"
+        confirmText="Đăng Xuất"
+        cancelText="Hủy"
+        loading={isLoggingOut}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </ScrollView>
   );
 }

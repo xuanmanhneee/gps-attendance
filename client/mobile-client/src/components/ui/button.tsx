@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ViewStyle,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { COLORS } from '../../constants/theme';
 
@@ -35,6 +36,7 @@ export const Button = ({
     styles[size],
     disabled && styles.disabled,
     loading && styles.disabled,
+    Platform.OS === 'web' && (disabled || loading ? styles.webDisabled : styles.webEnabled),
     style,
   ];
 
@@ -50,6 +52,7 @@ export const Button = ({
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.7}
+      accessibilityRole="button"
     >
       {loading ? <ActivityIndicator color="#FFFFFF" /> : <>{icon}{<Text style={textStyle}>{title}</Text>}</>}
     </TouchableOpacity>
@@ -83,6 +86,12 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
+  webEnabled: {
+    cursor: 'pointer',
+  } as ViewStyle,
+  webDisabled: {
+    cursor: 'not-allowed',
+  } as ViewStyle,
   small: {
     paddingVertical: 8,
     paddingHorizontal: 12,

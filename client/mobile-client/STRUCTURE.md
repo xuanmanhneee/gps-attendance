@@ -176,7 +176,7 @@ eas build --platform android  # Android
 
 ## 🔐 Security Notes
 
-- JWT tokens stored in AsyncStorage (consider using secure storage for production)
+- Access and refresh tokens, user session data stored with Expo SecureStore
 - Token sent in Authorization header for authenticated requests
 - API timeout: 30 seconds
 - Error handling and user feedback for API failures

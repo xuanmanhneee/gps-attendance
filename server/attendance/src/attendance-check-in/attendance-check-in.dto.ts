@@ -7,6 +7,10 @@ import {
   IsOptional,
   IsString,
   IsNotEmpty,
+  IsLatitude,
+  IsLongitude,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -28,6 +32,7 @@ export class LocationDto implements LocationPayload {
     example: 11.9404,
   })
   @IsNumber()
+  @IsLatitude()
   latitude!: number;
 
   @ApiProperty({
@@ -35,13 +40,16 @@ export class LocationDto implements LocationPayload {
     example: 108.4583,
   })
   @IsNumber()
+  @IsLongitude()
   longitude!: number;
 
   @ApiProperty({
-    description: 'Độ chính xác GPS, đơn vị mét',
+    description: 'Độ chính xác GPS, đơn vị mét (sai số, không phải khoảng cách)',
     example: 10,
   })
   @IsNumber()
+  @Min(0)
+  @Max(1000)
   accuracy!: number;
 
   @ApiProperty({

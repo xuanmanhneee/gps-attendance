@@ -3,7 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
-import { AppBootstrapLogger } from './common/logging/app-bootstrap.logger';
+import { WinstonJsonLogger } from './common/logging/winston-logger.service';
 
 function printBanner(url: string, docsUrl: string) {
   const lines = [
@@ -31,7 +31,7 @@ function printBanner(url: string, docsUrl: string) {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    logger: new AppBootstrapLogger(),
+    logger: new WinstonJsonLogger('Nest'),
   });
 
   app.useGlobalFilters(new ApiExceptionFilter());

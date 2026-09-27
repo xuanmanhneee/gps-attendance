@@ -1,263 +1,163 @@
-# GPS Attendance System - Architecture & Data Flow Reference
+# Kiến trúc dự án GPS Attendance
 
-## 📊 System Architecture Diagram
+## 1. Tổng quan kiến trúc
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                            CLIENT LAYER                                  │
-├────────────────────┬──────────────────────┬──────────────────────────────┤
-│                    │                      │                              │
-│  Expo Mobile App   │  React Web App       │  Third-party Services       │
-│  (iOS/Android)     │  (Admin Dashboard)   │  (Optional)                 │
-│                    │                      │  - Maps API                 │
-│  React Native      │  React 19            │  - Push Notifications      │
-│  Expo SDK 54       │  Vite                │  - Analytics               │
-│                    │                      │                              │
-│  Pages:            │  Pages:              │                              │
-│  - Login           │  - Login             │                              │
-│  - Sessions        │  - Dashboard         │                              │
-│  - Check-in        │  - Attendance        │                              │
-│  - History         │  - Reports           │                              │
-│                    │                      │                              │
-└─────┬──────────────┴──────────┬───────────┴──────────────────────────────┘
-      │                        │
-      │ REST API + JWT         │ REST API + JWT
-      │ (HTTP/HTTPS)           │ (HTTP/HTTPS)
-      │                        │
-┌─────▼──────────────────────────▼──────────────────────────────────────────┐
-│                         API GATEWAY & VALIDATION                           │
-│  ┌────────────────────────────────────────────────────────────────────┐  │
-│  │ • CORS handling                                                    │  │
-│  │ • Request validation (class-validator)                            │  │
-│  │ • Rate limiting (optional)                                        │  │
-│  │ • Error handling & formatting                                     │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                                                                            │
-└─────┬───────────────────────────────────────────────────────────────────┬─┘
-      │                                                                   │
-┌─────▼────────────────────────────────────────────────────────────────────▼─┐
-│                    NESTJS APPLICATION LAYER                                │
-│                                                                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │              │  │              │  │              │  │              │ │
-│  │  AuthModule  │  │  UsersModule │  │ AccountModule│  │    GeoModule │ │
-│  │              │  │              │  │              │  │              │ │
-│  │ • JWT auth   │  │ • User CRUD  │  │ • Login      │  │ • Haversine  │ │
-│  │ • Strategies │  │ • Roles      │  │ • Accounts   │  │ • Distance   │ │
-│  │ • Guards     │  │ • Filtering  │  │ • Password   │  │ • Radius     │ │
-│  │              │  │              │  │              │  │              │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘ │
-│                                                                            │
-│  ┌────────────────────────────────┐  ┌───────────────────────────────┐  │
-│  │                                │  │                               │  │
-│  │ AttendanceSessionsModule       │  │AttendanceCheckInModule        │  │
-│  │                                │  │                               │  │
-│  │ • Create session               │  │ • Check-in endpoint           │  │
-│  │ • List sessions                │  │ • Validation orchestration    │  │
-│  │ • Get session details          │  │ • Record creation             │  │
-│  │ • Update/Delete session        │  │                               │  │
-│  │ • Status management            │  │ Input: Location + Device      │  │
-│  │                                │  │ Output: Validation result     │  │
-│  └────────────────────────────────┘  └───────────────────────────────┘  │
-│                                                                            │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │                                                                  │   │
-│  │       AttendanceValidationModule (Anti-Fraud Engine)            │   │
-│  │                                                                  │   │
-│  │  ┌────────────────┐  ┌─────────────────┐  ┌────────────────┐  │   │
-│  │  │                │  │                 │  │                │  │   │
-│  │  │ LocationCheck  │  │ MockLocationCheck│  │ IntegrityCheck │  │   │
-│  │  │                │  │                 │  │                │  │   │
-│  │  │ • Distance     │  │ • System flags  │  │ • Fingerprint  │  │   │
-│  │  │ • Radius match │  │ • Provider type │  │ • Emulator det │  │   │
-│  │  │ • GPS accuracy │  │ • Movement speed│  │ • Device share │  │   │
-│  │  │                │  │                 │  │                │  │   │
-│  │  └────────┬───────┘  └────────┬────────┘  └────────┬───────┘  │   │
-│  │           │                   │                    │          │   │
-│  │           └───────────────┬───┴────────────────────┘          │   │
-│  │                           │                                    │   │
-│  │                 ┌─────────▼────────┐                          │   │
-│  │                 │  Score Calculator │                          │   │
-│  │                 │  (Weighted combo) │                          │   │
-│  │                 │   Score 0-100     │                          │   │
-│  │                 │   Status result   │                          │   │
-│  │                 └──────────────────┘                           │   │
-│  │                                                                  │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                                                            │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │ AttendanceRecordModule                                           │   │
-│  │ • Storage of check-in records                                    │   │
-│  │ • Querying attendance history                                    │   │
-│  │ • Reporting interface                                            │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-│                                                                            │
-└────┬──────────────────────────────────────────────────────────────────────┬┘
-     │                                                                      │
-┌────▼──────────────────────────────────────────────────────────────────────▼─┐
-│                    DATA ACCESS LAYER (Repository Pattern)                    │
-│                                                                              │
-│  ┌──────────────────────────────────────────────────────────────────────┐  │
-│  │  Prisma Client (ORM)                                                │  │
-│  │  • Automatic schema synchronization                                │  │
-│  │  • Type-safe query builder                                         │  │
-│  │  • Migration management                                            │  │
-│  │  • Connection pooling                                              │  │
-│  └──────────────────────────────────────────────────────────────────────┘  │
-│                                                                              │
-└────┬──────────────────────────────────────────────────────────────────────┬─┘
-     │                                                                      │
-┌────▼──────────────────────────────────────────────────────────────────────▼─┐
-│                      PERSISTENCE LAYER (PostgreSQL)                         │
-│                                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │              │  │              │  │              │  │              │  │
-│  │ Account      │  │ User         │  │ AttendanceS… │  │ AttendanceR… │  │
-│  │              │  │              │  │              │  │              │  │
-│  │ • id         │  │ • id         │  │ • id         │  │ • id         │  │
-│  │ • username   │  │ • accountId  │  │ • title      │  │ • userId     │  │
-│  │ • password   │  │ • code       │  │ • lat/lon    │  │ • sessionId  │  │
-│  │              │  │ • role       │  │ • radius     │  │ • checkedInAt│  │
-│  │              │  │ • name       │  │ • openAt     │  │ • status     │  │
-│  │              │  │              │  │ • closeAt    │  │ • score      │  │
-│  │              │  │              │  │ • status     │  │ • distance   │  │
-│  │              │  │              │  │ • createdBy  │  │ • deviceId   │  │
-│  │              │  │              │  │              │  │              │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘  │
-│                                                                              │
-│  Relationships:                                                             │
-│  • Account (1) ←FK→ (1) User                                               │
-│  • User (1) ←FK→ (N) AttendanceSession (createdBy)                        │
-│  • AttendanceSession (1) ←FK→ (N) AttendanceRecord                        │
-│  • User (1) ←FK→ (N) AttendanceRecord (userId)                            │
-│                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘
+Dự án GPS Attendance được tổ chức theo mô hình monorepo với 3 nền tảng chính:
+- backend API trên NestJS
+- dashboard web trên React + Vite
+- mobile app trên Expo + React Native
+- shared package dùng chung cho types và contract
+
+## 2. Lớp kiến trúc và trách nhiệm
+
+```text
+┌─────────────────────────────────────────────┐
+│            Client Layer                     │
+│  - Mobile app (Expo / React Native)        │
+│  - Admin dashboard (React / Vite)          │
+└─────────────────────────────────────────────┘
+                     │
+                     │ HTTP + JWT
+                     ▼
+┌─────────────────────────────────────────────┐
+│            API Layer (NestJS)               │
+│  Auth / Users / Sessions / Check-in        │
+│  Validation / Geo / Attendance Records     │
+└─────────────────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────┐
+│         Data / Persistence Layer           │
+│  Prisma schema + PostgreSQL (planned/partial)│
+│  In-memory stores in prototype phases      │
+└─────────────────────────────────────────────┘
 ```
 
----
+## 3. Mối quan hệ giữa các phần
 
-## 🔄 Check-In Data Flow (Detailed Sequence)
+### Mobile app
+- Lấy vị trí GPS của sinh viên
+- Gửi yêu cầu check-in với JWT
+- Hiển thị kết quả điểm danh và lịch sử
 
-```
-Mobile App                    Backend API               Database
-    │                              │                        │
-    │ 1. User taps "Check-in"      │                        │
-    │    (GUI state update)        │                        │
-    ├─→ Request GPS permission    │                        │
-    │    (OS-level)               │                        │
-    │                              │                        │
-    ├─→ Get GPS location          │                        │
-    │    (latitude, longitude)     │                        │
-    │                              │                        │
-    ├─→ Get device info           │                        │
-    │    (model, OS, app version)  │                        │
-    │                              │                        │
-    ├─→ Check location spoofing    │                        │
-    │    (isLocationMocked flag)   │                        │
-    │                              │                        │
-    │ 2. Build CheckInRequest      │                        │
-    │    {                         │                        │
-    │      sessionId,              │                        │
-    │      location: {...},        │                        │
-    │      device: {...},          │                        │
-    │      integrity: {...}        │                        │
-    │    }                         │                        │
-    │                              │                        │
-    │ 3. POST /attendance/check-in │                        │
-    ├─────────────────────────────→│                        │
-    │    (with JWT header)         │                        │
-    │                              │                        │
-    │                              │ 4. JwtAuthGuard        │
-    │                              │    validates token     │
-    │                              │                        │
-    │                              │ 5. Extract userId     │
-    │                              │    from JWT payload    │
-    │                              │                        │
-    │                              │ 6. Query session       │
-    │                              ├───────────────────────→│
-    │                              │   SELECT * FROM        │
-    │                              │   AttendanceSession    │
-    │                              │   WHERE id = ?         │
-    │                              │←───────────────────────┤
-    │                              │   (session data)       │
-    │                              │                        │
-    │                              │ 7. Validate session    │
-    │                              │    is OPEN             │
-    │                              │    (now >= openAt      │
-    │                              │     AND now <= closeAt)│
-    │                              │                        │
-    │                              │ 8. PARALLEL: Run       │
-    │                              │    validation checks   │
-    │                              │                        │
-    │                              │    ┌─ Location Check   │
-    │                              │    │  distance =       │
-    │                              │    │  Haversine(...)   │
-    │                              │    │  coeff = min(1,   │
-    │                              │    │    dist/radius)   │
-    │                              │    │                   │
-    │                              │    ├─ Mock Location    │
-    │                              │    │  Check            │
-    │                              │    │  • isLocationMock│
-    │                              │    │  • providerType  │
-    │                              │    │  • speedCheck    │
-    │                              │    │                   │
-    │                              │    └─ Integrity Check  │
-    │                              │       • deviceId match │
-    │                              │       • emulator check │
-    │                              │       • fingerprint    │
-    │                              │                        │
-    │                              │ 9. Calculate          │
-    │                              │    weighted score:     │
-    │                              │    score = 100 * (     │
-    │                              │      0.5 * (1-locCoef) │
-    │                              │      0.3 * (1-mockCoef)│
-    │                              │      0.2 * (1-intCoef) │
-    │                              │    )                   │
-    │                              │                        │
-    │                              │ 10. Determine status:  │
-    │                              │     if score >= 80     │
-    │                              │       → "approved"     │
-    │                              │     elif score >= 50   │
-    │                              │       → "flagged"      │
-    │                              │     else               │
-    │                              │       → "rejected"     │
-    │                              │                        │
-    │                              │ 11. Create record      │
-    │                              ├───────────────────────→│
-    │                              │  INSERT INTO           │
-    │                              │  AttendanceRecord {    │
-    │                              │    userId,             │
-    │                              │    sessionId,          │
-    │                              │    checkedInAt: now(),  │
-    │                              │    validationStatus,   │
-    │                              │    validationScore,    │
-    │                              │    distance,           │
-    │                              │    deviceId            │
-    │                              │  }                     │
-    │                              │←───────────────────────┤
-    │                              │   (inserted record id) │
-    │                              │                        │
-    │ 12. Response received        │                        │
-    ←─────────────────────────────┤                        │
-    │    {                         │                        │
-    │      success: true,          │                        │
-    │      data: {                 │                        │
-    │        record: {...},        │                        │
-    │        validation: {...}     │                        │
-    │      }                        │                        │
-    │    }                         │                        │
-    │                              │                        │
-    │ 13. Display result to user   │                        │
-    ├─→ "✅ Điểm danh thành công" │                        │
-    │    or warning/error message │                        │
-    │                              │                        │
+### Dashboard web
+- Dành cho lecturer/admin
+- Tạo session và xem chi tiết
+- Tương tác với API session và auth
+
+### Backend API
+- Xác thực người dùng
+- Kiểm tra session đang mở
+- Tính khoảng cách từ vị trí đến tâm session
+- Áp dụng anti-fraud validation
+- Lưu sự kiện điểm danh
+
+## 4. Module backend chính
+
+```text
+server/attendance/src/
+├── app.module.ts
+├── auth/
+├── users/
+├── account/
+├── attendance-sessions/
+├── attendance-check-in/
+├── attendance-validation/
+├── attendance-record/
+├── geo/
+├── common/
+└── main.ts
 ```
 
----
+### Các module cụ thể
+- `auth`: login, JWT, guards, role-based access
+- `users`: thông tin người dùng và truy vấn dữ liệu user
+- `attendance-sessions`: CRUD session
+- `attendance-check-in`: `POST /attendance/check-in`
+- `attendance-validation`: validate vị trí và độ tin cậy
+- `attendance-record`: lịch sử điểm danh
+- `geo`: tính khoảng cách GPS
 
-## 🔐 Authentication & JWT Flow
+## 5. Luồng check-in
 
+```text
+Sinh viên mở app
+    ↓
+App lấy location + device info
+    ↓
+Gửi POST /attendance/check-in với JWT
+    ↓
+Backend xác thực token
+    ↓
+Kiểm tra session hợp lệ và đang mở
+    ↓
+Tính khoảng cách đến tâm session
+    ↓
+Phát hiện mock-location và integrity issue
+    ↓
+Trả về approved/review/rejected
 ```
+
+## 6. Luồng auth
+
+```text
+Client -> Login endpoint
+    ↓
+Backend validate username/password
+    ↓
+Generate JWT
+    ↓
+Client gửi Bearer token trên request cần bảo vệ
+    ↓
+JwtAuthGuard xác thực
+```
+
+## 7. Quy ước response
+
+Dự án dùng chuẩn `ApiResponse` từ shared package:
+
+```ts
+{
+  success: true,
+  data: { ... }
+}
+```
+
+và lỗi:
+
+```ts
+{
+  success: false,
+  code: 'ERROR_CODE',
+  message: 'Mô tả lỗi'
+}
+```
+
+## 8. Database và dữ liệu
+
+Schema Prisma hiện có cơ sở dữ liệu mục tiêu dựa trên các model:
+- `Account`
+- `User`
+- `AttendanceSession`
+- `AttendanceRecord`
+- `AttendanceAttempt`
+
+Tuy nhiên, trong giai đoạn hiện tại, nhiều phần của dự án vẫn đang dùng mock/in-memory store để phát triển nhanh.
+
+## 9. Điểm cần lưu ý về trạng thái hiện tại
+
+- Backend đang làm việc với nhiều module rõ ràng nhưng chưa hoàn toàn kết nối database thật.
+- Dashboard và mobile app có kiến trúc cơ bản, đủ để phát triển tiếp.
+- Shared package là trung tâm để kiểm soát contract kiểu dữ liệu giữa các phần.
+- Dự án đang trong giai đoạn chuyển từ prototype sang phần mềm có thể triển khai thực tế.
+
+## 10. Tài liệu liên quan
+
+- [../README.md](../README.md)
+- [../docs/system-overview.md](system-overview.md)
+- [../docs/QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+- [../docs/conventions](conventions)
+
 Step 1: Login
 ┌──────────────┐
 │ Mobile/Admin │

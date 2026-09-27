@@ -5,8 +5,12 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthAPI } from '../api/auth.api';
+import {
+  getSession,
+  removeToken,
+  saveSession,
+} from '../services/token-storage';
 
 const decodeTokenPayload = (token: string): Partial<User> => {
   try {
@@ -70,15 +74,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const restoreToken = async () => {
     try {
-      const savedToken = await AsyncStorage.getItem('authToken');
-      const savedUser = await AsyncStorage.getItem('user');
-      const savedLastLoginAt = await AsyncStorage.getItem('lastLoginAt');
+      const session = await getSession();
+      const savedToken = session.accessToken;
+      const savedUser = session.user;
+      const savedLastLoginAt = session.lastLoginAt;
 
       if (savedToken && savedUser && !isTokenExpired(savedToken)) {
         setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+        setUser(savedUser);
       } else if (savedToken || savedUser) {
-        await AsyncStorage.multiRemove(['authToken', 'user']);
+        await removeToken();
       }
 
       if (savedLastLoginAt) {
@@ -97,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const response = await AuthAPI.login(username, password);
 
       if (response.success && response.data) {
-        const accessToken = response.data.accessToken;
+        const { accessToken, refreshToken } = response.data;
         const loginAt = new Date().toISOString();
         const userData: User = {
           id: decodeTokenPayload(accessToken).id ?? 0,
@@ -112,9 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLastLoginAt(loginAt);
 
         // Save to persistent storage
-        await AsyncStorage.setItem('authToken', accessToken);
-        await AsyncStorage.setItem('user', JSON.stringify(userData));
-        await AsyncStorage.setItem('lastLoginAt', loginAt);
+        await saveSession(accessToken, refreshToken, userData, loginAt);
       } else {
         throw new Error('Login failed');
       }
@@ -127,23 +130,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    try {
-      setIsLoading(true);
-      // Call logout API if needed
-      // await AuthAPI.logout();
-
-      setUser(null);
-      setToken(null);
-      setLastLoginAt(null);
-      await AsyncStorage.removeItem('authToken');
-      await AsyncStorage.removeItem('user');
-      await AsyncStorage.removeItem('lastLoginAt');
-    } catch (error) {
-      console.error('Logout error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
+    setUser(null);
+    setToken(null);
+    await removeToken();
   };
 
   const value: AuthContextType = {

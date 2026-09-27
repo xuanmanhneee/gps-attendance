@@ -24,6 +24,12 @@ enum AttendanceStatus {
   excused
 }
 
+enum AttendanceAttemptResult {
+  APPROVED
+  REVIEW
+  REJECTED
+}
+
 model Account {
   id        Int      @id @default(autoincrement())
   username  String   @unique @db.VarChar(100)
@@ -69,6 +75,7 @@ model AttendanceSession {
   attempts          AttendanceAttempt[]
 
   @@index([createdBy])
+  @@index([createdBy, openAt, closeAt])
   @@index([openAt, closeAt])
   @@map("attendance_sessions")
 }
@@ -92,18 +99,30 @@ model AttendanceRecord {
   updater        User?             @relation("RecordUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
 
   @@unique([sessionId, userId])
+  @@index([sessionId, deviceId])
   @@index([userId, updatedAt])
   @@map("attendance_records")
 }
 
 model AttendanceAttempt {
-  id        Int               @id @default(autoincrement())
-  sessionId Int               @map("session_id")
-  userId    Int               @map("user_id")
-  createdAt DateTime          @default(now()) @map("created_at")
+  id              Int                    @id @default(autoincrement())
+  sessionId       Int                    @map("session_id")
+  userId          Int                    @map("user_id")
+  latitude        Decimal                @db.Decimal(10, 7)
+  longitude       Decimal                @db.Decimal(10, 7)
+  accuracy        Decimal                @db.Decimal(8, 2)
+  distanceToCenter Decimal               @map("distance_to_center") @db.Decimal(8, 2)
+  deviceId        String                 @map("device_id") @db.VarChar(255)
+  isMockLocation  Boolean                @map("is_mock_location")
+  serverTimestamp DateTime               @default(now()) @map("server_timestamp")
+  result          AttendanceAttemptResult?
+  reasons         String[]               @default([])
+  createdAt       DateTime               @default(now()) @map("created_at")
   session   AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user      User              @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([sessionId, userId, createdAt])
+  @@index([sessionId, deviceId, createdAt])
+  @@index([sessionId, userId, serverTimestamp])
   @@map("attendance_attempts")
 }

@@ -6,6 +6,8 @@ import { UsersService } from '../users/users.service';
 import type { AuthenticatedUser } from './types/authenticated-user.type';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { AuthErrorCode, LoginResponse } from '@gps-attendance/shared';
+import { ConfigService } from '@nestjs/config';
+import type { SignOptions } from 'jsonwebtoken';
 
 @Injectable()
 export class AuthService {
@@ -13,6 +15,7 @@ export class AuthService {
     private readonly accountService: AccountService,
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -28,26 +31,16 @@ export class AuthService {
     if (!account) {
       throw new UnauthorizedException({
         code: AuthErrorCode.INVALID_CREDENTIALS,
-        message: 'Tên đăng nhập hoặc mật khẩu không chính xác.',
+        message: 'Invalid credentials',
       });
     }
 
-    let isPasswordValid = false;
-    if (
-      account.password.startsWith('$2a$') ||
-      account.password.startsWith('$2b$') ||
-      account.password.startsWith('$2y$')
-    ) {
-      isPasswordValid = await bcrypt.compare(password, account.password);
-    } else {
-      // Hỗ trợ backward compatibility với dữ liệu plaintext cũ nếu chưa seed lại
-      isPasswordValid = account.password === password;
-    }
+    const isPasswordValid = await bcrypt.compare(password, account.password);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException({
         code: AuthErrorCode.INVALID_CREDENTIALS,
-        message: 'Tên đăng nhập hoặc mật khẩu không chính xác.',
+        message: 'Invalid credentials',
       });
     }
 
@@ -55,8 +48,8 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException({
-        code: AuthErrorCode.ACCOUNT_NOT_LINKED,
-        message: 'Tài khoản chưa được liên kết với hồ sơ người dùng.',
+        code: AuthErrorCode.INVALID_CREDENTIALS,
+        message: 'Invalid credentials',
       });
     }
 
@@ -79,6 +72,30 @@ export class AuthService {
 
     return {
       accessToken: this.jwtService.sign(payload),
+      refreshToken: this.jwtService.sign(payload, {
+        secret: this.configService.getOrThrow<string>('REFRESH_TOKEN_SECRET'),
+        expiresIn: (this.configService.get<string>('REFRESH_TOKEN_EXPIRES_IN') ??
+          '14d') as SignOptions['expiresIn'],
+      }),
     };
+  }
+
+  refresh(refreshToken: string): LoginResponse {
+    try {
+      const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
+        secret: this.configService.getOrThrow<string>('REFRESH_TOKEN_SECRET'),
+      });
+
+      return this.login({
+        userId: payload.sub,
+        username: payload.username,
+        role: payload.role,
+      });
+    } catch {
+      throw new UnauthorizedException({
+        code: AuthErrorCode.INVALID_TOKEN,
+        message: 'Invalid refresh token',
+      });
+    }
   }
 }

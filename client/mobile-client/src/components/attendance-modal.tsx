@@ -34,7 +34,7 @@ export const AttendanceModal = ({
     const mapped: Record<string, string> = {
       TOO_MANY_ATTEMPTS: 'Bạn đã vượt quá 3 lần thử cho phiên điểm danh này. Không thể tiếp tục điểm danh phiên này.',
       LOW_CONFIDENCE_SCORE: 'Độ tin cậy của thông tin xác thực chưa đủ để điểm danh.',
-      LOW_LOCATION_ACCURACY: 'Vị trí hiện tại không đủ chính xác để điểm danh.',
+      LOW_LOCATION_ACCURACY: 'Sai số GPS lớn nên vị trí chưa chắc chắn nằm gọn trong phạm vi lớp. Điểm danh đã ghi nhận, giảng viên có thể xem xét.',
       MOCK_LOCATION: 'Hệ thống phát hiện vị trí giả mạo. Vui lòng tắt vị trí giả hoặc dùng GPS thật.',
       DUPLICATE_DEVICE: 'Thiết bị này đã được dùng để điểm danh cho buổi học này.',
       OUT_OF_RANGE: 'Khoảng cách cộng sai số GPS vượt quá bán kính cho phép của buổi học.',
@@ -56,9 +56,9 @@ export const AttendanceModal = ({
   };
 
   const getStatusText = () => {
-    if (isApproved) return 'Điểm danh thành công';
-    if (isFlagged) return 'Điểm danh với cảnh báo';
-    return 'Điểm danh không được phép';
+    if (isApproved) return 'Check-in thành công';
+    if (isFlagged) return 'Cần xem xét (Review)';
+    return 'Điểm danh bị từ chối';
   };
 
   return (

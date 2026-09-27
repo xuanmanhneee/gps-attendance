@@ -35,6 +35,13 @@ export const useAttendanceSessions = () => {
     setSessions((prev) => [created, ...prev]);
   };
 
+  const closeSession = async (id: number) => {
+    const updated = await attendanceSessionsApi.close(id);
+    setSessions((prev) =>
+      prev.map((session) => (session.id === id ? { ...session, ...updated, status: 'closed' } : session)),
+    );
+  };
+
   const deleteSession = async (id: number) => {
     await attendanceSessionsApi.remove(id);
     setSessions((prev) => prev.filter((session) => session.id !== id));
@@ -44,6 +51,7 @@ export const useAttendanceSessions = () => {
     sessions,
     isLoading,
     createSession,
+    closeSession,
     deleteSession,
     reload: loadSessions,
   };

@@ -7,14 +7,26 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
+  if (process.env.NODE_ENV !== 'development') {
+    throw new Error('Prisma seed chỉ được phép chạy với NODE_ENV=development');
+  }
+
+  const requiredSeedPassword = (name: string): string => {
+    const value = process.env[name];
+    if (!value) {
+      throw new Error(`Thiếu biến môi trường ${name} cho seed development`);
+    }
+    return value;
+  };
+
   const accounts = [
-    { id: 1, username: 'admin', password: 'admin' },
-    { id: 2, username: 'quangtn', password: 'quangtn' },
-    { id: 3, username: '2312686', password: '2312686' },
-    { id: 4, username: '2312716', password: '2312716' },
-    { id: 5, username: '2312718', password: '2312718' },
-    { id: 6, username: '2312682', password: '2312682' },
-    { id: 7, username: '2312631', password: '2312631' },
+    { id: 1, username: 'admin', password: requiredSeedPassword('SEED_ADMIN_PASSWORD') },
+    { id: 2, username: 'quangtn', password: requiredSeedPassword('SEED_LECTURER_PASSWORD') },
+    { id: 3, username: '2312686', password: requiredSeedPassword('SEED_STUDENT_1_PASSWORD') },
+    { id: 4, username: '2312716', password: requiredSeedPassword('SEED_STUDENT_2_PASSWORD') },
+    { id: 5, username: '2312718', password: requiredSeedPassword('SEED_STUDENT_3_PASSWORD') },
+    { id: 6, username: '2312682', password: requiredSeedPassword('SEED_STUDENT_4_PASSWORD') },
+    { id: 7, username: '2312631', password: requiredSeedPassword('SEED_STUDENT_5_PASSWORD') },
   ];
 
   const users = [

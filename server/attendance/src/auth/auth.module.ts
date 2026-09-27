@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import type { SignOptions } from 'jsonwebtoken';
 import { ConfigService } from '@nestjs/config';
 import { AdminAuthController } from './controllers/admin-auth.controller';
 import { UserAuthController } from './controllers/user-auth.controller';
@@ -19,7 +20,8 @@ import { LocalStrategy } from './strategies/local.strategy';
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: '1h',
+          expiresIn: (configService.get<string>('EXPIRES_IN') ??
+            '1h') as SignOptions['expiresIn'],
         },
       }),
     }),
@@ -27,5 +29,6 @@ import { LocalStrategy } from './strategies/local.strategy';
 
   controllers: [AdminAuthController, UserAuthController],
   providers: [AuthService, JwtStrategy, LocalStrategy],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

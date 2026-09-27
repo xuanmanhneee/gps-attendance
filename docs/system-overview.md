@@ -1,223 +1,192 @@
-# Tài liệu cấu trúc hệ thống GPS Attendance
+# Tổng quan hệ thống GPS Attendance
 
-## 1. Phạm vi và trạng thái
+## 1. Mục tiêu hệ thống
 
-GPS Attendance là monorepo pnpm cho hệ thống điểm danh theo vị trí GPS. Sinh viên dùng ứng dụng Expo để gửi yêu cầu check-in; giảng viên hoặc quản trị viên dùng dashboard web để quản lý phiên điểm danh.
-
-Tài liệu này mô tả **trạng thái thực tế của mã nguồn hiện tại**. Backend đang dùng các store in-memory cho user, session và attendance record; Prisma/PostgreSQL mới chỉ có cấu hình nền, chưa được kết nối vào luồng nghiệp vụ.
+GPS Attendance là hệ thống điểm danh bằng vị trí GPS với 3 đối tượng chính:
+- Sinh viên điểm danh từ ứng dụng mobile
+- Giảng viên/admin quản lý phiên điểm danh trên dashboard web
+- Backend API xác thực, kiểm tra vị trí và lưu lịch sử điểm danh
 
 ## 2. Kiến trúc tổng quan
 
 ```text
-Student Mobile (Expo / React Native)       Admin Dashboard (React / Vite)
-             |                                      |
-             | HTTP + Bearer JWT                   | HTTP + Bearer JWT
-             +------------------+-------------------+
-                                v
-                  NestJS Attendance API
-       Config + CORS + ValidationPipe + Swagger + Error Filter
-                                |
-       +------------------------+-------------------------+
-       |                        |                         |
-   Auth / Users          Attendance Sessions       Check-in + Validation
-       |                        |                         |
-   Account mock             Session store          Record store (memory)
-                                |
-                         Geo distance service
-
-       Shared TypeScript types, DTO contracts and error codes
+Mobile App (Expo / React Native)     Web Dashboard (React / Vite)     Backend (NestJS)
+           |                                    |                              |
+           |-------- login / JWT -------------->|                              |
+           |                                    |---- login / JWT ---------->|
+           |                                    |                              |
+           |---- GPS + device metadata ----->|                              |
+           |                                    |                              |-> Validate session
+           |                                    |                              |-> Check radius / mock location
+           |                                    |                              |-> Save attendance record
+           |<----- attendance result -----------|                              |
+           |                                    |<---- session data -----------|
 ```
-
-### Thành phần chính
-
-| Thành phần | Thư mục | Vai trò | Trạng thái |
-|---|---|---|---|
-| Backend API | `server/attendance` | Auth, session, check-in, GPS và validation | Đang phát triển |
-| Mobile client | `client/mobile-client` | Login, điểm danh, lịch sử, thông tin người dùng | Expo SDK 54 |
-| Admin dashboard | `client/admin-dashboard` | Login và màn hình dashboard cho admin/lecturer | Prototype |
-| Shared package | `packages/shared` | Type, DTO contract, API response và error code | Dùng chung |
-| Database | `server/attendance/prisma` | Cấu hình Prisma cho PostgreSQL | Chưa có model/schema nghiệp vụ |
 
 ## 3. Cấu trúc monorepo
 
 ```text
 gps-attendance-main/
-├── AGENTS.md                         # Chỉ dẫn và quy ước repo
-├── package.json                      # Script và package manager ở root
-├── pnpm-workspace.yaml               # Khai báo workspace
-├── pnpm-lock.yaml                    # Lockfile duy nhất
-├── tsconfig.json                     # TypeScript cấp repo
-├── docker-compose.yml                # Cấu hình Docker khi cần
-├── README.md                         # Cài đặt và chạy nhanh
+├── AGENTS.md
+├── README.md
+├── package.json
+├── pnpm-workspace.yaml
+├── pnpm-lock.yaml
+├── tsconfig.json
+├── docker-compose.yml
 ├── client/
-│   ├── admin-dashboard/              # React + Vite cho admin/lecturer
-│   └── mobile-client/                # Expo Router + React Native cho student
+│   ├── admin-dashboard/
+│   └── mobile-client/
 ├── packages/
-│   └── shared/                       # Package @gps-attendance/shared
+│   └── shared/
 ├── server/
-│   └── attendance/                   # NestJS API
-│       ├── prisma/schema.prisma      # Cấu hình Prisma hiện tại
-│       ├── src/                      # Mã nguồn backend
-│       └── test/                     # E2E test
-└── docs/
-    ├── system-overview.md            # Tài liệu này, nguồn tham chiếu chính
-    └── conventions/                  # Quy ước API, auth, module và naming
+│   └── attendance/
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── QUICK_REFERENCE.md
+│   ├── SYSTEM_OVERVIEW.md
+│   ├── system-overview.md
+│   └── conventions/
+└── .vscode/
 ```
 
-Monorepo dùng pnpm 11.12.0 và yêu cầu Node.js từ 20 trở lên. Cài dependency một lần ở root để giữ liên kết workspace và một lockfile duy nhất.
+## 4. Thành phần chính
 
-## 4. Backend: `server/attendance`
+### 4.1 Backend
+Vị trí: `server/attendance`
 
-### 4.1 Điểm khởi động và cấu hình
+Các module quan trọng:
+- `auth` — login, JWT, guard, role
+- `users` — user management
+- `account` — account và credential
+- `attendance-sessions` — time-based session management
+- `attendance-check-in` — check-in endpoint
+- `attendance-validation` — anti-fraud validation
+- `attendance-record` — record history
+- `geo` — distance calculation
+- `common` — logging, database, exception handling
 
-- `src/main.ts` tạo Nest application, bật CORS, `ValidationPipe({ whitelist: true, transform: true })`, `ApiExceptionFilter` và Swagger tại `/api-docs`.
-- Port đọc từ `PORT`, mặc định là `3000`; server lắng nghe trên `0.0.0.0`.
-- `src/app.module.ts` đăng ký `ConfigModule`, `AuthModule`, `UsersModule`, `AttendanceSessionsModule`, `GeoModule`, `AttendanceValidationModule`, `AttendanceCheckInModule` và `LoggingModule`.
-- `JWT_SECRET` là biến môi trường bắt buộc vì `JwtModule` dùng `ConfigService.getOrThrow()`.
+### 4.2 Admin dashboard
+Vị trí: `client/admin-dashboard`
 
-### 4.2 Cấu trúc backend
+Dùng React + Vite, có các màn hình:
+- login
+- dashboard overview
+- session detail
 
-```text
-server/attendance/
-├── prisma/schema.prisma              # provider PostgreSQL, chưa có model
-├── src/
-│   ├── main.ts                       # Bootstrap HTTP server
-│   ├── app.module.ts                 # Root dependency graph
-│   ├── app.controller.ts             # Endpoint mặc định
-│   ├── app.service.ts
-│   ├── account/                      # Account và credential mock
-│   ├── auth/                         # Login, JWT, guard, role
-│   ├── users/                        # User, repository và filter
-│   ├── attendance-sessions/          # Tạo và đọc session
-│   ├── attendance-check-in/          # POST /attendance/check-in
-│   ├── attendance-validation/        # Anti-fraud và scoring
-│   ├── attendance-record/            # Interface và in-memory store
-│   ├── geo/                          # Tính khoảng cách GPS
-│   └── common/
-│       ├── filters/                   # Chuẩn hóa exception response
-│       └── logging/                   # Logger abstraction/adapter
-└── test/                             # E2E test và cấu hình Jest
+### 4.3 Mobile app
+Vị trí: `client/mobile-client`
+
+Dùng Expo + React Native, có route flow:
+- login
+- tab điểm danh
+- lịch sử điểm danh
+- profile
+
+### 4.4 Shared package
+Vị trí: `packages/shared`
+
+Dùng chung cho type, DTO, response contract và error codes.
+
+## 5. Workflow thực tế
+
+### 5.1 Login
+1. Client gọi endpoint login theo role.
+2. Backend kiểm tra tài khoản trong `Account` và `User`.
+3. Trả JWT chứa `userId` của user.
+4. Client lưu token để truy cập API bảo vệ.
+
+### 5.2 Tạo session
+2. Lecturer/admin tạo session ở dashboard.
+3. Backend nhận `title`, `latitude`, `longitude`, `radius`, `openAt`, `closeAt`.
+4. Backend lưu session qua Prisma repository; trạng thái attempt và device usage
+    của check-in hiện vẫn lưu trong in-memory store.
+
+### 5.3 Check-in GPS
+1. Sinh viên dùng app mobile để lấy GPS hiện tại.
+2. App thu thập `latitude`, `longitude`, `accuracy`, `deviceId`, `isMockLocation`.
+3. Client gửi request lên endpoint `POST /attendance/check-in`.
+4. Server xác thực token và kiểm tra session đang mở.
+5. Hệ thống đánh giá vị trí, mock location và độ tin cậy thiết bị.
+6. Trả kết quả cho app.
+
+## 6. Validation chính
+
+Module `attendance-validation` đang thực hiện các check chính:
+- `LocationCheck`: so sánh khoảng cách với bán kính cho phép
+- `MockLocationCheck`: phát hiện vị trí giả hoặc flag hệ thống
+- `IntegrityCheck`: đánh giá thiết bị, dữ liệu và sự đáng tin cậy
+
+## 7. Database state hiện tại
+
+File Prisma hiện có:
+- `server/attendance/prisma/schema.prisma`
+
+Schema mô tả các model `Account`, `User`, `AttendanceSession`, `AttendanceRecord`, `AttendanceAttempt` và enum `Role`, `AttendanceStatus`.
+
+> Cấu hình database đã có, nhưng trong code hiện tại nhiều luồng nghiệp vụ vẫn đang dùng store in-memory, nên đây là trạng thái prototype phát triển hơn là production-ready.
+
+## 8. API response convention
+
+Mọi response backend nên theo contract:
+
+```ts
+{ success: true, data: ... }
 ```
 
-### 4.3 Auth và phân quyền
+hoặc
 
-`AuthModule` gồm `AdminAuthController`, `UserAuthController`, `AuthService`, `LocalStrategy` và `JwtStrategy`.
-
-Luồng xác thực:
-
-1. Client gửi username/password tới endpoint login phù hợp.
-2. Strategy và `AuthService` xác thực qua `AccountModule` và `UsersModule`.
-3. Server phát JWT với `userId` của `User`, không phải `Account.id`; token hết hạn sau 1 giờ.
-4. Client gửi `Authorization: Bearer <token>` ở request cần bảo vệ.
-5. `JwtAuthGuard` giải mã token và `CurrentUser` lấy `AuthenticatedUser`.
-6. `RolesGuard` kết hợp `@Roles(...)` để giới hạn quyền.
-
-Vai trò chính là `student`, `lecturer` và `admin`. Route tạo session yêu cầu `admin` hoặc `lecturer`. Route check-in hiện chỉ yêu cầu JWT ở controller; việc giới hạn riêng `student` chưa được áp dụng tại controller này.
-
-### 4.4 Attendance sessions
-
-Các file trong `attendance-sessions/` gồm model, controller, service và DTO `create-attendance-session.dto.ts`, `check-location.dto.ts`.
-
-Session gồm title, latitude, longitude, radius, openAt, closeAt, createdBy và timestamps. `status` được tính động từ thời gian hiện tại:
-
-- `pending`: chưa tới `openAt`;
-- `open`: `openAt <= now <= closeAt`;
-- `closed`: sau `closeAt`.
-
-Service giữ session trong mảng memory và cấp id tăng dần. Khi khởi tạo, một test session mặc định được tạo với tọa độ và danh sách code sinh viên mẫu.
-
-### 4.5 Check-in và validation
-
-Endpoint `POST /attendance/check-in` nhận `CheckInRequestDto`:
-
-```json
-{
-  "sessionId": 1,
-  "location": {
-    "latitude": 11.9404,
-    "longitude": 108.4583,
-    "accuracy": 10,
-    "timestamp": 1755345600000,
-    "isMockLocation": false
-  },
-  "device": {
-    "deviceId": "installation-id",
-    "platform": "android",
-    "model": "Pixel 8"
-  },
-  "integrity": { "integrityToken": null }
-}
+```ts
+{ success: false, code: '...', message: '...' }
 ```
 
-Luồng xử lý:
+Quy ước này được đặt trong `docs/conventions/api-response.md` và package shared.
 
-1. Resolve session; session không `open` bị từ chối.
-2. Đọc record cũ theo `sessionId + userId` từ `IAttendanceRecordStore`.
-3. Dùng thời gian server `new Date()`, không tin timestamp check-in của client.
-4. Gọi `AttendanceValidationService` với session, user, location, device và integrity.
-5. Trả kết quả validation. Luồng hiện tại chưa gọi `upsertRecord` sau validation thành công.
+## 9. Cài đặt và chạy
 
-Ba check được đăng ký trong `AttendanceValidationModule`:
-
-- `LocationCheck`: tính khoảng cách GPS và hệ số vị trí.
-- `MockLocationCheck`: đánh giá cờ mock location.
-- `IntegrityCheck`: đánh giá integrity payload/token.
-
-Validation có hai lớp:
-
-- Hard-block: record cũ trả `REJECTED/DUPLICATE_DEVICE`; mock location có coefficient bằng 0 trả `REJECTED/MOCK_LOCATION`.
-- Risk score: integrity 35%, mock location 25%, location 40%. Score từ 80 là `VALID`, từ 60 là `REVIEW`, thấp hơn là `REJECTED`. Ngoài vùng thêm lý do `OUT_OF_RANGE`.
-
-Lưu ý: service check-in hiện đặt `existingRecordCount = 0` sau khi đọc record, nên cơ chế chặn retry/trùng record chưa hoàn chỉnh trong prototype.
-
-### 4.6 Lưu trữ hiện tại
-
-`AttendanceRecordModule` inject `InMemoryAttendanceRecordStore` qua token `ATTENDANCE_RECORD_STORE`. Interface hỗ trợ đọc/upsert record, đếm attempts và xóa theo session. Dữ liệu mất khi server restart.
-
-`User` và `Account` cũng có mock repository/data trong `src/users/mocks` và `src/account/mocks`. `prisma/schema.prisma` mới chỉ khai báo generator client và PostgreSQL datasource, chưa có model nghiệp vụ.
-
-## 5. Mobile client: `client/mobile-client`
-
-Ứng dụng dùng Expo SDK 54, React Native và Expo Router.
-
-```text
-src/
-├── app/
-│   ├── _layout.tsx                  # AuthProvider, ThemeProvider, Stack
-│   ├── index.tsx                    # Route root
-│   ├── login.tsx                    # Đăng nhập
-│   ├── explore.tsx                  # Màn hình mẫu/khám phá
-│   └── (tabs)/
-│       ├── _layout.tsx              # Tab bar
-│       ├── index.tsx                # Điểm danh
-│       ├── history.tsx              # Lịch sử
-│       └── profile.tsx              # Thông tin người dùng
-├── api/                             # HTTP client, auth API, attendance API
-├── context/auth-context.tsx         # Auth state toàn cục
-├── components/                      # UI dùng lại, GPS và check-in
-│   └── ui/                          # Button, Card, Input, Collapsible, icon
-├── constants/theme.ts               # Design tokens
-├── hooks/                           # Theme và color scheme hooks
-└── global.css                       # Style dùng chung
+### Cài dependencies
+```bash
+cd gps-attendance-main
+pnpm install
 ```
 
-`_layout.tsx` bọc app bằng `AuthProvider` và `ThemeProvider`; Stack ẩn header và đăng ký `index`, `login` và `(tabs)`. Tab layout hiển thị Điểm Danh, Lịch Sử và Thông Tin.
-
-## 6. Admin dashboard: `client/admin-dashboard`
-
-Dashboard dùng React, Vite và TypeScript.
-
-```text
-src/
-├── main.tsx                         # Entry point React
-├── App.tsx                          # BrowserRouter và route map
-├── App.css
-├── index.css
-├── assets/hero.png                  # Asset giao diện
-└── pages/
-    ├── LoginPage.tsx                # /login
-    └── DashboardPage.tsx            # /dashboard
+### Chạy backend
+```bash
+pnpm dev:attendance
 ```
+
+### Chạy dashboard
+```bash
+pnpm dev:admin
+```
+
+### Chạy mobile app
+```bash
+pnpm dev:mobile
+```
+
+### Build toàn bộ
+```bash
+pnpm build
+```
+
+## 10. Ghi chú triển khai
+
+- Dự án đang ở giai đoạn phát triển, không phải hoàn chỉnh production.
+- Chưa chuyển hoàn toàn toàn bộ data layer sang Prisma/repository thật.
+- Nhiều module đã có cấu trúc rõ nét và chuẩn hóa phần API contract.
+- Shared package là nền tảng để tránh sai lệch kiểu dữ liệu giữa client và server.
+
+## 11. Tài liệu liên quan
+
+- [README.md](../README.md)
+- [docs/ARCHITECTURE.md](ARCHITECTURE.md)
+- [docs/QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+- [docs/conventions](conventions)
+- [server/attendance/README.md](../server/attendance/README.md)
+- [client/admin-dashboard/README.md](../client/admin-dashboard/README.md)
+- [client/mobile-client/README.md](../client/mobile-client/README.md)
+
 
 Route hiện tại: `/login` -> `LoginPage`, `/dashboard` -> `DashboardPage`; `/` và route không tồn tại redirect về `/login`. Đây là prototype; không giả định dashboard đã có đầy đủ CRUD session, báo cáo hoặc user management nếu source chưa có.
 

@@ -4,7 +4,6 @@ import {
   StyleSheet,
   Text,
   ScrollView,
-  Alert,
   ActivityIndicator,
   RefreshControl,
   Platform,
@@ -21,6 +20,8 @@ import { AttendanceModal } from '../../components/attendance-modal';
 import { AttendanceAPI } from '../../api/attendance.api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/theme';
+import { appAlert } from '../../utils/app-alert';
+import { getStableDeviceId } from '../../services/device-id';
 
 interface Session {
   id: number;
@@ -41,6 +42,8 @@ export default function AttendanceScreen() {
   const [location, setLocation] = useState<Location.LocationObject | null>(
     null,
   );
+  const [isLocating, setIsLocating] = useState(true);
+  const [gpsError, setGpsError] = useState<string | null>(null);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(
     null,
@@ -78,11 +81,13 @@ export default function AttendanceScreen() {
     } catch (error) {
       console.error('Failed to load sessions:', error);
       if (error instanceof ApiRequestError && error.status === 401) {
+        appAlert('Phiên làm việc hết hạn', 'Token đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
         await logout();
         router.replace('/login');
         return;
       }
-      Alert.alert('Lỗi', 'Không thể tải danh sách buổi học');
+      const errorMsg = error instanceof Error ? error.message : 'Không thể tải danh sách buổi học';
+      appAlert('Lỗi kết nối', errorMsg);
     } finally {
       if (showLoader) {
         setIsLoading(false);
@@ -93,17 +98,31 @@ export default function AttendanceScreen() {
   };
 
   const handleRefresh = async () => {
-    await loadSessions(false);
+    await Promise.all([loadSessions(false), startLocationTracking()]);
   };
 
   const startLocationTracking = async (): Promise<Location.LocationSubscription | undefined> => {
     try {
+      setIsLocating(true);
+      setGpsError(null);
+
+      // 1. Kiểm tra GPS trên thiết bị đã bật chưa
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        const msg = 'GPS chưa bật. Vui lòng bật Dịch vụ định vị trong Cài đặt thiết bị.';
+        setGpsError(msg);
+        setIsLocating(false);
+        appAlert('GPS chưa bật', msg);
+        return undefined;
+      }
+
+      // 2. Kiểm tra quyền truy cập vị trí
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          'Lỗi',
-          'Ứng dụng cần quyền truy cập vị trí để hoạt động',
-        );
+        const msg = 'Ứng dụng cần quyền truy cập vị trí để hoạt động.';
+        setGpsError(msg);
+        setIsLocating(false);
+        appAlert('Chưa cấp quyền GPS', msg);
         return undefined;
       }
 
@@ -111,23 +130,28 @@ export default function AttendanceScreen() {
         accuracy: Location.Accuracy.High,
       });
       setLocation(currentLocation);
+      setIsLocating(false);
 
-      // Subscribe to location updates
+      // Theo dõi vị trí liên tục
       const subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 5000, // Update every 5 seconds
-          distanceInterval: 10, // Update if moved 10 meters
+          timeInterval: 5000,
+          distanceInterval: 10,
         },
         (newLocation) => {
           setLocation(newLocation);
+          setIsLocating(false);
         },
       );
 
       return subscription;
     } catch (error) {
       console.error('Failed to get location:', error);
-      Alert.alert('Lỗi', 'Không thể truy cập GPS');
+      const msg = 'Không thể truy cập GPS. Vui lòng kiểm tra dịch vụ định vị.';
+      setGpsError(msg);
+      setIsLocating(false);
+      appAlert('Lỗi GPS', msg);
     }
   };
 
@@ -143,8 +167,43 @@ export default function AttendanceScreen() {
   };
 
   const handleCheckIn = async (sessionId: number) => {
+    const session = sessions.find((item) => item.id === sessionId);
+
+    if (session && session.status !== 'open') {
+      appAlert(
+        'Phiên chưa mở',
+        session.status === 'pending'
+          ? 'Buổi điểm danh chưa tới giờ mở. Nút bị tắt cho đến khi phiên chuyển sang trạng thái Mở.'
+          : 'Buổi điểm danh đã đóng. Không thể điểm danh.',
+      );
+      return;
+    }
+
     if (!location) {
-      Alert.alert('Lỗi', 'Chưa có thông tin vị trí. Vui lòng đợi...');
+      appAlert('Chưa có GPS', 'Chưa có thông tin vị trí. Hãy bật GPS, cấp quyền vị trí, rồi bấm Làm mới.');
+      return;
+    }
+
+    const { latitude, longitude, accuracy } = location.coords;
+
+    if (
+      typeof latitude !== 'number' ||
+      latitude < -90 ||
+      latitude > 90 ||
+      typeof longitude !== 'number' ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      appAlert('Lỗi tọa độ', 'Tọa độ GPS không hợp lệ. Vui lòng kiểm tra lại thiết bị.');
+      return;
+    }
+
+    const currentAccuracy = accuracy ?? 0;
+    if (currentAccuracy > 1000) {
+      appAlert(
+        'Sai số GPS không hợp lệ',
+        `Thiết bị báo sai số ${Math.round(currentAccuracy)}m. Hãy bật GPS, ra chỗ thoáng rồi thử lại.`,
+      );
       return;
     }
 
@@ -153,18 +212,19 @@ export default function AttendanceScreen() {
       setSelectedSessionId(sessionId);
 
       if (!token) throw new Error('Phiên đăng nhập đã hết hạn');
+      const deviceId = await getStableDeviceId();
       const response = await AttendanceAPI.checkIn(
         {
           sessionId,
           location: {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            accuracy: location.coords.accuracy ?? 0,
+            latitude,
+            longitude,
+            accuracy: Math.max(0, currentAccuracy),
             timestamp: location.timestamp,
             isMockLocation: location.mocked ?? false,
           },
           device: {
-            deviceId: Device.osBuildId ?? Device.modelId ?? 'unknown-device',
+            deviceId,
             platform: Platform.OS === 'ios' ? 'ios' : 'android',
             model: Device.modelName ?? 'unknown-model',
           },
@@ -185,13 +245,6 @@ export default function AttendanceScreen() {
           ...prev,
           [sessionId]: 'completed',
         }));
-
-        const successMessage =
-          validation.status === 'REVIEW'
-            ? 'Điểm danh đã được ghi nhận, đang chờ xét duyệt.'
-            : 'Điểm danh thành công.';
-
-        Alert.alert('Thành công', successMessage);
         setShowModal(true);
         return;
       }
@@ -212,10 +265,10 @@ export default function AttendanceScreen() {
 
       setSessionStatus((prev) => ({
         ...prev,
-        [selectedSessionId ?? 0]: 'failed',
+        [sessionId]: 'failed',
       }));
 
-      Alert.alert('Lỗi', apiMessage);
+      appAlert('Lỗi điểm danh', apiMessage);
     } finally {
       setIsCheckingIn(false);
     }
@@ -237,9 +290,10 @@ export default function AttendanceScreen() {
           styles.scrollContent,
           {
             paddingTop: Math.max(insets.top, 20) + 16,
-            paddingBottom: Math.max(insets.bottom, 20) + 24,
+            paddingBottom: 64 + insets.bottom + 24,
           },
         ]}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -257,6 +311,30 @@ export default function AttendanceScreen() {
             <Text style={styles.headerTitle}>Xin chào, {user?.name}</Text>
             <Text style={styles.headerSubtitle}>Chọn buổi học để điểm danh</Text>
           </View>
+
+          {isLocating && !location && (
+            <Card style={styles.locatingCard}>
+              <View style={styles.locatingRow}>
+                <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 10 }} />
+                <Text style={styles.locatingText}>
+                  Đang lấy tọa độ GPS... Vui lòng chờ thiết bị kết nối vệ tinh
+                </Text>
+              </View>
+            </Card>
+          )}
+
+          {gpsError && !location && (
+            <Card style={styles.gpsErrorCard}>
+              <Text style={styles.gpsErrorTitle}>⚠️ Lỗi GPS: Chưa bật hoặc chưa cấp quyền</Text>
+              <Text style={styles.gpsErrorSubtitle}>{gpsError}</Text>
+              <Button
+                title="Bật lại GPS & Thử lại"
+                onPress={() => startLocationTracking()}
+                variant="outline"
+                style={{ marginTop: 10 }}
+              />
+            </Card>
+          )}
 
           {location && (
             <GPSStatusCard
@@ -302,23 +380,28 @@ export default function AttendanceScreen() {
                   <Text style={styles.sessionDistance}>
                     Phạm vi: {session.radius} m | Sai số GPS: ±{Math.round(location?.coords.accuracy ?? 0)} m
                   </Text>
+                  {(location?.coords.accuracy ?? 0) > 30 && (
+                    <Text style={styles.sessionHint}>
+                      Sai số GPS cao: điểm danh vẫn gửi được. Nếu vòng sai số cắt mép lớp, kết quả có thể là xem xét (Review).
+                    </Text>
+                  )}
 
                   <Button
                     title={
                       isCompleted
-                        ? 'Hoàn thành'
+                        ? 'Check-in thành công'
                         : isFailed
                           ? 'Thử lại'
                           : isCheckingIn && selectedSessionId === session.id
-                            ? 'Đang xử lý...'
-                            : 'Điểm Danh'
+                            ? 'Đang gửi dữ liệu...'
+                            : session.status !== 'open'
+                              ? session.status === 'pending'
+                                ? 'Chưa tới giờ'
+                                : 'Phiên đã đóng'
+                              : 'Điểm Danh'
                     }
                     onPress={() => handleCheckIn(session.id)}
-                    disabled={
-                      isCompleted ||
-                      isCheckingIn ||
-                      session.status !== 'open'
-                    }
+                    disabled={isCompleted || isCheckingIn}
                     variant={isCompleted ? 'secondary' : 'primary'}
                     style={
                       isCompleted
@@ -386,6 +469,43 @@ const styles = StyleSheet.create({
   sessionList: {
     flex: 1,
   },
+  locatingCard: {
+    marginBottom: 16,
+    padding: 14,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 12,
+  },
+  locatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locatingText: {
+    fontSize: 13,
+    color: COLORS.primary,
+    fontWeight: '500',
+    flex: 1,
+  },
+  gpsErrorCard: {
+    marginBottom: 16,
+    padding: 14,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+  },
+  gpsErrorTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: COLORS.error,
+    marginBottom: 4,
+  },
+  gpsErrorSubtitle: {
+    fontSize: 13,
+    color: '#991B1B',
+    lineHeight: 18,
+  },
   refreshButton: {
     marginBottom: 12,
     borderRadius: 10,
@@ -418,6 +538,11 @@ const styles = StyleSheet.create({
   sessionDistance: {
     fontSize: 13,
     color: COLORS.text.secondary,
+  },
+  sessionHint: {
+    fontSize: 12,
+    color: COLORS.warning,
+    lineHeight: 16,
   },
   emptyState: {
     justifyContent: 'center',

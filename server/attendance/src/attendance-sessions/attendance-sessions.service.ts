@@ -1,10 +1,11 @@
 import {
   ForbiddenException,
+  BadRequestException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SessionStatus } from '@gps-attendance/shared';
+import { AttendanceSessionErrorCode, SessionStatus } from '@gps-attendance/shared';
 
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
 import { UserFilterService } from '../users/user-filter.service';
@@ -26,26 +27,30 @@ export class AttendanceSessionsService {
     dto: CreateAttendanceSessionDto,
     createdBy: number,
   ): Promise<AttendanceSession> {
+    const openAt = new Date(dto.openAt);
+    const closeAt = new Date(dto.closeAt);
+    if (closeAt <= openAt) {
+      throw new BadRequestException({
+        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
+        message: 'Thời gian đóng session phải sau thời gian mở',
+      });
+    }
+
     const userIds = await this.userFilterService.resolveUserIds(
       dto.participantCriteria,
     );
     const now = new Date();
-    const session = await this.attendanceSessionRepository.create({
+    const session = await this.attendanceSessionRepository.createWithRecords({
       title: dto.title,
       latitude: dto.latitude,
       longitude: dto.longitude,
       radius: dto.radius,
-      openAt: new Date(dto.openAt),
-      closeAt: new Date(dto.closeAt),
+      openAt,
+      closeAt,
       createdBy,
       createdAt: now,
       updatedAt: now,
-    });
-
-    await this.attendanceRecordsService.initializeForSession(
-      session.id,
-      userIds,
-    );
+    }, userIds);
 
     return this.withComputedStatus(session);
   }
@@ -63,6 +68,21 @@ export class AttendanceSessionsService {
     return this.withComputedStatus(session);
   }
 
+  async findByIdForUser(
+    id: number,
+    user: { userId: number; role: string },
+  ): Promise<AttendanceSession> {
+    const session = await this.findById(id);
+
+    if (user.role !== 'admin' && session.createdBy !== user.userId) {
+      throw new ForbiddenException(
+        'Bạn không có quyền truy cập phiên điểm danh này',
+      );
+    }
+
+    return session;
+  }
+
   async findByUser(userId: number): Promise<AttendanceSession[]> {
     const records = await this.attendanceRecordsService.findByUser(userId);
     const assignedSessionIds = new Set(records.map((record) => record.sessionId));
@@ -70,11 +90,9 @@ export class AttendanceSessionsService {
     const allSessions = await this.attendanceSessionRepository.findAll();
     const now = new Date();
 
-    const relevantSessions = allSessions.filter((session) => {
-      if (assignedSessionIds.has(session.id)) return true;
-      // Sinh viên cũng thấy các phiên đang mở hoặc sắp diễn ra
-      return now <= session.closeAt;
-    });
+    const relevantSessions = allSessions.filter((session) =>
+      assignedSessionIds.has(session.id),
+    );
 
     return relevantSessions.map((session) => this.withComputedStatus(session));
   }
@@ -103,6 +121,26 @@ export class AttendanceSessionsService {
     }
 
     await this.attendanceSessionRepository.delete(id);
+  }
+
+  async close(
+    id: number,
+    user: { userId: number; role: string },
+  ): Promise<AttendanceSession> {
+    const session = await this.attendanceSessionRepository.findById(id);
+
+    if (!session) {
+      throw new NotFoundException(`Không tìm thấy session id=${id}`);
+    }
+
+    if (user.role !== 'admin' && session.createdBy !== user.userId) {
+      throw new ForbiddenException(
+        'Bạn không có quyền đóng phiên điểm danh này',
+      );
+    }
+
+    const updated = await this.attendanceSessionRepository.close(id);
+    return this.withComputedStatus(updated);
   }
 
   private withComputedStatus(session: AttendanceSession): AttendanceSession {

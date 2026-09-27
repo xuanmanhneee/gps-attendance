@@ -1,13 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-
+import { Injectable } from '@nestjs/common';
 import { ILogger } from './logger.interface';
+import { WinstonJsonLogger } from './winston-logger.service';
 
 @Injectable()
 export class NestLoggerAdapter implements ILogger {
-  private readonly logger: Logger;
+  private readonly logger: WinstonJsonLogger;
 
   constructor(context: string) {
-    this.logger = new Logger(context);
+    this.logger = new WinstonJsonLogger(context);
   }
 
   log(message: string): void {

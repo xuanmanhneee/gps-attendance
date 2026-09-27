@@ -29,68 +29,40 @@ export class PrismaAttendanceRecordRepository
   async upsertRecord(
     record: Omit<AttendanceRecord, 'updatedAt'>,
   ): Promise<void> {
-    await this.prisma.attendanceRecord.upsert({
-      where: {
-        sessionId_userId: {
+    await this.prisma.$transaction([
+      this.prisma.attendanceRecord.upsert({
+        where: {
+          sessionId_userId: {
+            sessionId: record.sessionId,
+            userId: record.userId,
+          },
+        },
+        update: {
+          status: record.status,
+          deviceId: record.deviceId,
+          checkedInAt: record.checkedInAt,
+          latitude: record.latitude !== null ? record.latitude : null,
+          longitude: record.longitude !== null ? record.longitude : null,
+          accuracy: record.accuracy !== null ? record.accuracy : null,
+          distanceMeters:
+            record.distanceMeters !== null ? record.distanceMeters : null,
+          updatedBy: record.updateBy,
+        },
+        create: {
           sessionId: record.sessionId,
           userId: record.userId,
+          status: record.status,
+          deviceId: record.deviceId,
+          checkedInAt: record.checkedInAt,
+          latitude: record.latitude !== null ? record.latitude : null,
+          longitude: record.longitude !== null ? record.longitude : null,
+          accuracy: record.accuracy !== null ? record.accuracy : null,
+          distanceMeters:
+            record.distanceMeters !== null ? record.distanceMeters : null,
+          updatedBy: record.updateBy,
         },
-      },
-      update: {
-        status: record.status,
-        deviceId: record.deviceId,
-        checkedInAt: record.checkedInAt,
-        latitude: record.latitude !== null ? record.latitude : null,
-        longitude: record.longitude !== null ? record.longitude : null,
-        accuracy: record.accuracy !== null ? record.accuracy : null,
-        distanceMeters:
-          record.distanceMeters !== null ? record.distanceMeters : null,
-        updatedBy: record.updateBy,
-      },
-      create: {
-        sessionId: record.sessionId,
-        userId: record.userId,
-        status: record.status,
-        deviceId: record.deviceId,
-        checkedInAt: record.checkedInAt,
-        latitude: record.latitude !== null ? record.latitude : null,
-        longitude: record.longitude !== null ? record.longitude : null,
-        accuracy: record.accuracy !== null ? record.accuracy : null,
-        distanceMeters:
-          record.distanceMeters !== null ? record.distanceMeters : null,
-        updatedBy: record.updateBy,
-      },
-    });
-  }
-
-  async incrementAttempt(sessionId: number, userId: number): Promise<number> {
-    await this.prisma.attendanceAttempt.create({
-      data: {
-        sessionId,
-        userId,
-      },
-    });
-
-    return this.getAttemptCount(sessionId, userId);
-  }
-
-  async getAttemptCount(sessionId: number, userId: number): Promise<number> {
-    return this.prisma.attendanceAttempt.count({
-      where: {
-        sessionId,
-        userId,
-      },
-    });
-  }
-
-  async clearSession(sessionId: number): Promise<void> {
-    await this.prisma.attendanceRecord.deleteMany({
-      where: { sessionId },
-    });
-
-    await this.prisma.attendanceAttempt.deleteMany({
-      where: { sessionId },
-    });
+      }),
+    ]);
   }
 
   async findByUser(userId: number): Promise<AttendanceRecord[]> {

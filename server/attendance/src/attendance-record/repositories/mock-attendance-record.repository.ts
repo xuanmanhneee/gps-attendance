@@ -38,22 +38,6 @@ export class MockAttendanceRecordRepository
     }
   }
 
-  async incrementAttempt(sessionId: number, userId: number): Promise<number> {
-    const key = `${sessionId}:${userId}`;
-    const count = (this.attempts.get(key) ?? 0) + 1;
-    this.attempts.set(key, count);
-    return count;
-  }
-
-  async getAttemptCount(sessionId: number, userId: number): Promise<number> {
-    const key = `${sessionId}:${userId}`;
-    return this.attempts.get(key) ?? 0;
-  }
-
-  async clearSession(sessionId: number): Promise<void> {
-    this.records = this.records.filter((r) => r.sessionId !== sessionId);
-  }
-
   async findByUser(userId: number): Promise<AttendanceRecord[]> {
     return this.records.filter((r) => r.userId === userId);
   }

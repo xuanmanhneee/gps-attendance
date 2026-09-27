@@ -22,8 +22,11 @@ export const AuthAPI = {
   /**
    * Làm mới token (refresh token)
    */
-  async refreshToken(token: string): Promise<ApiResponse<{ accessToken: string }>> {
-    return http.post<ApiResponse<{ accessToken: string }>>('/v0/user/auth/refresh', {}, token);
+  async refreshToken(token: string): Promise<ApiResponse<{ accessToken: string; refreshToken: string }>> {
+    return http.post<ApiResponse<{ accessToken: string; refreshToken: string }>>(
+      '/v0/user/auth/refresh',
+      { refreshToken: token },
+    );
   },
 
 };

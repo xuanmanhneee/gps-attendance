@@ -1,26 +1,33 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type {
   AttendanceSessionResponse,
   SessionStatus,
 } from '@gps-attendance/shared';
 
-import { useNavigate } from 'react-router-dom';
+import { ConfirmModal } from './ConfirmModal';
+import { Pagination } from './Pagination';
+import { LoadingSkeleton } from './LoadingSkeleton';
+import { EmptyState } from './EmptyState';
 
 interface SessionTableProps {
   sessions: AttendanceSessionResponse[];
   isLoading: boolean;
   onDelete: (id: number) => Promise<void>;
+  onCloseSession?: (id: number) => Promise<void>;
+  onCreateNew?: () => void;
 }
 
 const statusBadge: Record<SessionStatus, string> = {
-  open: 'bg-green-100 text-green-600',
-  pending: 'bg-gray-100 text-gray-500',
-  closed: 'bg-gray-100 text-gray-400',
+  open: 'bg-emerald-100 text-emerald-700',
+  pending: 'bg-amber-100 text-amber-700',
+  closed: 'bg-slate-100 text-slate-500',
 };
 
 const statusLabel: Record<SessionStatus, string> = {
-  open: 'Đang diễn ra',
-  pending: 'Sắp diễn ra',
-  closed: 'Đã kết thúc',
+  open: '🟢 Đang diễn ra',
+  pending: '⏳ Sắp diễn ra',
+  closed: '⚫ Đã kết thúc',
 };
 
 const formatDateTime = (iso: string) =>
@@ -53,87 +60,201 @@ const groupSessionsByDate = (
   );
 };
 
-const SessionTable = ({ sessions, isLoading, onDelete }: SessionTableProps) => {
+const PAGE_SIZE = 6;
+
+const SessionTable = ({
+  sessions,
+  isLoading,
+  onDelete,
+  onCloseSession,
+  onCreateNew,
+}: SessionTableProps) => {
   const navigate = useNavigate();
 
-  const handleDelete = async (session: AttendanceSessionResponse) => {
-    const confirmed = window.confirm(
-      `Xóa phiên "${session.title}"? Toàn bộ bản ghi điểm danh và dữ liệu liên quan sẽ bị xóa vĩnh viễn.`,
-    );
-
-    if (!confirmed) return;
-
-    await onDelete(session.id);
-  };
+  const [currentPage, setCurrentPage] = useState(1);
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    session: AttendanceSessionResponse | null;
+    type: 'delete' | 'close';
+    isSubmitting: boolean;
+  }>({
+    isOpen: false,
+    session: null,
+    type: 'delete',
+    isSubmitting: false,
+  });
 
   if (isLoading) {
-    return <p className="text-sm text-gray-500">Đang tải danh sách...</p>;
+    return (
+      <div className="space-y-6">
+        <LoadingSkeleton type="card" count={3} />
+      </div>
+    );
   }
 
   if (sessions.length === 0) {
     return (
-      <p className="text-sm text-gray-500">
-        Chưa có phiên điểm danh nào. Nhấn "Tạo phiên mới" để bắt đầu.
-      </p>
+      <EmptyState
+        title="Chưa có phiên điểm danh nào"
+        description="Hiện tại chưa có phiên điểm danh nào trong hệ thống. Hãy nhấn 'Tạo phiên mới' để bắt đầu thiết lập buổi học và tọa độ GPS."
+        actionLabel={onCreateNew ? '+ Tạo phiên mới' : undefined}
+        onAction={onCreateNew}
+      />
     );
   }
 
-  const sessionsByDate = groupSessionsByDate(sessions);
+  const totalPages = Math.ceil(sessions.length / PAGE_SIZE);
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), Math.max(totalPages, 1));
+  const startIndex = (safeCurrentPage - 1) * PAGE_SIZE;
+  const pagedSessions = sessions.slice(startIndex, startIndex + PAGE_SIZE);
+  const sessionsByDate = groupSessionsByDate(pagedSessions);
+
+  const openConfirmModal = (
+    session: AttendanceSessionResponse,
+    type: 'delete' | 'close',
+  ) => {
+    setModalState({
+      isOpen: true,
+      session,
+      type,
+      isSubmitting: false,
+    });
+  };
+
+  const handleModalConfirm = async () => {
+    if (!modalState.session) return;
+
+    try {
+      setModalState((prev) => ({ ...prev, isSubmitting: true }));
+      if (modalState.type === 'delete') {
+        await onDelete(modalState.session.id);
+      } else if (modalState.type === 'close' && onCloseSession) {
+        await onCloseSession(modalState.session.id);
+      }
+      setModalState((prev) => ({ ...prev, isOpen: false }));
+    } catch (err) {
+      console.error('Lỗi khi thực hiện thao tác:', err);
+    } finally {
+      setModalState((prev) => ({ ...prev, isSubmitting: false }));
+    }
+  };
 
   return (
-    <div className="space-y-5">
-      {Object.entries(sessionsByDate).map(([date, dateSessions]) => (
-        <section key={date}>
-          <div className="mb-2 text-sm font-semibold text-gray-700">{date}</div>
+    <div className="space-y-6">
+      <div className="space-y-6">
+        {Object.entries(sessionsByDate).map(([date, dateSessions]) => (
+          <section key={date} className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-blue-600"></span>
+              <h2 className="text-sm font-bold tracking-tight text-slate-700">
+                {date}
+              </h2>
+            </div>
 
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {dateSessions.map((session) => (
-              <article
-                key={session.id}
-                className="min-w-[240px] rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
-              >
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <h2 className="font-semibold text-gray-900">
-                    {session.title}
-                  </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {dateSessions.map((session) => (
+                <article
+                  key={session.id}
+                  className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4.5 shadow-xs transition hover:shadow-md hover:border-slate-300"
+                >
+                  <div>
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <h3
+                        className="font-bold text-slate-900 text-base line-clamp-1"
+                        title={session.title}
+                      >
+                        {session.title}
+                      </h3>
 
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-1 text-xs font-medium ${statusBadge[session.status]}`}
-                  >
-                    {statusLabel[session.status]}
-                  </span>
-                </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadge[session.status]}`}
+                      >
+                        {statusLabel[session.status]}
+                      </span>
+                    </div>
 
-                <div className="space-y-1 text-sm text-gray-600">
-                  <p>
-                    {formatDateTime(session.openAt)} –{' '}
-                    {formatDateTime(session.closeAt)}
-                  </p>
+                    <div className="space-y-1.5 text-xs text-slate-600">
+                      <p className="flex items-center gap-1.5">
+                        <span className="text-slate-400">🕒</span>
+                        {formatDateTime(session.openAt)} –{' '}
+                        {formatDateTime(session.closeAt)}
+                      </p>
 
-                  <p>Bán kính: {session.radius}m</p>
+                      <p className="flex items-center gap-1.5">
+                        <span className="text-slate-400">📍</span>
+                        Bán kính: <span className="font-semibold text-blue-600">{session.radius}m</span>
+                      </p>
+                    </div>
+                  </div>
 
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                     <button
                       type="button"
                       onClick={() => navigate(`/sessions/${session.id}`)}
-                      className="inline-flex rounded-lg px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-600 transition hover:bg-blue-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
-                      Xem chi tiết
+                      Chi tiết
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDelete(session)}
-                      className="inline-flex rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                    >
-                      Xóa
-                    </button>
+
+                    <div className="flex items-center gap-1.5">
+                      {session.status === 'open' && onCloseSession && (
+                        <button
+                          type="button"
+                          onClick={() => openConfirmModal(session, 'close')}
+                          className="inline-flex items-center rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                        >
+                          Đóng phiên
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => openConfirmModal(session, 'delete')}
+                        className="inline-flex items-center rounded-lg bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-600 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                      >
+                        Xóa
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      ))}
+                </article>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      <Pagination
+        currentPage={safeCurrentPage}
+        totalPages={totalPages}
+        totalItems={sessions.length}
+        pageSize={PAGE_SIZE}
+        onPageChange={(page) => setCurrentPage(page)}
+      />
+
+      <ConfirmModal
+        isOpen={modalState.isOpen}
+        title={
+          modalState.type === 'delete'
+            ? 'Xác nhận xóa phiên điểm danh'
+            : 'Xác nhận kết thúc phiên điểm danh'
+        }
+        message={
+          modalState.type === 'delete'
+            ? `Bạn có chắc chắn muốn xóa phiên "${modalState.session?.title}"? Toàn bộ bản ghi điểm danh và dữ liệu nhật ký kiểm toán liên quan sẽ bị xóa vĩnh viễn và không thể khôi phục.`
+            : `Bạn có chắc chắn muốn đóng phiên "${modalState.session?.title}" ngay bây giờ? Sinh viên sẽ không thể tiếp tục gửi yêu cầu điểm danh cho phiên này.`
+        }
+        confirmText={
+          modalState.type === 'delete' ? 'Xóa vĩnh viễn' : 'Đóng phiên ngay'
+        }
+        cancelText="Hủy bỏ"
+        variant={modalState.type === 'delete' ? 'danger' : 'warning'}
+        isLoading={modalState.isSubmitting}
+        onConfirm={handleModalConfirm}
+        onClose={() =>
+          !modalState.isSubmitting &&
+          setModalState((prev) => ({ ...prev, isOpen: false }))
+        }
+      />
     </div>
   );
 };

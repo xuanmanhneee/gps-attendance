@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   AttendanceValidationReason,
-  AttendanceValidationStatus,
+  LocationPayload,
 } from '@gps-attendance/shared';
 
 import {
@@ -12,6 +12,7 @@ import {
 import { IntegrityCheck } from './checks/integrity.check';
 import { LocationCheck } from './checks/location.check';
 import { MockLocationCheck } from './checks/mock-location.check';
+import { AttendanceSession } from '../attendance-sessions/attendance-session.model';
 
 @Injectable()
 export class AttendanceValidationService {
@@ -25,6 +26,13 @@ export class AttendanceValidationService {
     private readonly locationCheck: LocationCheck,
   ) {}
 
+  distanceToCenter(
+    session: AttendanceSession,
+    location: LocationPayload,
+  ): number {
+    return this.locationCheck.evaluate(location, session).distance;
+  }
+
   validate(input: AttendanceValidationInput): AttendanceValidationResult {
     const mockCheck = this.mockLocationCheck.evaluate(input.location);
     const locationCheck = this.locationCheck.evaluate(
@@ -33,12 +41,30 @@ export class AttendanceValidationService {
     );
     const integrityCheck = this.integrityCheck.evaluate(input.integrity);
     const distance = locationCheck.distance;
+    const radius = input.session.radius;
 
-    // Giả mạo vị trí bị chặn trực tiếp
     if (mockCheck.coefficient === 0) {
       return {
         status: 'REJECTED',
         reasons: ['MOCK_LOCATION'],
+        distance,
+      };
+    }
+
+    // Vòng sai số GPS nằm hoàn toàn ngoài bán kính → chắc chắn vắng
+    if (locationCheck.coefficient === 0) {
+      return {
+        status: 'REJECTED',
+        reasons: ['OUT_OF_RANGE'],
+        distance,
+      };
+    }
+
+    // Điểm báo cáo ngoài bán kính nhưng vòng sai số vẫn cắt vòng điểm danh
+    if (distance > radius) {
+      return {
+        status: 'REVIEW',
+        reasons: ['OUT_OF_RANGE'],
         distance,
       };
     }
@@ -50,11 +76,11 @@ export class AttendanceValidationService {
 
     const reasons: AttendanceValidationReason[] = [];
 
-    if (locationCheck.coefficient === 0) {
-      reasons.push('OUT_OF_RANGE');
+    if (locationCheck.coefficient < 1) {
+      reasons.push('LOW_LOCATION_ACCURACY');
     }
 
-    if (score < 80 && locationCheck.coefficient !== 0) {
+    if (score < 80) {
       reasons.push('LOW_CONFIDENCE_SCORE');
     }
 

@@ -19,6 +19,37 @@ export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepo
     return this.toModel(session);
   }
 
+  async createWithRecords(
+    input: CreateAttendanceSessionRecord,
+    userIds: number[],
+  ): Promise<AttendanceSession> {
+    const session = await this.prisma.$transaction(async (transaction) => {
+      const createdSession = await transaction.attendanceSession.create({
+        data: {
+          ...input,
+          latitude: input.latitude,
+          longitude: input.longitude,
+          radius: input.radius,
+        },
+      });
+
+      if (userIds.length > 0) {
+        await transaction.attendanceRecord.createMany({
+          data: userIds.map((userId) => ({
+            sessionId: createdSession.id,
+            userId,
+            status: 'absent' as const,
+            updatedBy: null,
+          })),
+        });
+      }
+
+      return createdSession;
+    });
+
+    return this.toModel(session);
+  }
+
   async findAll(): Promise<AttendanceSession[]> {
     const sessions = await this.prisma.attendanceSession.findMany({ orderBy: { id: 'desc' } });
     return sessions.map((session) => this.toModel(session));
@@ -37,6 +68,14 @@ export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepo
   async findByCreator(createdBy: number): Promise<AttendanceSession[]> {
     const sessions = await this.prisma.attendanceSession.findMany({ where: { createdBy } });
     return sessions.map((session) => this.toModel(session));
+  }
+
+  async close(id: number): Promise<AttendanceSession> {
+    const session = await this.prisma.attendanceSession.update({
+      where: { id },
+      data: { closeAt: new Date() },
+    });
+    return this.toModel(session);
   }
 
   async delete(id: number): Promise<void> {

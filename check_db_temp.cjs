@@ -2,7 +2,9 @@ const { PrismaPg } = require('./node_modules/@prisma/adapter-pg');
 const { PrismaClient } = require('./node_modules/@prisma/client');
 
 const adapter = new PrismaPg({
-  connectionString: 'postgresql://postgres:2552005@localhost:5432/gps_attendance',
+  connectionString:
+    process.env.DATABASE_URL ||
+    'postgresql://postgres:postgres@localhost:5432/gps_attendance',
 });
 const prisma = new PrismaClient({ adapter });
 
@@ -16,7 +18,7 @@ async function main() {
   const sessions = await prisma.attendanceSession.findMany();
   console.log('\n--- SESSIONS (' + sessions.length + ') ---');
   for (const s of sessions) {
-    console.log(`ID: ${s.id}, Title: ${s.title}, Open: ${s.openAt.toISOString()}, Close: ${s.closeAt.toISOString()}, Status: ${s.status}`);
+    console.log(`ID: ${s.id}, Title: ${s.title}, Open: ${s.openAt.toISOString()}, Close: ${s.closeAt.toISOString()}`);
   }
 
   const records = await prisma.attendanceRecord.findMany();

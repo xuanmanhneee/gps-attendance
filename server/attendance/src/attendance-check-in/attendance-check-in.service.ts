@@ -18,6 +18,8 @@ import { AttemptCheck } from './checks/attempt.check';
 import { DeviceCheck } from './checks/device.check';
 import { ATTENDANCE_CHECK_IN_DEVICE_USAGE_REPOSITORY } from './attendance-check-in.token';
 import { IAttendanceCheckInDeviceUsageRepository } from './repositories/attendance-check-in-device-usage.repository';
+import { ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY } from './attendance-check-in.token';
+import type { IAttendanceCheckInAttemptRepository } from './repositories/attendance-check-in-attempt.repository';
 
 @Injectable()
 export class AttendanceCheckInService {
@@ -29,6 +31,8 @@ export class AttendanceCheckInService {
     private readonly deviceCheck: DeviceCheck,
     @Inject(ATTENDANCE_CHECK_IN_DEVICE_USAGE_REPOSITORY)
     private readonly deviceUsageRepository: IAttendanceCheckInDeviceUsageRepository,
+    @Inject(ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY)
+    private readonly attemptRepository: IAttendanceCheckInAttemptRepository,
   ) {}
 
   async checkIn(
@@ -56,6 +60,21 @@ export class AttendanceCheckInService {
       });
     }
 
+    const distanceToCenter = this.attendanceValidationService.distanceToCenter(
+      session,
+      dto.location,
+    );
+    const attempt = await this.attemptCheck.evaluate({
+      sessionId: dto.sessionId,
+      userId,
+      latitude: dto.location.latitude,
+      longitude: dto.location.longitude,
+      accuracy: dto.location.accuracy,
+      distanceToCenter,
+      deviceId: dto.device.deviceId,
+      isMockLocation: dto.location.isMockLocation,
+    });
+
     let existingRecord =
       await this.attendanceRecordsService.getBySessionAndUser(
         dto.sessionId,
@@ -63,17 +82,11 @@ export class AttendanceCheckInService {
       );
 
     if (!existingRecord) {
-      // Tự động phân bổ sinh viên vào phiên mở nếu chưa được phân bổ trước đó
-      await this.attendanceRecordsService.initializeForSession(dto.sessionId, [
-        userId,
-      ]);
-      existingRecord = await this.attendanceRecordsService.getBySessionAndUser(
-        dto.sessionId,
-        userId,
+      await this.attemptRepository.completeAttempt(
+        attempt.attemptId,
+        'REJECTED',
+        ['USER_NOT_IN_SESSION'],
       );
-    }
-
-    if (!existingRecord) {
       throw new BadRequestException({
         code: AttendanceCheckInErrorCode.USER_NOT_IN_SESSION,
         message: 'Sinh viên chưa được phân bổ vào phiên điểm danh này',
@@ -81,6 +94,11 @@ export class AttendanceCheckInService {
     }
 
     if (existingRecord.status === 'present') {
+      await this.attemptRepository.completeAttempt(
+        attempt.attemptId,
+        'REJECTED',
+        ['ALREADY_CHECKED_IN'],
+      );
       throw new ConflictException({
         code: AttendanceCheckInErrorCode.ALREADY_CHECKED_IN,
         message: 'Bạn đã điểm danh phiên học này rồi',
@@ -90,12 +108,12 @@ export class AttendanceCheckInService {
     // -------------------------------------------------------------------------
     // 2. Anti-fraud check: tần suất & trùng thiết bị
     // -------------------------------------------------------------------------
-    const attempt = await this.attemptCheck.evaluate({
-      sessionId: dto.sessionId,
-      userId,
-    });
-
     if (attempt.isTooMany) {
+      await this.attemptRepository.completeAttempt(
+        attempt.attemptId,
+        'REJECTED',
+        ['TOO_MANY_ATTEMPTS'],
+      );
       return {
         status: 'REJECTED',
         reasons: ['TOO_MANY_ATTEMPTS'],
@@ -105,9 +123,15 @@ export class AttendanceCheckInService {
     const device = await this.deviceCheck.evaluate({
       sessionId: dto.sessionId,
       deviceId: dto.device.deviceId,
+      userId,
     });
 
     if (device.isDuplicate) {
+      await this.attemptRepository.completeAttempt(
+        attempt.attemptId,
+        'REJECTED',
+        ['DUPLICATE_DEVICE'],
+      );
       return {
         status: 'REJECTED',
         reasons: ['DUPLICATE_DEVICE'],
@@ -131,6 +155,11 @@ export class AttendanceCheckInService {
     });
 
     if (validation.status === 'REJECTED') {
+      await this.attemptRepository.completeAttempt(
+        attempt.attemptId,
+        'REJECTED',
+        validation.reasons,
+      );
       return {
         status: 'REJECTED',
         reasons: validation.reasons as [
@@ -157,6 +186,12 @@ export class AttendanceCheckInService {
     await this.deviceUsageRepository.markUsed(
       dto.sessionId,
       dto.device.deviceId,
+    );
+
+    await this.attemptRepository.completeAttempt(
+      attempt.attemptId,
+      validation.status === 'VALID' ? 'APPROVED' : 'REVIEW',
+      validation.reasons,
     );
 
     if (validation.status === 'VALID') {

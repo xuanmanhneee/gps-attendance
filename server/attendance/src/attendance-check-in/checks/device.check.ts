@@ -13,10 +13,12 @@ export class DeviceCheck {
   async evaluate(input: {
     sessionId: number;
     deviceId: string;
+    userId?: number;
   }): Promise<{ isDuplicate: boolean }> {
     const isUsed = await this.deviceUsageRepository.isUsed(
       input.sessionId,
       input.deviceId,
+      input.userId,
     );
 
     return {

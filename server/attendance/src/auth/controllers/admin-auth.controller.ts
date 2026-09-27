@@ -3,6 +3,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Body,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ import { CurrentUser } from '../decorators/current-user.decorator';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import type { AuthenticatedUser } from '../types/authenticated-user.type';
 import { LoginDto } from '../dto/login.dto';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('admin-auth')
 @Controller('v0/admin/auth')
@@ -29,6 +31,7 @@ export class AdminAuthController {
     summary: 'Admin đăng nhập, trả về access token',
   })
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: LoginDto })
@@ -46,5 +49,10 @@ export class AdminAuthController {
       success: true,
       data: this.authService.login(user),
     };
+  }
+
+  @Post('refresh')
+  async refresh(@Body('refreshToken') refreshToken: string): Promise<ApiResponse<LoginResponse>> {
+    return { success: true, data: this.authService.refresh(refreshToken) };
   }
 }
