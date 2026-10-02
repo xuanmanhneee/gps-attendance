@@ -5,7 +5,7 @@ import type {
   AttendanceStatus,
 } from './attendance-record.types';
 
-export type SessionStatus = 'pending' | 'open' | 'closed';
+export type SessionStatus = 'pending' | 'open' | 'closed' | 'cancelled';
 
 export interface AttendanceSessionResponse {
   id: number;

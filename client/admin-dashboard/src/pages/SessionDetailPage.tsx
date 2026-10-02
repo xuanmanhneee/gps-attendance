@@ -148,12 +148,14 @@ const SessionDetailPage = () => {
     open: 'bg-emerald-100 text-emerald-700',
     pending: 'bg-amber-100 text-amber-700',
     closed: 'bg-slate-100 text-slate-600',
+    cancelled: 'bg-rose-100 text-rose-700',
   };
 
   const statusLabels = {
     open: '🟢 Đang diễn ra',
     pending: '⏳ Sắp diễn ra',
     closed: '⚫ Đã kết thúc',
+    cancelled: '⛔ Đã hủy',
   };
 
   // Pagination computations
