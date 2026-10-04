@@ -1,557 +1,324 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
+  AppState,
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl,
-  Platform,
+  View,
 } from 'react-native';
-import * as Location from 'expo-location';
-import * as Device from 'expo-device';
-import { useAuth } from '../../context/auth-context';
-import { ApiRequestError } from '../../api/api';
-import { useRouter } from 'expo-router';
-import { Button } from '../../components/ui/button';
-import { Card } from '../../components/ui/card';
-import { GPSStatusCard } from '../../components/gps-status-card';
-import { AttendanceModal } from '../../components/attendance-modal';
-import { AttendanceAPI } from '../../api/attendance.api';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS } from '../../constants/theme';
-import { appAlert } from '../../utils/app-alert';
-import { getStableDeviceId } from '../../services/device-id';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
+import type { MyAttendanceSessionResponse } from '@gps-attendance/shared';
 
-interface Session {
-  id: number;
-  title: string;
-  status: string;
-  openAt: string;
-  closeAt: string;
-  latitude: number;
-  longitude: number;
-  radius: number;
+import { AttendanceAPI } from '../../api/attendance.api';
+import { ApiRequestError } from '../../api/api';
+import { DluLogo } from '../../components/dlu-logo';
+import { Card } from '../../components/ui/card';
+import { COLORS } from '../../constants/theme';
+import { useAuth } from '../../context/auth-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { appAlert } from '../../utils/app-alert';
+
+function formatDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Ngày chưa xác định';
+  return date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 }
 
-export default function AttendanceScreen() {
+function localDateKey(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--:--';
+  return date.toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function getAttendanceStatus(session: MyAttendanceSessionResponse): {
+  label: string;
+  color: string;
+  background: string;
+} {
+  if (session.status === 'cancelled') {
+    return { label: 'Đã hủy', color: '#69736D', background: '#EEF1EF' };
+  }
+
+  switch (session.myAttendance.status) {
+    case 'present':
+      return { label: 'Đã điểm danh', color: '#16834B', background: '#E3F7EB' };
+    case 'late':
+      return { label: 'Đi muộn', color: '#A56A00', background: '#FFF4DB' };
+    case 'excused':
+      return { label: 'Có phép', color: '#6D55B5', background: '#F0EBFF' };
+    case 'absent':
+      if (session.status === 'open') {
+        return { label: 'Đang mở', color: '#16834B', background: '#E3F7EB' };
+      }
+      if (session.status === 'pending') {
+        return { label: 'Chưa mở', color: '#A56A00', background: '#FFF4DB' };
+      }
+      return { label: 'Vắng', color: '#C2413A', background: '#FDEAE8' };
+  }
+}
+
+export default function AttendanceOverviewScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, token, logout } = useAuth();
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [location, setLocation] = useState<Location.LocationObject | null>(
-    null,
-  );
-  const [isLocating, setIsLocating] = useState(true);
-  const [gpsError, setGpsError] = useState<string | null>(null);
-  const [isCheckingIn, setIsCheckingIn] = useState(false);
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(
-    null,
-  );
-  const [validationResult, setValidationResult] = useState<any>(null);
-  const [showModal, setShowModal] = useState(false);
+  const { token, logout } = useAuth();
+  const [sessions, setSessions] = useState<MyAttendanceSessionResponse[]>([]);
+  const [today, setToday] = useState(() => new Date());
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [sessionStatus, setSessionStatus] = useState<
-    Record<number, 'idle' | 'completed' | 'failed'>
-  >({});
 
   useEffect(() => {
-    if (!token) return;
-    loadSessions();
-    let subscription: Location.LocationSubscription | undefined;
-    startLocationTracking().then((createdSubscription) => {
-      subscription = createdSubscription;
+    const refreshToday = () => {
+      const now = new Date();
+      setToday((current) => localDateKey(current) === localDateKey(now) ? current : now);
+    };
+    const interval = setInterval(refreshToday, 60_000);
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshToday();
     });
-    return () => subscription?.remove();
-  }, [token]);
 
-  const loadSessions = async (showLoader = true) => {
+    return () => {
+      clearInterval(interval);
+      appStateSubscription.remove();
+    };
+  }, []);
+
+  const loadSessions = useCallback(async (refresh = false) => {
+    if (!token) {
+      setSessions([]);
+      setIsLoading(false);
+      return;
+    }
+
+    if (refresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     try {
-      if (showLoader) {
-        setIsLoading(true);
-      } else {
-        setIsRefreshing(true);
-      }
-
-      if (!token) return;
       const response = await AttendanceAPI.getSessions(token);
-      if (!response.success) throw new Error(response.message);
-      setSessions(response.data);
+      if (!response.success) {
+        throw new Error(response.message || 'Không thể tải danh sách lớp');
+      }
+      setSessions(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      console.error('Failed to load sessions:', error);
       if (error instanceof ApiRequestError && error.status === 401) {
-        appAlert('Phiên làm việc hết hạn', 'Token đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
         await logout();
         router.replace('/login');
-        return;
-      }
-      const errorMsg = error instanceof Error ? error.message : 'Không thể tải danh sách buổi học';
-      appAlert('Lỗi kết nối', errorMsg);
-    } finally {
-      if (showLoader) {
-        setIsLoading(false);
       } else {
-        setIsRefreshing(false);
+        appAlert(
+          'Lỗi tải danh sách',
+          error instanceof Error ? error.message : 'Vui lòng thử lại.',
+        );
       }
-    }
-  };
-
-  const handleRefresh = async () => {
-    await Promise.all([loadSessions(false), startLocationTracking()]);
-  };
-
-  const startLocationTracking = async (): Promise<Location.LocationSubscription | undefined> => {
-    try {
-      setIsLocating(true);
-      setGpsError(null);
-
-      // 1. Kiểm tra GPS trên thiết bị đã bật chưa
-      const servicesEnabled = await Location.hasServicesEnabledAsync();
-      if (!servicesEnabled) {
-        const msg = 'GPS chưa bật. Vui lòng bật Dịch vụ định vị trong Cài đặt thiết bị.';
-        setGpsError(msg);
-        setIsLocating(false);
-        appAlert('GPS chưa bật', msg);
-        return undefined;
-      }
-
-      // 2. Kiểm tra quyền truy cập vị trí
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        const msg = 'Ứng dụng cần quyền truy cập vị trí để hoạt động.';
-        setGpsError(msg);
-        setIsLocating(false);
-        appAlert('Chưa cấp quyền GPS', msg);
-        return undefined;
-      }
-
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      setLocation(currentLocation);
-      setIsLocating(false);
-
-      // Theo dõi vị trí liên tục
-      const subscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 5000,
-          distanceInterval: 10,
-        },
-        (newLocation) => {
-          setLocation(newLocation);
-          setIsLocating(false);
-        },
-      );
-
-      return subscription;
-    } catch (error) {
-      console.error('Failed to get location:', error);
-      const msg = 'Không thể truy cập GPS. Vui lòng kiểm tra dịch vụ định vị.';
-      setGpsError(msg);
-      setIsLocating(false);
-      appAlert('Lỗi GPS', msg);
-    }
-  };
-
-  const getDistanceInMeters = (session: Session) => {
-    if (!location) return null;
-    const earthRadius = 6371000;
-    const lat1 = (location.coords.latitude * Math.PI) / 180;
-    const lat2 = (session.latitude * Math.PI) / 180;
-    const deltaLat = ((session.latitude - location.coords.latitude) * Math.PI) / 180;
-    const deltaLng = ((session.longitude - location.coords.longitude) * Math.PI) / 180;
-    const a = Math.sin(deltaLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
-    return Math.round(earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-  };
-
-  const handleCheckIn = async (sessionId: number) => {
-    const session = sessions.find((item) => item.id === sessionId);
-
-    if (session && session.status !== 'open') {
-      appAlert(
-        'Phiên chưa mở',
-        session.status === 'pending'
-          ? 'Buổi điểm danh chưa tới giờ mở. Nút bị tắt cho đến khi phiên chuyển sang trạng thái Mở.'
-          : 'Buổi điểm danh đã đóng. Không thể điểm danh.',
-      );
-      return;
-    }
-
-    if (!location) {
-      appAlert('Chưa có GPS', 'Chưa có thông tin vị trí. Hãy bật GPS, cấp quyền vị trí, rồi bấm Làm mới.');
-      return;
-    }
-
-    const { latitude, longitude, accuracy } = location.coords;
-
-    if (
-      typeof latitude !== 'number' ||
-      latitude < -90 ||
-      latitude > 90 ||
-      typeof longitude !== 'number' ||
-      longitude < -180 ||
-      longitude > 180
-    ) {
-      appAlert('Lỗi tọa độ', 'Tọa độ GPS không hợp lệ. Vui lòng kiểm tra lại thiết bị.');
-      return;
-    }
-
-    const currentAccuracy = accuracy ?? 0;
-    if (currentAccuracy > 1000) {
-      appAlert(
-        'Sai số GPS không hợp lệ',
-        `Thiết bị báo sai số ${Math.round(currentAccuracy)}m. Hãy bật GPS, ra chỗ thoáng rồi thử lại.`,
-      );
-      return;
-    }
-
-    try {
-      setIsCheckingIn(true);
-      setSelectedSessionId(sessionId);
-
-      if (!token) throw new Error('Phiên đăng nhập đã hết hạn');
-      const deviceId = await getStableDeviceId();
-      const response = await AttendanceAPI.checkIn(
-        {
-          sessionId,
-          location: {
-            latitude,
-            longitude,
-            accuracy: Math.max(0, currentAccuracy),
-            timestamp: location.timestamp,
-            isMockLocation: location.mocked ?? false,
-          },
-          device: {
-            deviceId,
-            platform: Platform.OS === 'ios' ? 'ios' : 'android',
-            model: Device.modelName ?? 'unknown-model',
-          },
-          integrity: { integrityToken: null },
-        },
-        token,
-      );
-
-      if (!response.success) {
-        throw new Error(response.message || 'Điểm danh không thành công');
-      }
-
-      const validation = response.data;
-      setValidationResult(validation);
-
-      if (validation.status === 'VALID' || validation.status === 'REVIEW') {
-        setSessionStatus((prev) => ({
-          ...prev,
-          [sessionId]: 'completed',
-        }));
-        setShowModal(true);
-        return;
-      }
-
-      setSessionStatus((prev) => ({
-        ...prev,
-        [sessionId]: 'failed',
-      }));
-      setShowModal(true);
-    } catch (error) {
-      console.error('Check-in failed:', error);
-      const apiMessage =
-        error instanceof ApiRequestError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : 'Điểm danh không thành công';
-
-      setSessionStatus((prev) => ({
-        ...prev,
-        [sessionId]: 'failed',
-      }));
-
-      appAlert('Lỗi điểm danh', apiMessage);
     } finally {
-      setIsCheckingIn(false);
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
+  }, [logout, router, token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadSessions();
+    }, [loadSessions]),
+  );
+
+  const todayKey = localDateKey(today);
+  const sessionsForToday = useMemo(
+    () =>
+      sessions
+        .filter((session) => localDateKey(session.openAt) === todayKey)
+        .sort((left, right) => new Date(left.openAt).getTime() - new Date(right.openAt).getTime()),
+    [sessions, todayKey],
+  );
+
+  const openDetail = (sessionId: number) => {
+    router.push({ pathname: '/attendance/[id]', params: { id: String(sessionId) } });
   };
 
   if (isLoading) {
     return (
-      <View style={[styles.centerContainer, { paddingTop: insets.top + 16 }]}>
+      <View style={[styles.loading, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Đang tải phiên điểm danh hôm nay...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
+    <View style={styles.screen}>
+      <FlatList
+        data={sessionsForToday}
+        keyExtractor={(item) => String(item.id)}
         contentContainerStyle={[
-          styles.scrollContent,
-          {
-            paddingTop: Math.max(insets.top, 20) + 16,
-            paddingBottom: 64 + insets.bottom + 24,
-          },
+          styles.listContent,
+          { paddingTop: Math.max(insets.top, 18), paddingBottom: 24 + insets.bottom },
+          sessionsForToday.length === 0 && styles.emptyListContent,
         ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
-            onRefresh={handleRefresh}
+            onRefresh={() => void loadSessions(true)}
             tintColor={COLORS.primary}
             colors={[COLORS.primary]}
-            title="Kéo xuống để làm mới"
-            titleColor={COLORS.text.secondary}
           />
         }
-      >
-        <View style={styles.centerWrapper}>
+        ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Xin chào, {user?.name}</Text>
-            <Text style={styles.headerSubtitle}>Chọn buổi học để điểm danh</Text>
-          </View>
-
-          {isLocating && !location && (
-            <Card style={styles.locatingCard}>
-              <View style={styles.locatingRow}>
-                <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 10 }} />
-                <Text style={styles.locatingText}>
-                  Đang lấy tọa độ GPS... Vui lòng chờ thiết bị kết nối vệ tinh
-                </Text>
-              </View>
-            </Card>
-          )}
-
-          {gpsError && !location && (
-            <Card style={styles.gpsErrorCard}>
-              <Text style={styles.gpsErrorTitle}>⚠️ Lỗi GPS: Chưa bật hoặc chưa cấp quyền</Text>
-              <Text style={styles.gpsErrorSubtitle}>{gpsError}</Text>
-              <Button
-                title="Bật lại GPS & Thử lại"
-                onPress={() => startLocationTracking()}
-                variant="outline"
-                style={{ marginTop: 10 }}
-              />
-            </Card>
-          )}
-
-          {location && (
-            <GPSStatusCard
-              location={location}
-              distance={sessions[0] ? getDistanceInMeters(sessions[0]) : null}
-            />
-          )}
-
-          <Button
-            title={isRefreshing ? 'Đang tải...' : 'Làm mới'}
-            onPress={handleRefresh}
-            disabled={isRefreshing || isCheckingIn || isLoading}
-            variant="primary"
-            style={styles.refreshButton}
-          />
-
-          {sessions.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
-                Không có buổi học nào sắp diễn ra
+            <DluLogo size={48} containerStyle={{ marginRight: 12 }} />
+            <View style={styles.headerText}>
+              <Text style={styles.title}>Điểm danh</Text>
+              <Text style={styles.subtitle}>
+                Hôm nay · {today.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
               </Text>
             </View>
-          ) : (
-            sessions.map((session) => {
-              const isCompleted = sessionStatus[session.id] === 'completed';
-              const isFailed = sessionStatus[session.id] === 'failed';
-
-              return (
-                <Card key={session.id} style={styles.sessionCard}>
-                  <Text style={styles.sessionTitle}>{session.title}</Text>
-                  <Text style={styles.sessionTime}>
-                    {new Date(session.openAt).toLocaleTimeString('vi-VN')} -{' '}
-                    {new Date(session.closeAt).toLocaleTimeString('vi-VN')}
+            <View style={styles.countBadge}>
+              <Text style={styles.countText}>{sessionsForToday.length}</Text>
+            </View>
+          </View>
+        }
+        renderItem={({ item }) => {
+          const status = getAttendanceStatus(item);
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Mở chi tiết điểm danh lớp ${item.title}`}
+              onPress={() => openDetail(item.id)}
+              style={({ pressed }) => [styles.sessionCard, pressed && styles.sessionCardPressed]}
+            >
+              <View style={styles.sessionIcon}>
+                <MaterialCommunityIcons name="school-outline" size={22} color={COLORS.primary} />
+              </View>
+              <View style={styles.sessionInfo}>
+                <View style={styles.sessionTitleRow}>
+                  <Text style={styles.sessionTitle} numberOfLines={2}>{item.title}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: status.background }]}>
+                    <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+                  </View>
+                </View>
+                <Text style={styles.sessionDate}>{formatDate(item.openAt)}</Text>
+                <View style={styles.sessionMetaRow}>
+                  <MaterialCommunityIcons name="clock-outline" size={14} color="#737B85" />
+                  <Text style={styles.sessionMetaText}>
+                    {formatTime(item.openAt)} – {formatTime(item.closeAt)}
                   </Text>
-                  <Text style={styles.sessionStatus}>
-                    Trạng thái: {session.status === 'open' ? '🟢 Mở' : '⚫ Đóng'}
-                  </Text>
-                  {getDistanceInMeters(session) !== null && (
-                    <Text style={styles.sessionDistance}>
-                      Khoảng cách: {getDistanceInMeters(session)} m
-                    </Text>
-                  )}
-                  <Text style={styles.sessionDistance}>
-                    Phạm vi: {session.radius} m | Sai số GPS: ±{Math.round(location?.coords.accuracy ?? 0)} m
-                  </Text>
-                  {(location?.coords.accuracy ?? 0) > 30 && (
-                    <Text style={styles.sessionHint}>
-                      Sai số GPS cao: điểm danh vẫn gửi được. Nếu vòng sai số cắt mép lớp, kết quả có thể là xem xét (Review).
-                    </Text>
-                  )}
-
-                  <Button
-                    title={
-                      isCompleted
-                        ? 'Check-in thành công'
-                        : isFailed
-                          ? 'Thử lại'
-                          : isCheckingIn && selectedSessionId === session.id
-                            ? 'Đang gửi dữ liệu...'
-                            : session.status !== 'open'
-                              ? session.status === 'pending'
-                                ? 'Chưa tới giờ'
-                                : 'Phiên đã đóng'
-                              : 'Điểm Danh'
-                    }
-                    onPress={() => handleCheckIn(session.id)}
-                    disabled={isCompleted || isCheckingIn}
-                    variant={isCompleted ? 'secondary' : 'primary'}
-                    style={
-                      isCompleted
-                        ? styles.completedButton
-                        : styles.checkInButton
-                    }
-                  />
-                </Card>
-              );
-            })
-          )}
-        </View>
-      </ScrollView>
-
-      <AttendanceModal
-        visible={showModal}
-        result={validationResult}
-        onClose={() => {
-          setShowModal(false);
-          setValidationResult(null);
+                  <Text style={styles.metaSeparator}>·</Text>
+                  <Text style={styles.sessionMetaText}>Bán kính {item.radius} m</Text>
+                </View>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={22} color="#8A929B" />
+            </Pressable>
+          );
         }}
+        ListEmptyComponent={
+          <Card style={styles.emptyCard}>
+            <View style={styles.emptyIcon}>
+              <MaterialCommunityIcons name="check-all" size={30} color={COLORS.primary} />
+            </View>
+            <Text style={styles.emptyTitle}>Hôm nay chưa có phiên điểm danh</Text>
+            <Text style={styles.emptyText}>
+              Các phiên trong ngày {today.toLocaleDateString('vi-VN')} sẽ hiển thị ở đây, dù bạn đã điểm danh hay chưa.
+            </Text>
+            <Pressable onPress={() => void loadSessions(true)} style={styles.retryButton}>
+              <Text style={styles.retryText}>Làm mới</Text>
+            </Pressable>
+          </Card>
+        }
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  centerWrapper: {
-    width: '100%',
-    maxWidth: 480,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 16,
-  },
+  screen: { flex: 1, backgroundColor: '#F5F7F6' },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F5F7F6' },
+  loadingText: { marginTop: 12, color: '#626B73', fontSize: 14 },
+  listContent: { flexGrow: 1, paddingHorizontal: 16, gap: 12 },
+  emptyListContent: { justifyContent: 'flex-start' },
   header: {
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: COLORS.text.secondary,
-    marginTop: 4,
-  },
-  sessionList: {
-    flex: 1,
-  },
-  locatingCard: {
-    marginBottom: 16,
-    padding: 14,
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    borderRadius: 12,
-  },
-  locatingRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+    paddingVertical: 12,
   },
-  locatingText: {
-    fontSize: 13,
-    color: COLORS.primary,
-    fontWeight: '500',
-    flex: 1,
-  },
-  gpsErrorCard: {
-    marginBottom: 16,
-    padding: 14,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: 12,
-  },
-  gpsErrorTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.error,
-    marginBottom: 4,
-  },
-  gpsErrorSubtitle: {
-    fontSize: 13,
-    color: '#991B1B',
-    lineHeight: 18,
-  },
-  refreshButton: {
-    marginBottom: 12,
-    borderRadius: 10,
-  },
-  checkInButton: {
-    backgroundColor: COLORS.primary,
-  },
-  completedButton: {
-    backgroundColor: '#2E7D32',
-  },
-  sessionCard: {
-    marginBottom: 12,
-    padding: 16,
-    gap: 8,
-  },
-  sessionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.text.primary,
-  },
-  sessionTime: {
-    fontSize: 13,
-    color: COLORS.text.secondary,
-  },
-  sessionStatus: {
-    fontSize: 13,
-    color: COLORS.primary,
-    fontWeight: '500',
-  },
-  sessionDistance: {
-    fontSize: 13,
-    color: COLORS.text.secondary,
-  },
-  sessionHint: {
-    fontSize: 12,
-    color: COLORS.warning,
-    lineHeight: 16,
-  },
-  emptyState: {
-    justifyContent: 'center',
+  headerText: { flex: 1 },
+  title: { fontSize: 24, fontWeight: '800', color: '#173529' },
+  subtitle: { marginTop: 3, fontSize: 13, color: '#68736D' },
+  countBadge: {
+    minWidth: 32,
+    height: 32,
+    borderRadius: 16,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    paddingVertical: 40,
+    justifyContent: 'center',
+    backgroundColor: '#E2F4EA',
   },
-  emptyStateText: {
-    fontSize: 16,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
+  countText: { color: COLORS.primary, fontSize: 14, fontWeight: '800' },
+  sessionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E9EFEB',
+    shadowColor: '#183B2A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
+  sessionCardPressed: { opacity: 0.78, transform: [{ scale: 0.99 }] },
+  sessionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EAF7F0',
+    marginRight: 12,
+  },
+  sessionInfo: { flex: 1, gap: 6 },
+  sessionTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  sessionTitle: { flex: 1, color: '#1F2924', fontSize: 15, fontWeight: '700' },
+  statusBadge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
+  statusText: { fontSize: 9, fontWeight: '700' },
+  sessionDate: { color: '#626B73', fontSize: 12, fontWeight: '600' },
+  sessionMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  sessionMetaText: { color: '#737B85', fontSize: 11 },
+  metaSeparator: { color: '#A0A6AD', fontSize: 12 },
+  emptyCard: { marginTop: 20, alignItems: 'center', paddingVertical: 28, paddingHorizontal: 22 },
+  emptyIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#EAF7F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  emptyTitle: { color: '#1F2924', fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  emptyText: { marginTop: 7, color: '#717A74', fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  retryButton: { marginTop: 18, paddingHorizontal: 22, paddingVertical: 10, borderRadius: 10, backgroundColor: '#EAF7F0' },
+  retryText: { color: COLORS.primary, fontSize: 13, fontWeight: '700' },
 });

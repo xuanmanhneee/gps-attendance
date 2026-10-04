@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DluLogo } from '@/components/dlu-logo';
 import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -41,6 +42,7 @@ export default function TabTwoScreen() {
     >
       <ThemedView style={styles.container}>
         <ThemedView style={styles.titleContainer}>
+          <DluLogo size={48} />
           <ThemedText type="subtitle">Explore</ThemedText>
           <ThemedText style={styles.centerText} themeColor="textSecondary">
             This starter app includes example{'\n'}code to help you get started.

@@ -41,7 +41,6 @@ export class AttendanceValidationService {
     );
     const integrityCheck = this.integrityCheck.evaluate(input.integrity);
     const distance = locationCheck.distance;
-    const radius = input.session.radius;
 
     if (mockCheck.coefficient === 0) {
       return {
@@ -52,7 +51,7 @@ export class AttendanceValidationService {
     }
 
     // Vòng sai số GPS nằm hoàn toàn ngoài bán kính → chắc chắn vắng
-    if (locationCheck.coefficient === 0) {
+    if (locationCheck.certainty === 'OUTSIDE') {
       return {
         status: 'REJECTED',
         reasons: ['OUT_OF_RANGE'],
@@ -60,25 +59,32 @@ export class AttendanceValidationService {
       };
     }
 
-    // Điểm báo cáo ngoài bán kính nhưng vòng sai số vẫn cắt vòng điểm danh
-    if (distance > radius) {
+    // Vị trí có thể nằm cả trong lẫn ngoài vùng: cần người có thẩm quyền xem xét.
+    // Nếu mức độ toàn vẹn thiết bị thấp, trường hợp này không được phép tự động qua.
+    if (locationCheck.certainty === 'UNCERTAIN') {
+      const nearSessionBoundary = distance >= input.session.radius * 0.75;
+
+      if (integrityCheck.coefficient < 0.75 && nearSessionBoundary) {
+        return {
+          status: 'REJECTED',
+          reasons: ['LOW_LOCATION_ACCURACY', 'LOW_CONFIDENCE_SCORE'],
+          distance,
+        };
+      }
+
       return {
         status: 'REVIEW',
-        reasons: ['OUT_OF_RANGE'],
+        reasons: ['LOW_LOCATION_ACCURACY'],
         distance,
       };
     }
 
     const score =
       mockCheck.coefficient * this.MOCK_LOCATION_WEIGHT +
-      locationCheck.coefficient * this.LOCATION_WEIGHT +
+      this.LOCATION_WEIGHT +
       integrityCheck.coefficient * this.INTEGRITY_WEIGHT;
 
     const reasons: AttendanceValidationReason[] = [];
-
-    if (locationCheck.coefficient < 1) {
-      reasons.push('LOW_LOCATION_ACCURACY');
-    }
 
     if (score < 80) {
       reasons.push('LOW_CONFIDENCE_SCORE');

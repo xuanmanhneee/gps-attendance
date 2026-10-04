@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/database/prisma.service';
+import type { SessionStatus } from '@gps-attendance/shared';
 import type { AttendanceSession, CreateAttendanceSessionRecord } from '../attendance-session.model';
 import type { IAttendanceSessionRepository } from '../attendance-session.repository';
 
@@ -78,6 +79,14 @@ export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepo
     return this.toModel(session);
   }
 
+  async cancel(id: number): Promise<AttendanceSession> {
+    const session = await this.prisma.attendanceSession.update({
+      where: { id },
+      data: { status: 'cancelled' },
+    });
+    return this.toModel(session);
+  }
+
   async delete(id: number): Promise<void> {
     await this.prisma.attendanceSession.delete({ where: { id } });
   }
@@ -90,6 +99,7 @@ export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepo
     radius: unknown;
     openAt: Date;
     closeAt: Date;
+    status: string;
     createdBy: number;
     createdAt: Date;
     updatedAt: Date;
@@ -99,7 +109,7 @@ export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepo
       latitude: Number(session.latitude),
       longitude: Number(session.longitude),
       radius: Number(session.radius),
-      status: 'pending',
+      status: (session.status === 'cancelled' ? 'cancelled' : 'pending') as SessionStatus,
     };
   }
 }

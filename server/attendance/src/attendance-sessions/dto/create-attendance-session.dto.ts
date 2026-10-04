@@ -8,8 +8,11 @@ import {
   IsObject,
   IsPositive,
   IsString,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import type { CreateAttendanceSessionRequest } from '@gps-attendance/shared';
+import { UserFilterCriteriaDto } from './user-filter-criteria.dto';
 
 export class CreateAttendanceSessionDto implements CreateAttendanceSessionRequest {
   @ApiProperty({ example: 'Điểm danh buổi sáng - Lớp CNTT K20' })
@@ -42,6 +45,7 @@ export class CreateAttendanceSessionDto implements CreateAttendanceSessionReques
   closeAt!: string;
 
   @ApiProperty({
+    type: () => UserFilterCriteriaDto,
     example: {
       codeFilter: {
         addCodes: ['2312686', '2312682', '2312716'],
@@ -49,5 +53,7 @@ export class CreateAttendanceSessionDto implements CreateAttendanceSessionReques
     },
   })
   @IsObject()
+  @ValidateNested()
+  @Type(() => UserFilterCriteriaDto)
   participantCriteria!: CreateAttendanceSessionRequest['participantCriteria'];
 }

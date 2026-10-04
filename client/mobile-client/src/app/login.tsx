@@ -41,10 +41,13 @@ export default function LoginScreen() {
     }
 
     try {
-      await login(username.trim(), password);
+      await login(username.trim(), password, isLecturer);
       router.replace('/(tabs)');
-    } catch {
-      Alert.alert('Đăng nhập thất bại', 'MSSV/email hoặc mật khẩu không đúng.');
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : 'Thông tin đăng nhập không hợp lệ.';
+      Alert.alert('Đăng nhập thất bại', message);
     }
   };
 

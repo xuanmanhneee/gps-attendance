@@ -26,9 +26,16 @@ Mỗi phiên điểm danh có **tâm GPS**, **bán kính (mét)** và **cửa s�
 | `lecturer` | Admin dashboard | Tạo / đóng / xóa phiên của mình, xem chi tiết sinh viên |
 | `admin` | Admin dashboard | Toàn bộ phiên, danh sách user, phiên theo giảng viên |
 
-**Đã có:** JWT access + refresh (tách login student / staff), CRUD phiên, phân bổ sinh viên, check-in GPS + anti-fraud, lịch sử điểm danh, health check, Docker Compose, Swagger, rate limit, logging.
-
-**Chưa hoàn thiện:** verify Play Integrity / App Attest, logout/revoke token phía server, filter Unit/Tag (type có sẵn, chưa có bảng), CORS đang mở mọi origin.
+**Hệ thống đồng bộ hợp nhất:**
+- JWT access + refresh, tách biệt cổng login student / admin-lecturer.
+- Đăng xuất & thu hồi token phía server bằng Redis blacklist (`POST /v0/user/auth/logout`, `POST /v0/admin/auth/logout`).
+- CRUD phiên điểm danh, đóng sớm, xóa cascade.
+- Phân bổ sinh viên linh hoạt theo Mã SV, Đơn vị đa cấp (`Unit`) và Thẻ (`Tag`).
+- Điểm danh GPS, chống giả lập vị trí (Mock location), Haversine geofencing, phân tích Play Integrity / App Attest token.
+- Giới hạn 3 lần thử thất bại, cơ chế khóa chống trùng lặp thiết bị (`deviceId`).
+- Lịch sử & chi tiết bản ghi điểm danh (`GET /attendance/records/:id`).
+- Xuất danh sách điểm danh ra định dạng Excel (CSV UTF-8 BOM).
+- Cấu hình CORS Whitelist linh hoạt, Health check, Docker Compose, Swagger, Winston logging.
 
 ---
 
@@ -66,6 +73,22 @@ Docker Compose (`docker-compose.yml`):
 | `admin-dashboard` | `8080` | Nginx phục vụ bản build dashboard |
 
 App mobile **không** nằm trong Compose. Chạy Expo trên máy/điện thoại, trỏ `EXPO_PUBLIC_API_URL` tới IP LAN của máy chạy API (không dùng `localhost` trên điện thoại thật).
+
+### Kết nối qua mạng khác bằng ngrok
+
+Cài ngrok, đăng nhập và chạy backend ở cổng `3000`, sau đó chạy từ root:
+
+```powershell
+pnpm.cmd dev:ngrok
+```
+
+Script tự lấy HTTPS URL từ ngrok và cập nhật `client/admin-dashboard/.env` cùng `client/mobile-client/.env`. Để URL không đổi giữa các lần chạy, dùng static domain:
+
+```powershell
+pnpm.cmd dev:ngrok -Domain your-static-domain.ngrok-free.app
+```
+
+Sau đó khởi động lại dashboard/Expo. Ngrok chỉ giải quyết địa chỉ mạng; lỗi `401 Invalid credentials` vẫn cần username/mật khẩu đúng.
 
 ---
 

@@ -8,6 +8,7 @@
   "scripts": {
     "postinstall": "prisma generate",
     "predev": "rimraf tsconfig.build.tsbuildinfo tsconfig.tsbuildinfo",
+    "prebuild": "rimraf dist tsconfig.build.tsbuildinfo tsconfig.tsbuildinfo",
     "dev": "nest start --watch",
     "debug": "nest start --debug --watch",
     "build": "nest build && tsc-alias",

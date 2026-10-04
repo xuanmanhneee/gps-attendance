@@ -181,7 +181,7 @@ Load danh sách lúc mount; `createSession` prepend list; `closeSession` set sta
 `.env.example`:
 
 ```env
-VITE_API_BASE_URL=http://localhost:3000
+VITE_API_BASE_URL=http://127.0.0.1:3000
 ```
 
 Dev: Vite **http://localhost:5173** (`pnpm dev:admin`).

@@ -1,5 +1,6 @@
 // src/redis/redis.module.ts
-import { Global, Module } from '@nestjs/common';
+import { Global, Logger, Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { RedisService } from './redis.service';
 
@@ -8,7 +9,19 @@ import { RedisService } from './redis.service';
   providers: [
     {
       provide: 'REDIS',
-      useFactory: () => new Redis({ host: 'localhost', port: 6379 }),
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const host = configService.get<string>('REDIS_HOST') ?? '127.0.0.1';
+        const port = Number(configService.get<string>('REDIS_PORT') ?? 6379);
+        const redis = new Redis({ host, port });
+        const logger = new Logger('Redis');
+
+        redis.on('error', (error) => {
+          logger.warn(`Redis unavailable at ${host}:${port}: ${error.message}`);
+        });
+
+        return redis;
+      },
     },
     RedisService,
   ],

@@ -55,10 +55,11 @@ export class AttendanceCheckInService {
       });
     }
 
-    if (session.status !== 'open') {
+    const now = new Date();
+    if (session.status !== 'open' || now < session.openAt || now > session.closeAt) {
       throw new BadRequestException({
         code: AttendanceSessionErrorCode.SESSION_NOT_OPEN,
-        message: 'Phiên điểm danh hiện không mở',
+        message: 'Phiên điểm danh hiện không mở hoặc đã hết thời gian điểm danh',
       });
     }
 

@@ -55,7 +55,7 @@ interface AuthContextType {
   lastLoginAt: string | null;
   isLoading: boolean;
   isSignedIn: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, isLecturer?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
 }
@@ -98,10 +98,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const login = async (username: string, password: string) => {
+  const login = async (
+    username: string,
+    password: string,
+    isLecturer = false,
+  ) => {
     try {
       setIsLoading(true);
-      const response = await AuthAPI.login(username, password);
+      const response = await AuthAPI.login(username, password, isLecturer);
 
       if (response.success && response.data) {
         const { accessToken, refreshToken } = response.data;

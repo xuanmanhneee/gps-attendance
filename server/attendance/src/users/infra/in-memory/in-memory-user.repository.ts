@@ -1,6 +1,6 @@
 // src/users/infra/in-memory/in-memory-user.repository.ts
 import type { IUserRepository } from '../../user.repository';
-import type { User } from '../../user.model';
+import type { User, UserProfileUpdate } from '../../user.model';
 import type { ITransactionContext } from '#common/unit-of-work/unit-of-work.interface';
 import { mockUsers } from '#common/mock-data/users.mock';
 import { mockAccounts } from '#common/mock-data/accounts.mock';
@@ -60,6 +60,19 @@ export class InMemoryUserRepository implements IUserRepository {
 
   async findAll(_ctx?: ITransactionContext): Promise<User[]> {
     return [...this.users];
+  }
+
+  async updateProfile(id: number, data: UserProfileUpdate): Promise<User | undefined> {
+    const index = this.users.findIndex((user) => user.id === id);
+    if (index < 0) return undefined;
+
+    const updatedUser: User = {
+      ...this.users[index],
+      ...data,
+      updatedAt: new Date(),
+    };
+    this.users[index] = updatedUser;
+    return updatedUser;
   }
 
   async create(data: CreateUserDto, _ctx?: ITransactionContext): Promise<User> {

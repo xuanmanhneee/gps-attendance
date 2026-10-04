@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
@@ -149,7 +150,44 @@ export class AttendanceSessionsService {
     return this.withComputedStatus(updated);
   }
 
+  async cancel(
+    id: number,
+    user: { userId: number; role: string },
+  ): Promise<AttendanceSession> {
+    const session = await this.attendanceSessionRepository.findById(id);
+
+    if (!session) {
+      throw new NotFoundException({
+        code: AttendanceSessionErrorCode.NOT_FOUND,
+        message: `Không tìm thấy session id=${id}`,
+      });
+    }
+
+    if (user.role !== 'admin' && session.createdBy !== user.userId) {
+      throw new ForbiddenException({
+        code: AttendanceSessionErrorCode.CANCEL_FORBIDDEN,
+        message: 'Bạn không có quyền hủy phiên điểm danh này',
+      });
+    }
+
+    const current = this.withComputedStatus(session);
+    if (current.status === 'closed' || current.status === 'cancelled') {
+      throw new ConflictException({
+        code: AttendanceSessionErrorCode.CANCEL_INVALID_STATUS,
+        message: `Không thể hủy phiên đang ở trạng thái "${current.status}"`,
+      });
+    }
+
+    return this.withComputedStatus(
+      await this.attendanceSessionRepository.cancel(id),
+    );
+  }
+
   private withComputedStatus(session: AttendanceSession): AttendanceSession {
+    if (session.status === 'cancelled') {
+      return session;
+    }
+
     const now = new Date();
     let status: SessionStatus = 'pending';
 

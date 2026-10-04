@@ -288,7 +288,7 @@ Migration:
 - `20260918000100_attendance_attempt_audit`
 - `20260919000000_relax_gps_accuracy_check`
 
-`prisma/seed.ts`: chỉ khi `NODE_ENV=development`. Username: `admin`, `quangtn`, SV `2312686`… Mật khẩu từ `SEED_*_PASSWORD`.
+`prisma/seed.ts`: chỉ khi `NODE_ENV=development`. Username: `admin`, `quangtn`, SV `2312686`… Mật khẩu lấy từ `SEED_*_PASSWORD`; nếu các biến mật khẩu sinh viên bị bỏ trống thì mặc định là `123456` trong môi trường dev.
 
 ---
 
@@ -303,7 +303,6 @@ JWT_SECRET=...
 EXPIRES_IN=1h
 REFRESH_TOKEN_SECRET=...
 REFRESH_TOKEN_EXPIRES_IN=14d
-MOBILE_DEV_IP=192.168.x.x
 SEED_ADMIN_PASSWORD=...
 SEED_LECTURER_PASSWORD=...
 SEED_STUDENT_1_PASSWORD … SEED_STUDENT_5_PASSWORD

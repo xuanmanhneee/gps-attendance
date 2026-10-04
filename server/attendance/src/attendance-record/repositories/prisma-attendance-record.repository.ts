@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { StudentAttendanceHistoryItemDto } from '@gps-attendance/shared';
 import { PrismaService } from '../../common/database/prisma.service';
 import { AttendanceRecord } from '../attendance-record.model';
-import { IAttendanceRecordRepository } from '../attendance-record.repository';
+import {
+  CreateAttendanceHistoryEventInput,
+  IAttendanceRecordRepository,
+} from '../attendance-record.repository';
 
 @Injectable()
 export class PrismaAttendanceRecordRepository
@@ -89,11 +92,30 @@ export class PrismaAttendanceRecordRepository
       },
     });
 
+    const attempts = records.length
+      ? await this.prisma.attendanceAttempt.findMany({
+          where: {
+            userId,
+            sessionId: { in: records.map((record) => record.sessionId) },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      : [];
+    const latestAttemptBySession = new Map<number, (typeof attempts)[number]>();
+    for (const attempt of attempts) {
+      if (!latestAttemptBySession.has(attempt.sessionId)) {
+        latestAttemptBySession.set(attempt.sessionId, attempt);
+      }
+    }
+
     const now = new Date();
 
     return records.map((record) => {
-      let sessionStatus: 'open' | 'pending' | 'closed' = 'pending';
-      if (now < record.session.openAt) {
+      const latestAttempt = latestAttemptBySession.get(record.sessionId);
+      let sessionStatus: 'open' | 'pending' | 'closed' | 'cancelled' = 'pending';
+      if (record.session.status === 'cancelled') {
+        sessionStatus = 'cancelled';
+      } else if (now < record.session.openAt) {
         sessionStatus = 'pending';
       } else if (now > record.session.closeAt) {
         sessionStatus = 'closed';
@@ -120,6 +142,10 @@ export class PrismaAttendanceRecordRepository
         longitude: this.toNumber(record.longitude),
         accuracy: this.toNumber(record.accuracy),
         distanceMeters: this.toNumber(record.distanceMeters),
+        attemptResult: latestAttempt?.result ?? null,
+        attemptReasons: latestAttempt?.reasons ?? [],
+        attemptReviewedAt: latestAttempt?.reviewedAt?.toISOString() ?? null,
+        attemptReviewNote: latestAttempt?.reviewNote ?? null,
       };
     });
   }
@@ -131,6 +157,92 @@ export class PrismaAttendanceRecordRepository
     });
 
     return records.map((record) => this.toModel(record));
+  }
+
+  async createHistoryEvent(
+    event: CreateAttendanceHistoryEventInput,
+  ): Promise<void> {
+    await this.prisma.attendanceHistoryEvent.create({
+      data: {
+        sessionId: event.sessionId,
+        userId: event.userId,
+        actorId: event.actorId ?? null,
+        attemptId: event.attemptId ?? null,
+        eventType: event.eventType,
+        status: event.status ?? null,
+        attemptResult: event.attemptResult ?? null,
+        reasons: event.reasons ?? [],
+        note: event.note ?? null,
+      },
+    });
+  }
+
+  async findHistoryEventsByUser(userId: number) {
+    const events = await this.prisma.attendanceHistoryEvent.findMany({
+      where: { userId },
+      include: {
+        session: { select: { title: true } },
+        actor: { select: { fullname: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return events.map((event) => ({
+      id: event.id,
+      sessionId: event.sessionId,
+      sessionTitle: event.session.title,
+      eventType: event.eventType,
+      status: event.status,
+      attemptResult: event.attemptResult,
+      reasons: event.reasons,
+      note: event.note,
+      actorName: event.actor?.fullname ?? null,
+      createdAt: event.createdAt.toISOString(),
+    }));
+  }
+
+  async findById(id: number): Promise<StudentAttendanceHistoryItemDto | null> {
+    const record = await this.prisma.attendanceRecord.findUnique({
+      where: { id },
+      include: {
+        session: true,
+      },
+    });
+
+    if (!record) return null;
+
+    const now = new Date();
+    let sessionStatus: 'open' | 'pending' | 'closed' | 'cancelled' = 'pending';
+    if (record.session.status === 'cancelled') {
+      sessionStatus = 'cancelled';
+    } else if (now < record.session.openAt) {
+      sessionStatus = 'pending';
+    } else if (now > record.session.closeAt) {
+      sessionStatus = 'closed';
+    } else {
+      sessionStatus = 'open';
+    }
+
+    return {
+      id: record.id,
+      sessionId: record.sessionId,
+      sessionTitle: record.session.title,
+      sessionStatus,
+      openAt: record.session.openAt.toISOString(),
+      closeAt: record.session.closeAt.toISOString(),
+      radius: this.toNumber(record.session.radius) ?? 0,
+      sessionLatitude: this.toNumber(record.session.latitude) ?? 0,
+      sessionLongitude: this.toNumber(record.session.longitude) ?? 0,
+      status: record.status as StudentAttendanceHistoryItemDto['status'],
+      checkedInAt: record.checkedInAt
+        ? record.checkedInAt.toISOString()
+        : null,
+      deviceId: record.deviceId,
+      latitude: this.toNumber(record.latitude),
+      longitude: this.toNumber(record.longitude),
+      accuracy: this.toNumber(record.accuracy),
+      distanceMeters: this.toNumber(record.distanceMeters),
+    };
   }
 
   private toModel(record: {

@@ -58,7 +58,7 @@ Root `_layout.tsx`: `AuthProvider`, theme dark/light, Stack (`index`, `login`, `
 | File | Route | Việc |
 |---|---|---|
 | `index.tsx` | `/` | Redirect: signed in → `/(tabs)`, chưa → `/login`. Phần template Expo phía trên file đã comment. |
-| `login.tsx` | `/login` | Form MSSV/mật khẩu, logo DLU, campus footer. State `isLecturer` trên form **không đổi endpoint** — vẫn `user/auth/login`. |
+| `login.tsx` | `/login` | Form MSSV/mật khẩu, logo DLU, campus footer. Không chọn giảng viên sẽ gọi `user/auth/login`; chọn giảng viên sẽ gọi `admin/auth/login`. |
 | `(tabs)/_layout.tsx` | tabs | Điểm Danh / Lịch Sử / Thông Tin |
 | `(tabs)/index.tsx` | tab check-in | GPS watch, list session `/mine`, gửi check-in, modal kết quả |
 | `(tabs)/history.tsx` | tab lịch sử | `GET /attendance/records/mine`, pull-to-refresh |
@@ -166,11 +166,10 @@ Vẫn trong repo, chủ yếu phục vụ `explore.tsx` hoặc file đã comment
 `.env.example`:
 
 ```env
-MOBILE_DEV_IP=192.168.1.15
-EXPO_PUBLIC_API_URL=http://192.168.1.15:3000
+EXPO_PUBLIC_API_URL=
 ```
 
-Điện thoại thật **không** dùng `localhost`. Đổi mạng thì đổi IP và restart Expo (`EXPO_PUBLIC_*` nạp lúc start).
+Khi để trống, app lấy host từ Expo Metro và gọi backend ở cổng `3000`, dùng được khi điện thoại và máy chạy backend cùng Wi-Fi. Khi dùng điện thoại ở mạng khác, đặt `EXPO_PUBLIC_API_URL` thành URL HTTPS của ngrok; dùng static domain để URL không đổi giữa các lần chạy. Khởi động lại Expo sau khi đổi biến môi trường.
 
 Từ root:
 

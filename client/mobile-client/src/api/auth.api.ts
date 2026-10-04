@@ -3,10 +3,15 @@ import type { ApiResponse, LoginResponse } from '@gps-attendance/shared';
 
 export const AuthAPI = {
   /**
-   * Đăng nhập với username và password
+   * Đăng nhập theo loại tài khoản được chọn trên màn hình mobile.
    */
-  async login(username: string, password: string): Promise<ApiResponse<LoginResponse>> {
-    return http.post<ApiResponse<LoginResponse>>('/v0/user/auth/login', {
+  async login(
+    username: string,
+    password: string,
+    isLecturer = false,
+  ): Promise<ApiResponse<LoginResponse>> {
+    const endpoint = isLecturer ? '/v0/admin/auth/login' : '/v0/user/auth/login';
+    return http.post<ApiResponse<LoginResponse>>(endpoint, {
       username,
       password,
     });

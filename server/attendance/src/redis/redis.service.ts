@@ -1,13 +1,12 @@
 // src/redis/redis.service.ts
-import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
-  constructor(
-    @Inject('REDIS')
-    private readonly redis: Redis,
-  ) {}
+  private readonly logger = new Logger(RedisService.name);
+
+  constructor(@Inject('REDIS') private readonly redis: Redis) {}
 
   get(key: string): Promise<string | null> {
     return this.redis.get(key);
@@ -32,8 +31,13 @@ export class RedisService implements OnModuleDestroy {
     return this.redis.set(key, value);
   }
 
-  del(key: string): Promise<number> {
-    return this.redis.del(key);
+  async del(key: string): Promise<number> {
+    try {
+      return this.redis.del(key);
+    } catch (err) {
+      this.logger.warn(`Redis del error for key ${key}: ${(err as Error).message}`);
+      return 0;
+    }
   }
 
   exists(key: string): Promise<number> {
@@ -101,7 +105,49 @@ export class RedisService implements OnModuleDestroy {
     );
   }
 
+  async setJson(key: string, value: object, ttlSec?: number) {
+    try {
+      const raw = JSON.stringify(value);
+      if (ttlSec) await this.redis.set(key, raw, 'EX', ttlSec);
+      else await this.redis.set(key, raw);
+    } catch (err) {
+      this.logger.warn(`Redis setJson error for key ${key}: ${(err as Error).message}`);
+    }
+  }
+
+  async getJson<T>(key: string): Promise<T | null> {
+    try {
+      const raw = await this.redis.get(key);
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch (err) {
+      this.logger.warn(`Redis getJson error for key ${key}: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
+  async setBlacklistToken(token: string, ttlSec = 86400): Promise<void> {
+    try {
+      await this.redis.set(`bl:${token}`, '1', 'EX', ttlSec);
+    } catch (err) {
+      this.logger.warn(`Failed to blacklist token in Redis: ${(err as Error).message}`);
+    }
+  }
+
+  async isTokenBlacklisted(token: string): Promise<boolean> {
+    try {
+      const exists = await this.redis.exists(`bl:${token}`);
+      return exists === 1;
+    } catch (err) {
+      this.logger.warn(`Failed to check token blacklist in Redis: ${(err as Error).message}`);
+      return false;
+    }
+  }
+
   async onModuleDestroy(): Promise<void> {
-    await this.redis.quit();
+    try {
+      await this.redis.quit();
+    } catch {
+      // ignore
+    }
   }
 }

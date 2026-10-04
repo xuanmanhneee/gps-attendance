@@ -4,7 +4,10 @@ import type {
   CheckInRequestPayload,
   CheckInResponsePayload,
   AttendanceSessionResponse,
+  MyAttendanceSessionResponse,
   StudentAttendanceHistoryItemDto,
+  StudentAttendanceSummary,
+  AttendanceHistoryEventDto,
 } from '@gps-attendance/shared';
 
 export type AttendanceHistoryItem = StudentAttendanceHistoryItemDto;
@@ -17,9 +20,21 @@ export const AttendanceAPI = {
   /**
    * Lấy các phiên mà user hiện tại được gán
    */
-  async getSessions(token: string): Promise<ApiResponse<AttendanceSession[]>> {
-    return http.get<ApiResponse<AttendanceSession[]>>(
-      '/v0/attendance-sessions/mine',
+  async getSessions(token: string): Promise<ApiResponse<MyAttendanceSessionResponse[]>> {
+    return http.get<ApiResponse<MyAttendanceSessionResponse[]>>(
+      '/v0/attendance-sessions/me',
+      token,
+    );
+  },
+
+  /**
+   * Lấy tổng quan chuyên cần của sinh viên hiện tại
+   */
+  async getMySummary(
+    token: string,
+  ): Promise<ApiResponse<StudentAttendanceSummary>> {
+    return http.get<ApiResponse<StudentAttendanceSummary>>(
+      '/v0/attendance/records/summary',
       token,
     );
   },
@@ -46,7 +61,7 @@ export const AttendanceAPI = {
     token: string,
   ): Promise<ApiResponse<ValidationResult>> {
     return http.post<ApiResponse<ValidationResult>>(
-      '/attendance/check-in',
+      '/v0/attendance/check-in',
       payload,
       token,
     );
@@ -59,7 +74,16 @@ export const AttendanceAPI = {
     token: string,
   ): Promise<ApiResponse<StudentAttendanceHistoryItemDto[]>> {
     return http.get<ApiResponse<StudentAttendanceHistoryItemDto[]>>(
-      '/attendance/records/mine',
+      '/v0/attendance/records/mine',
+      token,
+    );
+  },
+
+  async getAttendanceHistoryEvents(
+    token: string,
+  ): Promise<ApiResponse<AttendanceHistoryEventDto[]>> {
+    return http.get<ApiResponse<AttendanceHistoryEventDto[]>>(
+      '/v0/attendance/records/events/mine',
       token,
     );
   },
@@ -68,13 +92,12 @@ export const AttendanceAPI = {
    * Lấy chi tiết một bản ghi điểm danh
    */
   async getAttendanceRecord(
-    _recordId: number,
-    _token: string,
-  ): Promise<ApiResponse<never>> {
-    return Promise.resolve({
-      success: false,
-      code: 'UNKNOWN_ERROR',
-      message: 'Backend chưa cung cấp API chi tiết bản ghi điểm danh',
-    });
+    recordId: number,
+    token: string,
+  ): Promise<ApiResponse<StudentAttendanceHistoryItemDto>> {
+    return http.get<ApiResponse<StudentAttendanceHistoryItemDto>>(
+      `/v0/attendance/records/${recordId}`,
+      token,
+    );
   },
 };

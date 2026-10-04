@@ -11,6 +11,7 @@ overrides:
   react-dom: 19.1.0
   '@types/react': ~19.1.0
   '@types/react-dom': ~19.1.0
+  jest-mock: 29.7.0
 
 allowBuilds:
   '@parcel/watcher': false

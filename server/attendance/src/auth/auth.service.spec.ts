@@ -13,6 +13,7 @@ describe('AuthService', () => {
   let usersService: jest.Mocked<Partial<UsersService>>;
   let jwtService: jest.Mocked<Partial<JwtService>>;
   let configService: jest.Mocked<Partial<ConfigService>>;
+  let redisService: any;
 
   const mockUser: AuthenticatedUser = {
     userId: 1,
@@ -25,7 +26,7 @@ describe('AuthService', () => {
       findByUsername: jest.fn(),
     };
     usersService = {
-      findByAccountId: jest.fn(),
+      findById: jest.fn(),
     };
     jwtService = {
       sign: jest.fn().mockReturnValue('mock-jwt-token'),
@@ -35,12 +36,17 @@ describe('AuthService', () => {
       getOrThrow: jest.fn().mockReturnValue('mock-refresh-secret'),
       get: jest.fn().mockReturnValue('14d'),
     };
+    redisService = {
+      setBlacklistToken: jest.fn().mockResolvedValue(undefined),
+      isTokenBlacklisted: jest.fn().mockResolvedValue(false),
+    };
 
     authService = new AuthService(
       accountService as AccountService,
       usersService as UsersService,
       jwtService as JwtService,
       configService as ConfigService,
+      redisService,
     );
   });
 
@@ -51,13 +57,13 @@ describe('AuthService', () => {
 
       accountService.findByUsername = jest.fn().mockResolvedValue({
         id: 10,
+        userId: 1,
         username: 'testuser',
-        password: hashedPassword,
+        passwordHash: hashedPassword,
       });
 
-      usersService.findByAccountId = jest.fn().mockResolvedValue({
+      usersService.findById = jest.fn().mockResolvedValue({
         id: 1,
-        accountId: 10,
         code: '2312686',
         role: 'student',
         fullname: 'Nguyen Van A',
@@ -84,7 +90,7 @@ describe('AuthService', () => {
       accountService.findByUsername = jest.fn().mockResolvedValue({
         id: 10,
         username: 'testuser',
-        password: hashedPassword,
+        passwordHash: hashedPassword,
       });
 
       await expect(
@@ -103,24 +109,32 @@ describe('AuthService', () => {
   });
 
   describe('refresh', () => {
-    it('nên cấp token mới khi refreshToken hợp lệ', () => {
+    it('nên cấp token mới khi refreshToken hợp lệ', async () => {
       jwtService.verify = jest.fn().mockReturnValue({
         sub: 1,
         username: 'testuser',
         role: 'student',
       });
 
-      const tokens = authService.refresh('valid-refresh-token');
+      const tokens = await authService.refresh('valid-refresh-token');
       expect(tokens).toHaveProperty('accessToken');
       expect(tokens).toHaveProperty('refreshToken');
     });
 
-    it('nên ném UnauthorizedException khi refreshToken không hợp lệ', () => {
+    it('nên ném UnauthorizedException khi refreshToken không hợp lệ', async () => {
       jwtService.verify = jest.fn().mockImplementation(() => {
         throw new Error('invalid token');
       });
 
-      expect(() => authService.refresh('invalid-token')).toThrow(
+      await expect(authService.refresh('invalid-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('nên ném UnauthorizedException khi refreshToken đã bị thu hồi (blacklisted)', async () => {
+      redisService.isTokenBlacklisted.mockResolvedValueOnce(true);
+
+      await expect(authService.refresh('revoked-token')).rejects.toThrow(
         UnauthorizedException,
       );
     });

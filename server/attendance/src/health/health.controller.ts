@@ -4,7 +4,7 @@ import { Response } from 'express';
 import { HealthCheckResult, HealthService } from './health.service';
 
 @ApiTags('health')
-@Controller(['health', 'v0/health'])
+@Controller('v0/health')
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 

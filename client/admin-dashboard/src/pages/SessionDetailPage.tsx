@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { MdRefresh, MdLockClock, MdDeleteForever } from 'react-icons/md';
+import {
+  MdRefresh,
+  MdLockClock,
+  MdCancel,
+  MdDeleteForever,
+  MdFileDownload,
+} from 'react-icons/md';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import type { AttendanceSessionDetailResponse } from '@gps-attendance/shared';
@@ -25,6 +31,14 @@ const reasonLabels: Record<string, string> = {
 
 const formatReason = (reason: string) => reasonLabels[reason] ?? reason;
 
+const normalizeSessionDetail = (
+  data: AttendanceSessionDetailResponse,
+): AttendanceSessionDetailResponse => ({
+  ...data,
+  participants: Array.isArray(data.participants) ? data.participants : [],
+  attempts: Array.isArray(data.attempts) ? data.attempts : [],
+});
+
 const SessionDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -35,6 +49,7 @@ const SessionDetailPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [reviewSubmittingId, setReviewSubmittingId] = useState<number | null>(null);
 
   // Pagination states
   const [participantPage, setParticipantPage] = useState(1);
@@ -43,7 +58,7 @@ const SessionDetailPage = () => {
   // Modal states
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
-    type: 'close' | 'delete';
+    type: 'close' | 'cancel' | 'delete';
     isSubmitting: boolean;
   }>({
     isOpen: false,
@@ -64,7 +79,7 @@ const SessionDetailPage = () => {
       setIsLoading(true);
       setError(null);
       const data = await attendanceSessionsApi.getDetail(sessionId);
-      setSession(data);
+      setSession(normalizeSessionDetail(data));
     } catch {
       setError('Không thể tải thông tin phiên điểm danh. Vui lòng thử lại.');
     } finally {
@@ -83,7 +98,9 @@ const SessionDetailPage = () => {
     setRefreshError(null);
 
     try {
-      const data = await attendanceSessionsApi.getDetail(session.id);
+      const data = normalizeSessionDetail(
+        await attendanceSessionsApi.getDetail(session.id),
+      );
       setSession((current) => (current?.id === data.id ? data : current));
     } catch {
       setRefreshError(
@@ -91,6 +108,42 @@ const SessionDetailPage = () => {
       );
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleReviewAttempt = async (
+    attemptId: number,
+    decision: 'APPROVED' | 'REJECTED',
+  ) => {
+    if (!session || reviewSubmittingId !== null) return;
+    const note = window.prompt(
+      decision === 'APPROVED'
+        ? 'Ghi chú lý do duyệt điểm danh:'
+        : 'Ghi chú lý do từ chối điểm danh:',
+    );
+    if (note === null) return;
+    if (note.trim().length < 3) {
+      window.alert('Ghi chú cần có ít nhất 3 ký tự để lưu nhật ký xử lý.');
+      return;
+    }
+
+    try {
+      setReviewSubmittingId(attemptId);
+      await attendanceSessionsApi.reviewAttempt(
+        session.id,
+        attemptId,
+        decision,
+        note.trim(),
+      );
+      const updated = normalizeSessionDetail(
+        await attendanceSessionsApi.getDetail(session.id),
+      );
+      setSession(updated);
+    } catch (reviewError) {
+      console.error('Không thể xử lý lượt điểm danh:', reviewError);
+      window.alert('Không thể lưu quyết định. Vui lòng tải lại phiên và thử lại.');
+    } finally {
+      setReviewSubmittingId(null);
     }
   };
 
@@ -114,11 +167,82 @@ const SessionDetailPage = () => {
       } else if (modalState.type === 'delete') {
         await attendanceSessionsApi.remove(session.id);
         navigate('/dashboard', { replace: true });
+      } else if (modalState.type === 'cancel') {
+        const updated = await attendanceSessionsApi.cancel(session.id);
+        setSession((prev) =>
+          prev ? { ...prev, ...updated, status: 'cancelled' } : null,
+        );
+        setModalState({ isOpen: false, type: 'cancel', isSubmitting: false });
       }
     } catch (err) {
       console.error('Lỗi khi thực hiện thao tác:', err);
       setModalState((prev) => ({ ...prev, isSubmitting: false }));
     }
+  };
+
+  const handleExportCSV = () => {
+    if (!session || !session.participants || session.participants.length === 0) {
+      alert('Không có dữ liệu sinh viên để xuất.');
+      return;
+    }
+
+    const headers = [
+      'STT',
+      'Mã SV',
+      'Họ và tên',
+      'Trạng thái',
+      'Thời gian điểm danh',
+      'Khoảng cách (m)',
+      'Mã thiết bị',
+    ];
+
+    const attemptsMap = new Map<string, NonNullable<typeof session.attempts>[0]>();
+    for (const attempt of session.attempts ?? []) {
+      if (!attemptsMap.has(attempt.userCode)) {
+        attemptsMap.set(attempt.userCode, attempt);
+      }
+    }
+
+    const rows = (Array.isArray(session.participants) ? session.participants : []).map((p, index) => {
+      const attempt = attemptsMap.get(p.user.code);
+      const isPresent = p.status === 'present';
+      const statusText = isPresent
+        ? 'Có mặt'
+        : attempt && attempt.result === 'REJECTED'
+          ? 'Bị từ chối'
+          : attempt && attempt.result === 'REVIEW'
+            ? 'Cần xem xét'
+            : 'Vắng mặt';
+
+      return [
+        (index + 1).toString(),
+        `"${p.user.code}"`,
+        `"${p.user.fullname}"`,
+        `"${statusText}"`,
+        p.checkedInAt
+          ? `"${new Date(p.checkedInAt).toLocaleString('vi-VN')}"`
+          : 'Chưa điểm danh',
+        attempt ? `${attempt.distanceToCenter}` : 'N/A',
+        `"${attempt?.deviceId ?? 'N/A'}"`,
+      ];
+    });
+
+    const csvContent =
+      '\uFEFF' +
+      [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute(
+      'download',
+      `DiemDanh_Phien_${session.id}_${new Date().toISOString().slice(0, 10)}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   if (isLoading) {
@@ -159,10 +283,11 @@ const SessionDetailPage = () => {
   };
 
   // Pagination computations
+  const participants = Array.isArray(session.participants) ? session.participants : [];
   const totalParticipantPages = Math.ceil(
-    session.participants.length / PARTICIPANTS_PAGE_SIZE,
+    participants.length / PARTICIPANTS_PAGE_SIZE,
   );
-  const pagedParticipants = session.participants.slice(
+  const pagedParticipants = participants.slice(
     (participantPage - 1) * PARTICIPANTS_PAGE_SIZE,
     participantPage * PARTICIPANTS_PAGE_SIZE,
   );
@@ -214,6 +339,32 @@ const SessionDetailPage = () => {
               </button>
             )}
 
+            {(session.status === 'pending' || session.status === 'open') && (
+              <button
+                type="button"
+                onClick={() =>
+                  setModalState({
+                    isOpen: true,
+                    type: 'cancel',
+                    isSubmitting: false,
+                  })
+                }
+                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+              >
+                <MdCancel className="h-4 w-4" />
+                Hủy phiên
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 cursor-pointer"
+            >
+              <MdFileDownload className="h-4 w-4" />
+              Xuất danh sách (Excel)
+            </button>
+
             <button
               type="button"
               onClick={() =>
@@ -223,7 +374,7 @@ const SessionDetailPage = () => {
                   isSubmitting: false,
                 })
               }
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 cursor-pointer"
             >
               <MdDeleteForever className="h-4 w-4" />
               Xóa phiên
@@ -305,7 +456,7 @@ const SessionDetailPage = () => {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-xs font-medium text-slate-500">
-                {session.participants.length} sinh viên
+                {participants.length} sinh viên
               </span>
               <button
                 type="button"
@@ -329,7 +480,7 @@ const SessionDetailPage = () => {
             </p>
           )}
 
-          {session.participants.length === 0 ? (
+          {participants.length === 0 ? (
             <div className="p-6">
               <EmptyState
                 title="Chưa có sinh viên tham gia"
@@ -376,13 +527,33 @@ const SessionDetailPage = () => {
                         )}
 
                         {isReview && !isPresent && (
-                          <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-xs text-amber-800 border border-amber-200">
-                            <span className="font-bold">⚠️ Cần xem xét:</span>
-                            <span>
-                              {studentAttempt.reasons && studentAttempt.reasons.length > 0
-                                ? studentAttempt.reasons.map(formatReason).join(', ')
-                                : 'Có dấu hiệu bất thường'}
-                            </span>
+                          <div className="mt-1.5">
+                            <div className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-xs text-amber-800 border border-amber-200">
+                              <span className="font-bold">⚠️ Cần xem xét:</span>
+                              <span>
+                                {studentAttempt.reasons && studentAttempt.reasons.length > 0
+                                  ? studentAttempt.reasons.map(formatReason).join(', ')
+                                  : 'Có dấu hiệu bất thường'}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleReviewAttempt(studentAttempt.id, 'APPROVED')}
+                                disabled={reviewSubmittingId !== null}
+                                className="rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                {reviewSubmittingId === studentAttempt.id ? 'Đang lưu...' : 'Duyệt có mặt'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleReviewAttempt(studentAttempt.id, 'REJECTED')}
+                                disabled={reviewSubmittingId !== null}
+                                className="rounded-md border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                              >
+                                Từ chối
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -418,7 +589,7 @@ const SessionDetailPage = () => {
                 <Pagination
                   currentPage={participantPage}
                   totalPages={totalParticipantPages}
-                  totalItems={session.participants.length}
+                  totalItems={participants.length}
                   pageSize={PARTICIPANTS_PAGE_SIZE}
                   onPageChange={(page) => setParticipantPage(page)}
                 />
@@ -491,6 +662,13 @@ const SessionDetailPage = () => {
                               ? '⚠️ REVIEW'
                               : '❌ REJECTED'}
                           </span>
+                          {attempt.reviewedAt && (
+                            <p className="mt-1 max-w-48 text-[11px] text-slate-500">
+                              Đã xử lý {new Date(attempt.reviewedAt).toLocaleString('vi-VN')}
+                              {attempt.reviewedBy ? ` · GV #${attempt.reviewedBy}` : ''}
+                              {attempt.reviewNote ? ` · ${attempt.reviewNote}` : ''}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-2.5 text-xs">
                           <span className="font-semibold text-slate-800">{attempt.distanceToCenter}m</span>
@@ -532,24 +710,32 @@ const SessionDetailPage = () => {
           )}
         </section>
 
-        {/* Modal xác nhận Đóng / Xóa Session */}
+        {/* Modal xác nhận Đóng / Hủy / Xóa Session */}
         <ConfirmModal
           isOpen={modalState.isOpen}
           title={
             modalState.type === 'delete'
               ? 'Xác nhận xóa phiên điểm danh'
-              : 'Xác nhận kết thúc phiên điểm danh'
+              : modalState.type === 'cancel'
+                ? 'Xác nhận hủy phiên điểm danh'
+                : 'Xác nhận kết thúc phiên điểm danh'
           }
           message={
             modalState.type === 'delete'
               ? `Bạn có chắc chắn muốn xóa phiên "${session.title}"? Toàn bộ dữ liệu điểm danh và nhật ký đối soát sẽ bị xóa vĩnh viễn.`
-              : `Bạn có chắc chắn muốn đóng phiên "${session.title}" ngay bây giờ? Sinh viên sẽ không thể tiếp tục gửi yêu cầu điểm danh cho phiên này.`
+              : modalState.type === 'cancel'
+                ? `Bạn có chắc chắn muốn hủy phiên "${session.title}"? Phiên sẽ không thể tiếp tục nhận điểm danh.`
+                : `Bạn có chắc chắn muốn đóng phiên "${session.title}" ngay bây giờ? Sinh viên sẽ không thể tiếp tục gửi yêu cầu điểm danh cho phiên này.`
           }
           confirmText={
-            modalState.type === 'delete' ? 'Xóa vĩnh viễn' : 'Đóng phiên ngay'
+            modalState.type === 'delete'
+              ? 'Xóa vĩnh viễn'
+              : modalState.type === 'cancel'
+                ? 'Hủy phiên'
+                : 'Đóng phiên ngay'
           }
           cancelText="Hủy bỏ"
-          variant={modalState.type === 'delete' ? 'danger' : 'warning'}
+          variant={modalState.type === 'close' ? 'warning' : 'danger'}
           isLoading={modalState.isSubmitting}
           onConfirm={handleConfirmAction}
           onClose={() =>

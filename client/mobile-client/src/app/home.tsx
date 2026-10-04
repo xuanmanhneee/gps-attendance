@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import DebugDeviceCard from '../components/debug-device-card';
+import { DluLogo } from '../components/dlu-logo';
 
 import type {
   AttendanceCheckInReason,
@@ -44,7 +45,14 @@ function buildStubCheckInPayload(sessionId: number) {
   };
 }
 
-type StudentSessionStatus = 'pending' | 'absent' | 'present' | 'closed';
+type StudentSessionStatus =
+  | 'pending'
+  | 'absent'
+  | 'present'
+  | 'late'
+  | 'excused'
+  | 'closed'
+  | 'cancelled';
 
 function getStudentSessionStatus(
   session: MyAttendanceSessionResponse,
@@ -55,6 +63,10 @@ function getStudentSessionStatus(
 
   if (session.status === 'closed') {
     return 'closed';
+  }
+
+  if (session.status === 'cancelled') {
+    return 'cancelled';
   }
 
   return session.myAttendance.status;
@@ -71,13 +83,22 @@ function getStudentSessionStatusLabel(status: StudentSessionStatus): string {
     case 'present':
       return 'Đã điểm danh';
 
+    case 'late':
+      return 'Đi muộn';
+
+    case 'excused':
+      return 'Có phép';
+
     case 'closed':
       return 'Đã kết thúc';
+
+    case 'cancelled':
+      return 'Đã hủy';
   }
 }
 
 function getCheckInFailureMessage(reasons: AttendanceCheckInReason[]): string {
-  return reasons
+  return (Array.isArray(reasons) ? reasons : [])
     .map((reason) => {
       switch (reason) {
         case 'OUT_OF_RANGE':
@@ -123,6 +144,18 @@ function getStatusStyle(status: StudentSessionStatus) {
         text: styles.statusPresentText,
       };
 
+    case 'late':
+      return {
+        container: styles.statusPending,
+        text: styles.statusPendingText,
+      };
+
+    case 'excused':
+      return {
+        container: styles.statusClosed,
+        text: styles.statusClosedText,
+      };
+
     case 'absent':
       return {
         container: styles.statusAbsent,
@@ -140,6 +173,12 @@ function getStatusStyle(status: StudentSessionStatus) {
         container: styles.statusClosed,
         text: styles.statusClosedText,
       };
+
+    case 'cancelled':
+      return {
+        container: styles.statusClosed,
+        text: styles.statusClosedText,
+      };
   }
 }
 
@@ -152,7 +191,7 @@ export default function HomeScreen() {
   const loadSessions = useCallback(async () => {
     try {
       const data = await attendanceSessionsApi.getSessions();
-      setSessions(data);
+      setSessions(Array.isArray(data) ? data : []);
     } catch {
       Alert.alert('Lỗi', 'Không tải được danh sách phiên điểm danh');
     }
@@ -256,11 +295,11 @@ export default function HomeScreen() {
         ListHeaderComponent={
           <>
             <View style={styles.header}>
-              <Text style={styles.headerTitle}>Điểm danh</Text>
-
-              <Text style={styles.headerSubtitle}>
-                Các phiên điểm danh của bạn
-              </Text>
+              <DluLogo size={46} />
+              <View style={styles.headerCopy}>
+                <Text style={styles.headerTitle}>Điểm danh</Text>
+                <Text style={styles.headerSubtitle}>Các phiên điểm danh của bạn</Text>
+              </View>
             </View>
             <DebugDeviceCard />
           </>
@@ -398,9 +437,13 @@ const styles = StyleSheet.create({
   },
 
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginBottom: 20,
     paddingHorizontal: 2,
   },
+  headerCopy: { flex: 1 },
 
   headerTitle: {
     fontSize: 28,

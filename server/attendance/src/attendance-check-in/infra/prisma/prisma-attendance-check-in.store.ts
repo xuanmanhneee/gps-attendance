@@ -41,9 +41,25 @@ export class PrismaAttendanceCheckInStore
     result: AttendanceAttemptResult,
     reasons: string[],
   ): Promise<void> {
-    await this.prisma.attendanceAttempt.update({
-      where: { id },
-      data: { result, reasons },
+    await this.prisma.$transaction(async (transaction) => {
+      const attempt = await transaction.attendanceAttempt.update({
+        where: { id },
+        data: { result, reasons },
+        select: { id: true, sessionId: true, userId: true },
+      });
+
+      await transaction.attendanceHistoryEvent.create({
+        data: {
+          sessionId: attempt.sessionId,
+          userId: attempt.userId,
+          actorId: attempt.userId,
+          attemptId: attempt.id,
+          eventType: 'CHECK_IN_ATTEMPT',
+          status: result === 'APPROVED' || result === 'REVIEW' ? 'present' : null,
+          attemptResult: result,
+          reasons,
+        },
+      });
     });
   }
 

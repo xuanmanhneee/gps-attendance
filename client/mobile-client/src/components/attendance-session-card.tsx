@@ -1,7 +1,14 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MyAttendanceSessionResponse } from '@gps-attendance/shared';
 
-type StudentSessionStatus = 'pending' | 'absent' | 'present' | 'closed';
+type StudentSessionStatus =
+  | 'pending'
+  | 'absent'
+  | 'present'
+  | 'late'
+  | 'excused'
+  | 'closed'
+  | 'cancelled';
 
 interface AttendanceSessionCardProps {
   session: MyAttendanceSessionResponse;
@@ -62,6 +69,10 @@ function getStudentSessionStatus(
     return 'closed';
   }
 
+  if (session.status === 'cancelled') {
+    return 'cancelled';
+  }
+
   return session.myAttendance.status;
 }
 
@@ -83,8 +94,14 @@ function getStatusLabel(status: StudentSessionStatus): string {
       return 'Chưa điểm danh';
     case 'present':
       return 'Đã điểm danh';
+    case 'late':
+      return 'Đi muộn';
+    case 'excused':
+      return 'Có phép';
     case 'closed':
       return 'Đã kết thúc';
+    case 'cancelled':
+      return 'Đã hủy';
   }
 }
 
@@ -146,8 +163,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0fdf4',
   },
 
+  badge_late: {
+    backgroundColor: '#fff7ed',
+  },
+
+  badge_excused: {
+    backgroundColor: '#eff6ff',
+  },
+
   badge_closed: {
     backgroundColor: '#f3f4f6',
+  },
+
+  badge_cancelled: {
+    backgroundColor: '#fef2f2',
   },
 
   badgeText: {
@@ -167,8 +196,20 @@ const styles = StyleSheet.create({
     color: '#15803d',
   },
 
+  badgeText_late: {
+    color: '#c2410c',
+  },
+
+  badgeText_excused: {
+    color: '#2563eb',
+  },
+
   badgeText_closed: {
     color: '#6b7280',
+  },
+
+  badgeText_cancelled: {
+    color: '#b91c1c',
   },
 
   schedule: {

@@ -126,7 +126,7 @@ describe('AttendanceValidationService', () => {
       expect(result.distance).toBeGreaterThan(mockSession.radius);
     });
 
-    it('không REJECTED khi đứng trong bán kính dù sai số GPS lớn (9m, ±106m, radius 100m)', () => {
+    it('đưa vào REVIEW khi vị trí nằm trong bán kính nhưng sai số giao với ranh giới', () => {
       const indoorSession = { ...mockSession, radius: 100 };
       const nearCenter: LocationPayload = {
         latitude: indoorSession.latitude + 9 / 111_320,
@@ -146,9 +146,33 @@ describe('AttendanceValidationService', () => {
         integrity: { integrityToken: null },
       });
 
-      expect(result.status).not.toBe('REJECTED');
+      expect(result.status).toBe('REVIEW');
       expect(result.reasons).toContain('LOW_LOCATION_ACCURACY');
       expect(result.distance).toBeLessThan(indoorSession.radius);
+    });
+
+    it('đưa log 8.69m, ±121m, bán kính 50m vào REVIEW thay vì từ chối theo điểm số', () => {
+      const uncertainLocation: LocationPayload = {
+        latitude: mockSession.latitude + 8.69 / 111_320,
+        longitude: mockSession.longitude,
+        accuracy: 121,
+        timestamp: Date.now(),
+        isMockLocation: false,
+      };
+
+      const result = validationService.validate({
+        session: mockSession,
+        userId: 10,
+        existingRecordCount: 0,
+        checkedInAt: new Date(),
+        location: uncertainLocation,
+        device: defaultDevice,
+        integrity: { integrityToken: null },
+      });
+
+      expect(result.status).toBe('REVIEW');
+      expect(result.reasons).toEqual(['LOW_LOCATION_ACCURACY']);
+      expect(result.distance).toBeCloseTo(8.69, 0);
     });
 
     it('nên đánh dấu REVIEW khi khoảng cách nằm sát mép ngoài nhưng trong phạm vi sai số GPS (borderline)', () => {
@@ -173,7 +197,31 @@ describe('AttendanceValidationService', () => {
       });
 
       expect(result.status).toBe('REVIEW');
-      expect(result.reasons).toContain('OUT_OF_RANGE');
+      expect(result.reasons).toContain('LOW_LOCATION_ACCURACY');
+    });
+
+    it('nên từ chối với lỗi LOW_LOCATION_ACCURACY khi vị trí không chắc chắn và integrity yếu', () => {
+      const weakLocation: LocationPayload = {
+        latitude: mockSession.latitude + 0.00040,
+        longitude: mockSession.longitude,
+        accuracy: 80,
+        timestamp: Date.now(),
+        isMockLocation: false,
+      };
+
+      const result = validationService.validate({
+        session: mockSession,
+        userId: 10,
+        existingRecordCount: 0,
+        checkedInAt: new Date(),
+        location: weakLocation,
+        device: defaultDevice,
+        integrity: { integrityToken: '' },
+      });
+
+      expect(result.status).toBe('REJECTED');
+      expect(result.reasons).toContain('LOW_LOCATION_ACCURACY');
+      expect(result.reasons).toContain('LOW_CONFIDENCE_SCORE');
     });
   });
 });

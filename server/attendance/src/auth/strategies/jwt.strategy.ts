@@ -1,9 +1,10 @@
 import { ConfigService } from '@nestjs/config';
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AuthenticatedUser } from '../types/authenticated-user.type';
-import { Role } from '@gps-attendance/shared';
+import { AuthErrorCode, Role } from '@gps-attendance/shared';
+import { RedisService } from '../../redis/redis.service';
 
 export interface JwtPayload {
   sub: number;
@@ -13,15 +14,27 @@ export interface JwtPayload {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(configService: ConfigService) {
+  constructor(
+    configService: ConfigService,
+    private readonly redisService: RedisService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
+      passReqToCallback: true,
     });
   }
 
-  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
+  async validate(req: any, payload: JwtPayload): Promise<AuthenticatedUser> {
+    const rawToken = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+    if (rawToken && (await this.redisService.isTokenBlacklisted(rawToken))) {
+      throw new UnauthorizedException({
+        code: AuthErrorCode.INVALID_TOKEN,
+        message: 'Token has been revoked',
+      });
+    }
+
     return {
       userId: payload.sub,
       username: payload.username,
@@ -29,3 +42,4 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     };
   }
 }
+

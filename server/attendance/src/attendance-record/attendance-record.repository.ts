@@ -1,5 +1,22 @@
-import { StudentAttendanceHistoryItemDto } from '@gps-attendance/shared';
+import {
+  AttendanceHistoryEventDto,
+  AttendanceHistoryEventType,
+  AttendanceStatus,
+  StudentAttendanceHistoryItemDto,
+} from '@gps-attendance/shared';
 import { AttendanceRecord } from './attendance-record.model';
+
+export interface CreateAttendanceHistoryEventInput {
+  sessionId: number;
+  userId: number;
+  actorId?: number | null;
+  attemptId?: number | null;
+  eventType: AttendanceHistoryEventType;
+  status?: AttendanceStatus | null;
+  attemptResult?: 'APPROVED' | 'REVIEW' | 'REJECTED' | null;
+  reasons?: string[];
+  note?: string | null;
+}
 
 export interface IAttendanceRecordRepository {
   getRecord(
@@ -11,6 +28,9 @@ export interface IAttendanceRecordRepository {
   findDetailedHistoryByUser(
     userId: number,
   ): Promise<StudentAttendanceHistoryItemDto[]>;
+  createHistoryEvent(event: CreateAttendanceHistoryEventInput): Promise<void>;
+  findHistoryEventsByUser(userId: number): Promise<AttendanceHistoryEventDto[]>;
+  findById(id: number): Promise<StudentAttendanceHistoryItemDto | null>;
   upsertRecord(record: Omit<AttendanceRecord, 'updatedAt'>): Promise<void>;
 }
 

@@ -10,8 +10,13 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "infoPlist": {
+        "UIStatusBarHidden": true,
+        "UIViewControllerBasedStatusBarAppearance": false,
         "NSLocationWhenInUseUsageDescription": "Ứng dụng cần vị trí để hiển thị toạ độ hiện tại"
       }
+    },
+    "androidStatusBar": {
+      "hidden": true
     },
     "android": {
       "adaptiveIcon": {

@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   NotFoundException,
   Param,
   ParseIntPipe,
@@ -24,6 +25,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserFilterService } from './user-filter.service';
 import { UserFilterDto } from './dto/user-filter.dto';
+import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 
 @ApiTags('users')
 @ApiBearerAuth()
@@ -49,13 +51,39 @@ export class UserController {
       });
     }
 
+    return { success: true, data: this.toProfileResponse(user) };
+  }
+
+  @ApiOperation({ summary: 'Cập nhật thông tin hồ sơ người dùng hiện tại' })
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  async updateMe(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: UpdateMyProfileDto,
+  ): Promise<ApiResponse<UserProfileDto>> {
+    const user = await this.usersService.updateProfile(req.user.userId, dto);
+    if (!user) {
+      throw new NotFoundException({
+        code: UserErrorCode.NOT_FOUND,
+        message: 'User không tồn tại',
+      });
+    }
+    return { success: true, data: this.toProfileResponse(user) };
+  }
+
+  private toProfileResponse(user: User): UserProfileDto {
     return {
-      success: true,
-      data: {
-        code: user.code,
-        role: user.role,
-        fullname: user.fullname,
-      },
+      code: user.code,
+      role: user.role,
+      fullname: user.fullname,
+      email: user.email ?? null,
+      phone: user.phone ?? null,
+      dateOfBirth: user.dateOfBirth ?? null,
+      gender: user.gender ?? null,
+      address: user.address ?? null,
+      programName: user.programName ?? null,
+      cohort: user.cohort ?? null,
+      studyMode: user.studyMode ?? null,
     };
   }
 

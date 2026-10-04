@@ -42,6 +42,39 @@ enum AttendanceAttemptResult {
   REJECTED
 }
 
+enum AttendanceHistoryEventType {
+  SESSION_ASSIGNED
+  CHECK_IN_ATTEMPT
+  REVIEW_DECISION
+  RECORD_UPDATED
+}
+
+enum EnrollmentStatus {
+  active
+  withdrawn
+  completed
+}
+
+enum NotificationType {
+  SESSION_ASSIGNED
+  SESSION_OPENED
+  CHECK_IN_RESULT
+  REVIEW_DECISION
+  ATTENDANCE_REMINDER
+  SYSTEM
+}
+
+enum DeviceTrustStatus {
+  UNVERIFIED
+  TRUSTED
+  BLOCKED
+}
+
+enum IntegrityProvider {
+  PLAY_INTEGRITY
+  APP_ATTEST
+}
+
 model Account {
   id           Int           @id @default(autoincrement()) @map("id")
   userId       Int           @unique @map("user_id")
@@ -89,6 +122,7 @@ model Unit {
   parent   Unit?  @relation("UnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children Unit[] @relation("UnitHierarchy")
   users    User[]
+  courses  Course[]
 
   @@index([parentId])
   @@index([level])
@@ -101,15 +135,34 @@ model User {
   role               Role
   fullname           String              @db.VarChar(150)
   unitId             Int?                @map("unit_id")
+  email              String?             @db.VarChar(254)
+  phone              String?             @db.VarChar(30)
+  dateOfBirth        String?             @map("date_of_birth") @db.VarChar(10)
+  gender             String?             @db.VarChar(30)
+  address            String?             @db.VarChar(255)
+  programName        String?             @map("program_name") @db.VarChar(150)
+  cohort             String?             @db.VarChar(50)
+  studyMode          String?             @map("study_mode") @db.VarChar(50)
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
 
   unit               Unit?               @relation(fields: [unitId], references: [id], onDelete: Restrict)
   account            Account?
+  taughtSections     CourseSection[]     @relation("SectionLecturer")
+  classEnrollments   ClassEnrollment[]
+  notificationsCreated Notification[]    @relation("NotificationCreator")
+  notificationStates UserNotificationState[]
+  pushTokens         PushToken[]
+  registeredDevices  RegisteredDevice[]
+  integrityChecks    DeviceIntegrityCheck[]
+  auditLogs          AuditLog[]           @relation("AuditActor")
   createdSessions    AttendanceSession[] @relation("SessionCreator")
   attendanceRecords  AttendanceRecord[]
   updatedRecords     AttendanceRecord[]  @relation("RecordUpdater")
   attempts           AttendanceAttempt[]
+  reviewedAttempts   AttendanceAttempt[]  @relation("AttemptReviewer")
+  attendanceHistoryEvents AttendanceHistoryEvent[] @relation("AttendanceHistorySubject")
+  actedAttendanceHistoryEvents AttendanceHistoryEvent[] @relation("AttendanceHistoryActor")
   tags               UserTag[]
 
   @@index([role])
@@ -127,15 +180,21 @@ model AttendanceSession {
   closeAt           DateTime           @map("close_at")
   status            SessionStatus      @default(draft)
   createdBy         Int                @map("created_by")
+  courseSectionId   Int?               @map("course_section_id")
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
   creator           User               @relation("SessionCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  courseSection     CourseSection?     @relation(fields: [courseSectionId], references: [id], onDelete: SetNull)
   attendanceRecords AttendanceRecord[]
   attempts          AttendanceAttempt[]
+  historyEvents     AttendanceHistoryEvent[]
+  integrityChecks   DeviceIntegrityCheck[]
+  notifications     Notification[]
 
   @@index([createdBy])
   @@index([createdBy, openAt, closeAt])
+  @@index([courseSectionId])
   @@index([openAt, closeAt])
   @@map("attendance_sessions")
 }
@@ -178,13 +237,257 @@ model AttendanceAttempt {
   serverTimestamp  DateTime                 @default(now()) @map("server_timestamp")
   result           AttendanceAttemptResult?
   reasons          String[]                 @default([])
+  reviewedBy       Int?                     @map("reviewed_by")
+  reviewedAt       DateTime?                @map("reviewed_at")
+  reviewNote       String?                  @map("review_note") @db.VarChar(500)
   createdAt        DateTime                 @default(now()) @map("created_at")
 
   session          AttendanceSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user             User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  reviewer         User?                    @relation("AttemptReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  historyEvents    AttendanceHistoryEvent[]
 
   @@index([sessionId, userId, createdAt])
   @@index([sessionId, deviceId, createdAt])
   @@index([sessionId, userId, serverTimestamp])
   @@map("attendance_attempts")
+}
+
+model AttendanceHistoryEvent {
+  id            Int                        @id @default(autoincrement())
+  sessionId     Int                        @map("session_id")
+  userId        Int                        @map("user_id")
+  actorId       Int?                       @map("actor_id")
+  attemptId     Int?                       @map("attempt_id")
+  eventType     AttendanceHistoryEventType @map("event_type")
+  status        AttendanceStatus?
+  attemptResult AttendanceAttemptResult?   @map("attempt_result")
+  reasons       String[]                   @default([])
+  note          String?                    @db.VarChar(500)
+  createdAt     DateTime                   @default(now()) @map("created_at")
+
+  session AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User              @relation("AttendanceHistorySubject", fields: [userId], references: [id], onDelete: Cascade)
+  actor   User?             @relation("AttendanceHistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+  attempt AttendanceAttempt? @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([sessionId, userId, createdAt])
+  @@index([attemptId])
+  @@map("attendance_history_events")
+}
+
+model AcademicTerm {
+  id           Int             @id @default(autoincrement())
+  name         String          @db.VarChar(100)
+  academicYear String          @map("academic_year") @db.VarChar(20)
+  semester     Int
+  startDate    DateTime        @map("start_date") @db.Date
+  endDate      DateTime        @map("end_date") @db.Date
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  sections     CourseSection[]
+
+  @@unique([academicYear, semester])
+  @@map("academic_terms")
+}
+
+model Course {
+  id          Int             @id @default(autoincrement())
+  code        String          @unique @db.VarChar(30)
+  name        String          @db.VarChar(180)
+  credits     Int?
+  unitId      Int?            @map("unit_id")
+  isActive    Boolean         @default(true) @map("is_active")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  unit        Unit?           @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  sections    CourseSection[]
+
+  @@index([unitId])
+  @@map("courses")
+}
+
+model Room {
+  id        Int             @id @default(autoincrement())
+  code      String          @unique @db.VarChar(50)
+  name      String          @db.VarChar(100)
+  building  String?         @db.VarChar(100)
+  latitude  Decimal?        @db.Decimal(10, 7)
+  longitude Decimal?        @db.Decimal(10, 7)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  sections  CourseSection[]
+  slots     TimetableSlot[]
+
+  @@map("rooms")
+}
+
+model CourseSection {
+  id         Int             @id @default(autoincrement())
+  code       String          @db.VarChar(50)
+  courseId   Int             @map("course_id")
+  termId     Int             @map("term_id")
+  lecturerId Int?            @map("lecturer_id")
+  roomId     Int?            @map("room_id")
+  capacity   Int?
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  course     Course          @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  term       AcademicTerm    @relation(fields: [termId], references: [id], onDelete: Restrict)
+  lecturer   User?           @relation("SectionLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
+  room       Room?           @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  enrollments ClassEnrollment[]
+  timetable  TimetableSlot[]
+  attendanceSessions AttendanceSession[]
+
+  @@unique([termId, code])
+  @@index([courseId])
+  @@index([lecturerId])
+  @@index([roomId])
+  @@map("course_sections")
+}
+
+model ClassEnrollment {
+  courseSectionId Int             @map("course_section_id")
+  userId          Int             @map("user_id")
+  status          EnrollmentStatus @default(active)
+  enrolledAt      DateTime        @default(now()) @map("enrolled_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  courseSection   CourseSection   @relation(fields: [courseSectionId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([courseSectionId, userId])
+  @@index([userId, status])
+  @@map("class_enrollments")
+}
+
+model TimetableSlot {
+  id              Int           @id @default(autoincrement())
+  courseSectionId Int           @map("course_section_id")
+  dayOfWeek       Int           @map("day_of_week")
+  startMinute     Int           @map("start_minute")
+  endMinute       Int           @map("end_minute")
+  roomId          Int?          @map("room_id")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  courseSection   CourseSection @relation(fields: [courseSectionId], references: [id], onDelete: Cascade)
+  room            Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@index([courseSectionId, dayOfWeek])
+  @@index([roomId, dayOfWeek])
+  @@map("timetable_slots")
+}
+
+model Notification {
+  id          Int               @id @default(autoincrement())
+  type        NotificationType
+  title       String            @db.VarChar(180)
+  message     String            @db.VarChar(1000)
+  sessionId   Int?              @map("session_id")
+  createdBy   Int?              @map("created_by")
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  session     AttendanceSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  creator     User?             @relation("NotificationCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  recipients  UserNotificationState[]
+
+  @@index([createdAt])
+  @@index([sessionId])
+  @@map("notifications")
+}
+
+model UserNotificationState {
+  notificationId Int          @map("notification_id")
+  userId         Int          @map("user_id")
+  readAt         DateTime?    @map("read_at")
+  deliveredAt    DateTime?    @map("delivered_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([notificationId, userId])
+  @@index([userId, readAt, createdAt])
+  @@map("user_notification_states")
+}
+
+model PushToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  token     String   @unique @db.VarChar(512)
+  platform  String   @db.VarChar(20)
+  deviceId  String?  @map("device_id") @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_tokens")
+}
+
+model RegisteredDevice {
+  id          Int              @id @default(autoincrement())
+  userId      Int              @map("user_id")
+  deviceId    String           @map("device_id") @db.VarChar(255)
+  platform    String           @db.VarChar(20)
+  model       String?          @db.VarChar(150)
+  trustStatus DeviceTrustStatus @default(UNVERIFIED) @map("trust_status")
+  firstSeenAt DateTime         @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime         @default(now()) @map("last_seen_at")
+  blockedAt   DateTime?        @map("blocked_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integrityChecks DeviceIntegrityCheck[]
+
+  @@unique([userId, deviceId])
+  @@index([trustStatus])
+  @@map("registered_devices")
+}
+
+model DeviceIntegrityCheck {
+  id                 Int               @id @default(autoincrement())
+  userId             Int               @map("user_id")
+  registeredDeviceId Int?              @map("registered_device_id")
+  sessionId          Int?              @map("session_id")
+  provider           IntegrityProvider
+  verdict            String            @db.VarChar(50)
+  reasons            String[]          @default([])
+  checkedAt          DateTime          @default(now()) @map("checked_at")
+
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  registeredDevice   RegisteredDevice? @relation(fields: [registeredDeviceId], references: [id], onDelete: SetNull)
+  session            AttendanceSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, checkedAt])
+  @@index([registeredDeviceId, checkedAt])
+  @@index([sessionId])
+  @@map("device_integrity_checks")
+}
+
+model AuditLog {
+  id          Int       @id @default(autoincrement())
+  actorUserId Int?      @map("actor_user_id")
+  action      String    @db.VarChar(100)
+  entityType  String    @map("entity_type") @db.VarChar(100)
+  entityId    String?   @map("entity_id") @db.VarChar(100)
+  metadata    Json?
+  requestId   String?   @map("request_id") @db.VarChar(100)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  actor       User?     @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

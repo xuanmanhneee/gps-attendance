@@ -1,6 +1,6 @@
 import type { UserFilterCriteria } from '../../types/users';
 
-export type SessionStatus = 'pending' | 'open' | 'closed';
+export type SessionStatus = 'pending' | 'open' | 'closed' | 'cancelled';
 
 export interface AttendanceSessionPayload {
   id: number;

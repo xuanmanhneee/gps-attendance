@@ -8,7 +8,8 @@
   },
   "scripts": {
     "predev:attendance": "pnpm build:shared",
-    "dev:attendance": "pnpm --filter @gps-attendance/attendance dev",
+    "dev:attendance": "powershell -ExecutionPolicy Bypass -NoProfile -Command \"& { ./scripts/start-ngrok.ps1; pnpm --filter @gps-attendance/attendance dev }\"",
+    "dev:ngrok": "powershell -ExecutionPolicy Bypass -File scripts/start-ngrok.ps1",
     "predev:admin": "pnpm build:shared",
     "dev:admin": "pnpm --filter @gps-attendance/admin-dashboard dev",
     "predev:mobile": "pnpm build:shared",
@@ -29,5 +30,15 @@
   "devDependencies": {
     "prettier": "^3.9.6",
     "rimraf": "^6.1.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "jest": "29.7.0",
+      "jest-runtime": "29.7.0",
+      "jest-environment-node": "29.7.0",
+      "jest-mock": "29.7.0",
+      "@jest/environment": "29.7.0",
+      "@jest/types": "29.6.3"
+    }
   }
 }

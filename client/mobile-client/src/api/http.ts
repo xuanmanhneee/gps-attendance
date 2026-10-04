@@ -1,7 +1,8 @@
 import { getToken } from '@/services/token';
 import { createHttpClient } from '@gps-attendance/shared';
+import { BASE_URL } from './api';
 
 export const httpClient = createHttpClient(
-  process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000',
+  BASE_URL,
   () => getToken(),
 );

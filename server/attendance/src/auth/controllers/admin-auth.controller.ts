@@ -4,6 +4,7 @@ import {
   HttpStatus,
   Post,
   Body,
+  Headers,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
@@ -53,6 +54,25 @@ export class AdminAuthController {
 
   @Post('refresh')
   async refresh(@Body('refreshToken') refreshToken: string): Promise<ApiResponse<LoginResponse>> {
-    return { success: true, data: this.authService.refresh(refreshToken) };
+    return { success: true, data: await this.authService.refresh(refreshToken) };
+  }
+
+  @ApiOperation({
+    summary: 'Admin/Lecturer đăng xuất và thu hồi token trên server',
+  })
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(
+    @Body('refreshToken') refreshToken?: string,
+    @Headers('authorization') authHeader?: string,
+  ): Promise<ApiResponse<null>> {
+    const accessToken = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : undefined;
+    await this.authService.logout(accessToken, refreshToken);
+    return {
+      success: true,
+      data: null,
+    };
   }
 }

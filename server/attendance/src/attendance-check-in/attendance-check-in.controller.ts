@@ -12,7 +12,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 
 @ApiTags('attendance-check-in')
 @ApiBearerAuth()
-@Controller(['attendance', 'v0/attendance'])
+@Controller('v0/attendance')
 export class AttendanceCheckInController {
   constructor(
     private readonly attendanceCheckInService: AttendanceCheckInService,

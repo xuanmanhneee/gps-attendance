@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import type { User } from './user.model';
+import type { User, UserProfileUpdate } from './user.model';
 import type { IUserRepository } from './user.repository';
 import { USER_REPOSITORY } from './user.repository.token';
 
@@ -33,5 +33,9 @@ export class UsersService {
 
   async findAll(): Promise<User[]> {
     return this.userRepository.findAll();
+  }
+
+  async updateProfile(id: number, data: UserProfileUpdate): Promise<User | undefined> {
+    return this.userRepository.updateProfile(id, data);
   }
 }

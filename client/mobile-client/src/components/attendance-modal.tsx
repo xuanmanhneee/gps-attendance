@@ -23,7 +23,8 @@ export const AttendanceModal = ({
   const isApproved = result.status === 'VALID';
   const isFlagged = result.status === 'REVIEW';
   const isRejected = result.status === 'REJECTED';
-  const reasons: string[] = 'reasons' in result ? (result.reasons as string[]) : [];
+  const resultReasons = 'reasons' in result ? result.reasons : undefined;
+  const reasons: string[] = Array.isArray(resultReasons) ? resultReasons : [];
 
   const getReasonMessage = (reason: string) => {
     const mapped: Record<string, string> = {
@@ -32,7 +33,7 @@ export const AttendanceModal = ({
       LOW_LOCATION_ACCURACY: 'Sai số GPS lớn nên vị trí chưa chắc chắn nằm gọn trong phạm vi lớp. Điểm danh đã ghi nhận, giảng viên có thể xem xét.',
       MOCK_LOCATION: 'Hệ thống phát hiện vị trí giả mạo. Vui lòng tắt vị trí giả hoặc dùng GPS thật.',
       DUPLICATE_DEVICE: 'Thiết bị này đã được dùng để điểm danh cho buổi học này.',
-      OUT_OF_RANGE: 'Khoảng cách cộng sai số GPS vượt quá bán kính cho phép của buổi học.',
+      OUT_OF_RANGE: 'Vị trí nằm ngoài phạm vi điểm danh ngay cả khi đã tính đến sai số GPS.',
     };
 
     return mapped[reason] ?? reason;

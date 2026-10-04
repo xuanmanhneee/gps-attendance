@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   ParseIntPipe,
   Post,
   Query,
@@ -20,6 +21,7 @@ import { AttendanceSessionsService } from './attendance-sessions.service';
 import { AttendanceSessionQueryService } from './attendance-session-query.service';
 import { toAttendanceSessionResponse } from './attendance-session.mapper';
 import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
+import { ReviewAttendanceAttemptDto } from './dto/review-attendance-attempt.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -28,7 +30,7 @@ import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 
 @ApiTags('attendance-sessions')
 @ApiBearerAuth()
-@Controller(['attendance-sessions', 'v0/attendance-sessions'])
+@Controller('v0/attendance-sessions')
 export class AttendanceSessionsController {
   constructor(
     private readonly attendanceSessionsService: AttendanceSessionsService,
@@ -87,6 +89,22 @@ export class AttendanceSessionsController {
     return { success: true, data: sessions.map(toAttendanceSessionResponse) };
   }
 
+  @ApiOperation({ summary: 'Thống kê chuyên cần và sinh viên cần quan tâm' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('lecturer', 'admin')
+  @Get('analytics')
+  async getAnalytics(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ApiResponse<Awaited<ReturnType<AttendanceSessionQueryService['getLecturerAnalytics']>>>> {
+    return {
+      success: true,
+      data: await this.attendanceSessionQueryService.getLecturerAnalytics(
+        user.userId,
+        user.role === 'admin',
+      ),
+    };
+  }
+
   @ApiOperation({ summary: 'Danh sách session do 1 giảng viên tạo (admin)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
@@ -112,6 +130,27 @@ export class AttendanceSessionsController {
     return { success: true, data: sessions.map(toAttendanceSessionResponse) };
   }
 
+  @ApiOperation({ summary: 'Giảng viên duyệt hoặc từ chối lượt điểm danh cần xem xét' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'lecturer')
+  @Post(':id/attempts/:attemptId/review')
+  async reviewAttempt(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('attemptId', ParseIntPipe) attemptId: number,
+    @Body() dto: ReviewAttendanceAttemptDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ApiResponse<null>> {
+    await this.attendanceSessionQueryService.reviewAttempt(
+      id,
+      attemptId,
+      user.userId,
+      user.role,
+      dto.decision,
+      dto.note,
+    );
+    return { success: true, data: null };
+  }
+
   @ApiOperation({ summary: 'Xóa session và toàn bộ dữ liệu điểm danh liên quan' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'lecturer')
@@ -133,6 +172,18 @@ export class AttendanceSessionsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ApiResponse<AttendanceSessionResponse>> {
     const session = await this.attendanceSessionsService.close(id, user);
+    return { success: true, data: toAttendanceSessionResponse(session) };
+  }
+
+  @ApiOperation({ summary: 'Hủy phiên điểm danh chưa kết thúc' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'lecturer')
+  @Patch(':id/cancel')
+  async cancel(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ApiResponse<AttendanceSessionResponse>> {
+    const session = await this.attendanceSessionsService.cancel(id, user);
     return { success: true, data: toAttendanceSessionResponse(session) };
   }
 

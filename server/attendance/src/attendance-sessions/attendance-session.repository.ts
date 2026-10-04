@@ -13,5 +13,6 @@ export interface IAttendanceSessionRepository {
   findByIds(ids: number[]): Promise<AttendanceSession[]>;
   findByCreator(createdBy: number): Promise<AttendanceSession[]>;
   close(id: number): Promise<AttendanceSession>;
+  cancel(id: number): Promise<AttendanceSession>;
   delete(id: number): Promise<void>;
 }

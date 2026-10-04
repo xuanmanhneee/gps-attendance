@@ -32,7 +32,32 @@ export interface AttendanceAttemptDto {
   serverTimestamp: string;
   result: 'APPROVED' | 'REVIEW' | 'REJECTED' | null;
   reasons: string[];
+  reviewedAt?: string | null;
+  reviewedBy?: number | null;
+  reviewNote?: string | null;
 }
+
+export interface LecturerAttendanceAnalytics {
+  totalSessions: number;
+  totalStudents: number;
+  totalRecords: number;
+  presentCount: number;
+  lateCount: number;
+  absentCount: number;
+  excusedCount: number;
+  attendanceRate: number;
+  reviewCount: number;
+  atRiskStudents: Array<{
+    userId: number;
+    userCode: string;
+    fullname: string;
+    absentCount: number;
+    totalSessions: number;
+    attendanceRate: number;
+  }>;
+}
+
+export type AttendanceReviewDecision = 'APPROVED' | 'REJECTED';
 
 export interface AttendanceSessionDetailResponse extends AttendanceSessionResponse {
   participants: AttendanceParticipantResponse[];

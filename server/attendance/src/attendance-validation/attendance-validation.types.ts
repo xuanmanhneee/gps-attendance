@@ -43,8 +43,10 @@ export interface MockLocationCheckResult {
   coefficient: Coefficient;
 }
 
+export type LocationCertainty = 'INSIDE' | 'OUTSIDE' | 'UNCERTAIN';
+
 export interface LocationCheckResult {
-  coefficient: Coefficient;
+  certainty: LocationCertainty;
   distance: number;
 }
 

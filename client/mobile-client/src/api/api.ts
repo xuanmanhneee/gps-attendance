@@ -1,4 +1,12 @@
-export const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+import Constants from 'expo-constants';
+
+const configuredApiUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+const metroHost = Constants.expoConfig?.hostUri?.split(':')[0];
+const apiHost = metroHost === 'localhost' ? '127.0.0.1' : metroHost;
+
+export const BASE_URL =
+  configuredApiUrl ||
+  (apiHost ? `http://${apiHost}:3000` : 'http://127.0.0.1:3000');
 
 export const API_TIMEOUT = 30000; // 30 seconds
 
@@ -23,6 +31,7 @@ async function request<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
     ...options.headers,
   };
 
@@ -43,14 +52,14 @@ async function request<T>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      if (response.status === 401) {
+      if (response.status === 401 && path.includes('/auth/login')) {
         throw new ApiRequestError(
-          'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+          errorData.message || 'Tài khoản hoặc mật khẩu không đúng.',
           401,
         );
       }
       throw new ApiRequestError(
-        errorData.message || `API request failed: ${response.status}`,
+        errorData.message || `Yêu cầu thất bại (HTTP ${response.status}).`,
         response.status,
       );
     }
@@ -69,7 +78,7 @@ async function request<T>(
     }
 
     throw new ApiRequestError(
-      `Không thể kết nối đến máy chủ (${BASE_URL}).\n\nVui lòng kiểm tra:\n1. Máy chủ backend đã chạy chưa (pnpm dev:attendance).\n2. Thiết bị và máy chủ có đang kết nối chung mạng Wi-Fi không.\n3. Địa chỉ EXPO_PUBLIC_API_URL trong .env đã đúng IP LAN máy tính chưa.`,
+      `Không thể kết nối đến máy chủ (${BASE_URL}).\n\nVui lòng kiểm tra:\n1. Máy chủ backend đã chạy chưa (pnpm dev:attendance).\n2. Nếu dùng mạng nội bộ, điện thoại và máy chủ có cùng mạng Wi-Fi không.\n3. Nếu dùng ngrok, EXPO_PUBLIC_API_URL có đúng URL tunnel không.`,
       0,
     );
   } finally {

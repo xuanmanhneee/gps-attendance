@@ -398,16 +398,14 @@ Logout gọi `/v0/user/auth/logout` nhưng **backend chưa có endpoint logout**
 - Swagger
 - E2E/unit test trong `server/attendance` (`test/`, `*.spec.ts`)
 
-Hạn chế hiện tại (cần biết khi bảo vệ đồ án / triển khai):
+Đặc điểm hệ thống sau khi đồng bộ hóa và hoàn thiện:
 
-- CORS mở toàn bộ origin
-- Integrity token **chưa verify** với Google/Apple
-- Không có logout/revoke token phía server
-- `unitFilter` / `tagFilter` chưa có dữ liệu
-- Fallback “mọi sinh viên” khi nhập sai mã có thể gán nhầm cả lớp
-- Accuracy GPS bị chặn tối đa 30 m ở DTO
-- Mobile logout/record-detail lệch contract với API
-- README/ARCHITECTURE cũ vẫn nói “in-memory” — **không còn đúng**; persistence là Prisma/PostgreSQL
+- Đã tích hợp Token Revocation & Logout phía server qua Redis blacklist.
+- Đã bổ sung endpoint chi tiết bản ghi điểm danh `GET /attendance/records/:id` cho cả Backend và Mobile client.
+- Đã tích hợp tính năng xuất báo cáo danh sách điểm danh ra Excel (CSV UTF-8 BOM) trên Admin Dashboard.
+- Nâng cấp bộ kiểm tra tính toàn vẹn (IntegrityCheck) phân tích cấu trúc token Play Integrity / App Attest.
+- Cấu hình CORS cho phép Whitelist thông qua biến môi trường `CORS_ORIGIN`.
+- Đã đồng bộ bộ lọc theo Đơn vị (`Unit`) và Thẻ (`Tag`) trong `UserFilterService`.
 
 ---
 

@@ -1,122 +1,205 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  useWindowDimensions,
+  View,
 } from 'react-native';
-import { Card } from '../../components/ui/card';
-import { COLORS } from '../../constants/theme';
-import {
-  AttendanceAPI,
-  type AttendanceHistoryItem,
-} from '../../api/attendance.api';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import type { AttendanceStatus } from '@gps-attendance/shared';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '../../context/auth-context';
+
 import { ApiRequestError } from '../../api/api';
+import { AttendanceAPI, type AttendanceHistoryItem } from '../../api/attendance.api';
+import { DluLogo } from '../../components/dlu-logo';
+import { COLORS } from '../../constants/theme';
+import { useAuth } from '../../context/auth-context';
+
+type StatusFilter = 'all' | AttendanceStatus;
+
+const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: 'all', label: 'Tất cả trạng thái' },
+  { key: 'present', label: 'Đã điểm danh' },
+  { key: 'late', label: 'Đi muộn' },
+  { key: 'absent', label: 'Vắng' },
+  { key: 'excused', label: 'Nghỉ phép' },
+];
+
+function validDate(value: string): Date | null {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDate(value: string): string {
+  const date = validDate(value);
+  if (!date) return '--/--/----';
+  return date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function formatTime(value: string | null, fallback: string): string {
+  const date = validDate(value ?? fallback);
+  if (!date) return '--:--';
+  return date.toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function semesterForDate(value: string): { key: string; label: string; sort: number } {
+  const date = validDate(value) ?? new Date();
+  const semester = date.getMonth() < 6 ? 1 : 2;
+  return {
+    key: `${date.getFullYear()}-${semester}`,
+    label: `Học kỳ ${semester} - ${date.getFullYear()}`,
+    sort: date.getFullYear() * 10 + semester,
+  };
+}
+
+function statusForRecord(record: AttendanceHistoryItem): {
+  label: string;
+  color: string;
+  background: string;
+} {
+  if (record.sessionStatus === 'cancelled') {
+    return { label: 'Đã hủy', color: '#69736D', background: '#EEF1EF' };
+  }
+  if (record.status === 'absent' && record.sessionStatus !== 'closed') {
+    return { label: 'Chờ điểm danh', color: '#A56A00', background: '#FFF3D8' };
+  }
+  switch (record.status) {
+    case 'present':
+      return { label: 'Đã điểm danh', color: '#16834B', background: '#E4F5EA' };
+    case 'late':
+      return { label: 'Đi muộn', color: '#A56A00', background: '#FFF3D8' };
+    case 'absent':
+      return { label: 'Vắng', color: '#C2413A', background: '#FDEAE8' };
+    case 'excused':
+      return { label: 'Nghỉ phép', color: '#A56A00', background: '#FFF3D8' };
+  }
+}
 
 export default function HistoryScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
-  const { token, lastLoginAt } = useAuth();
+  const { token, logout } = useAuth();
   const [records, setRecords] = useState<AttendanceHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedSemester, setSelectedSemester] = useState(semesterForDate(new Date().toISOString()).key);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [semesterMenuVisible, setSemesterMenuVisible] = useState(false);
+  const [filterMenuVisible, setFilterMenuVisible] = useState(false);
 
-  // Visible height strictly excluding bottom tab bar (60 + insets.bottom) and top safe inset
-  const visibleHeight = Math.max(300, windowHeight - (60 + insets.bottom) - insets.top);
+  const loadHistory = useCallback(async (refresh = false) => {
+    if (!token) {
+      setRecords([]);
+      setIsLoading(false);
+      return;
+    }
 
-  useEffect(() => {
-    loadAttendanceHistory(true);
-  }, [token]);
+    if (refresh) setIsRefreshing(true);
+    else setIsLoading(true);
 
-  const loadAttendanceHistory = async (showLoader = false) => {
     try {
-      if (showLoader) {
-        setIsLoading(true);
-      } else {
-        setIsRefreshing(true);
-      }
-
-      if (!token) {
-        setRecords([]);
-        return;
-      }
-
       const response = await AttendanceAPI.getAttendanceHistory(token);
-
       if (!response.success) {
-        throw new Error(response.message || 'Không thể tải lịch sử điểm danh');
+        throw new Error(response.message || 'Không thể tải lịch sử điểm danh.');
       }
-
-      setRecords(response.data);
+      setRecords(Array.isArray(response.data) ? response.data : []);
+      setLoadError(null);
     } catch (error) {
-      console.error('Failed to load history:', error);
       if (error instanceof ApiRequestError && error.status === 401) {
-        return;
+        await logout();
+        router.replace('/login');
+      } else {
+        setLoadError(error instanceof Error ? error.message : 'Không thể tải lịch sử điểm danh.');
       }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [logout, router, token]);
 
-  const handleRefresh = async () => {
-    await loadAttendanceHistory(false);
-  };
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'present':
-        return '✅ Có mặt';
-      case 'late':
-        return '⚠️ Đi muộn';
-      case 'absent':
-        return '❌ Vắng mặt';
-      case 'excused':
-        return '📝 Có phép';
-      default:
-        return '❓ Chưa rõ';
+  const semesterOptions = useMemo(() => {
+    const options = new Map<string, { key: string; label: string; sort: number }>();
+    for (const record of records) {
+      const semester = semesterForDate(record.openAt);
+      options.set(semester.key, semester);
     }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'present':
-        return COLORS.success;
-      case 'late':
-        return COLORS.warning;
-      case 'absent':
-        return COLORS.error;
-      case 'excused':
-        return COLORS.primary;
-      default:
-        return COLORS.text.secondary;
+    if (options.size === 0) {
+      const current = semesterForDate(new Date().toISOString());
+      options.set(current.key, current);
     }
-  };
+    return [...options.values()].sort((left, right) => right.sort - left.sort);
+  }, [records]);
 
-  const getSessionStatusText = (status: string) => {
-    switch (status) {
-      case 'open':
-        return '🟢 Đang diễn ra';
-      case 'pending':
-        return '🟡 Sắp mở';
-      case 'closed':
-        return '⚪ Đã kết thúc';
-      default:
-        return status;
+  useEffect(() => {
+    if (!semesterOptions.some((option) => option.key === selectedSemester)) {
+      setSelectedSemester(semesterOptions[0]?.key ?? '');
     }
-  };
+  }, [selectedSemester, semesterOptions]);
 
-  const presentCount = records.filter((r) => r.status === 'present').length;
-  const absentCount = records.filter((r) => r.status === 'absent').length;
+  const visibleRecords = useMemo(
+    () =>
+      records
+        .filter((record) => semesterForDate(record.openAt).key === selectedSemester)
+        .filter((record) => statusFilter === 'all' || record.status === statusFilter)
+        .sort((left, right) => {
+          const leftTime = validDate(left.openAt)?.getTime() ?? 0;
+          const rightTime = validDate(right.openAt)?.getTime() ?? 0;
+          return rightTime - leftTime;
+        }),
+    [records, selectedSemester, statusFilter],
+  );
+
+  const selectedSemesterLabel = semesterOptions.find((option) => option.key === selectedSemester)?.label
+    ?? semesterOptions[0]?.label
+    ?? 'Chọn học kỳ';
+  const selectedStatusLabel = STATUS_FILTERS.find((filter) => filter.key === statusFilter)?.label ?? 'Lọc';
+
+  const renderRecord = ({ item }: { item: AttendanceHistoryItem }) => {
+    const status = statusForRecord(item);
+    const time = formatTime(item.checkedInAt, item.openAt);
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Xem chi tiết điểm danh ${item.sessionTitle}, ${formatDate(item.openAt)}, ${status.label}`}
+        onPress={() => router.push({
+          pathname: '/attendance/[id]',
+          params: { id: String(item.sessionId) },
+        })}
+        style={({ pressed }) => [styles.recordRow, pressed && styles.recordRowPressed]}
+      >
+        <View style={styles.recordDateTime}>
+          <Text style={styles.recordDate}>{formatDate(item.openAt)}</Text>
+          <Text style={styles.recordTime}>{time}</Text>
+        </View>
+        <Text style={styles.recordSubject} numberOfLines={1}>{item.sessionTitle}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: status.background }]}>
+          <Text style={[styles.statusText, { color: status.color }]} numberOfLines={1}>{status.label}</Text>
+        </View>
+      </Pressable>
+    );
+  };
 
   if (isLoading) {
     return (
-      <View style={[styles.centerContainer, { paddingTop: insets.top + 16 }]}>
+      <View style={[styles.loadingScreen, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Đang tải lịch sử điểm danh...</Text>
       </View>
@@ -124,378 +207,222 @@ export default function HistoryScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
+    <View style={styles.screen}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 10) }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Quay lại"
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
+          style={styles.backButton}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={21} color="#26352D" />
+        </Pressable>
+        <View style={styles.headerTitleGroup}>
+          <DluLogo size={28} />
+          <Text style={styles.headerTitle}>Lịch sử điểm danh</Text>
+        </View>
+        <View style={styles.headerSpacer} />
+      </View>
+
+      <View style={styles.controlsRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Chọn học kỳ. Đang chọn ${selectedSemesterLabel}`}
+          onPress={() => setSemesterMenuVisible(true)}
+          style={styles.semesterButton}
+        >
+          <Text style={styles.semesterButtonText}>{selectedSemesterLabel}</Text>
+          <MaterialCommunityIcons name="chevron-down" size={17} color="#738078" />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Lọc trạng thái. ${selectedStatusLabel}`}
+          onPress={() => setFilterMenuVisible(true)}
+          style={[styles.filterButton, statusFilter !== 'all' && styles.filterButtonActive]}
+        >
+          <MaterialCommunityIcons name="filter-outline" size={19} color={statusFilter === 'all' ? '#536158' : COLORS.primary} />
+        </Pressable>
+      </View>
+
+      {semesterMenuVisible && (
+        <View style={styles.semesterMenu}>
+          {semesterOptions.map((option) => (
+            <Pressable
+              key={option.key}
+              accessibilityRole="button"
+              onPress={() => {
+                setSelectedSemester(option.key);
+                setSemesterMenuVisible(false);
+              }}
+              style={styles.semesterOption}
+            >
+              <Text style={[styles.semesterOptionText, option.key === selectedSemester && styles.semesterOptionSelected]}>
+                {option.label}
+              </Text>
+              {option.key === selectedSemester && <MaterialCommunityIcons name="check" size={17} color={COLORS.primary} />}
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {loadError && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{loadError}</Text>
+          <Pressable onPress={() => void loadHistory()}>
+            <Text style={styles.retryText}>Thử lại</Text>
+          </Pressable>
+        </View>
+      )}
+
+      <FlatList
+        data={visibleRecords}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderRecord}
         contentContainerStyle={[
-          styles.scrollContent,
-          {
-            minHeight: Math.max(450, windowHeight - 60 - insets.bottom - insets.top),
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingTop: Math.max(insets.top, 28) + 16,
-            paddingBottom: Math.max(insets.bottom, 20) + 40,
-          },
+          styles.listContent,
+          { paddingBottom: Math.max(insets.bottom, 12) + 12 },
+          visibleRecords.length === 0 && styles.emptyList,
         ]}
-        showsVerticalScrollIndicator={false}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
-            onRefresh={handleRefresh}
+            onRefresh={() => void loadHistory(true)}
+            tintColor={COLORS.primary}
             colors={[COLORS.primary]}
           />
         }
-      >
-        <View style={styles.centerWrapper}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Lịch Sử Điểm Danh</Text>
-            <View style={styles.lastLoginBadge}>
-              <Text style={styles.lastLoginIcon}>🕒</Text>
-              <Text style={styles.lastLoginText}>
-                Lần đăng nhập gần nhất:{' '}
-                {lastLoginAt
-                  ? new Date(lastLoginAt).toLocaleString('vi-VN')
-                  : 'Vừa mới đăng nhập'}
-              </Text>
-            </View>
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons name="calendar-blank-outline" size={34} color="#A8B1AB" />
+            <Text style={styles.emptyTitle}>Chưa có lịch sử điểm danh</Text>
+            <Text style={styles.emptyDescription}>
+              Không tìm thấy buổi học phù hợp với học kỳ và bộ lọc đã chọn.
+            </Text>
           </View>
+        }
+      />
 
-          {/* Summary Stats */}
-          {records.length > 0 && (
-            <View style={styles.statsContainer}>
-              <View style={[styles.statBox, { borderLeftColor: '#3B82F6' }]}>
-                <Text style={styles.statLabel}>Tổng buổi</Text>
-                <Text style={styles.statNumber}>{records.length}</Text>
-              </View>
-              <View style={[styles.statBox, { borderLeftColor: COLORS.success }]}>
-                <Text style={styles.statLabel}>Có mặt</Text>
-                <Text style={[styles.statNumber, { color: COLORS.success }]}>
-                  {presentCount}
+      <Modal
+        visible={filterMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFilterMenuVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Đóng bộ lọc"
+            style={StyleSheet.absoluteFill}
+            onPress={() => setFilterMenuVisible(false)}
+          />
+          <View style={[styles.filterSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Lọc trạng thái</Text>
+            {STATUS_FILTERS.map((filter) => (
+              <Pressable
+                key={filter.key}
+                accessibilityRole="button"
+                onPress={() => {
+                  setStatusFilter(filter.key);
+                  setFilterMenuVisible(false);
+                }}
+                style={styles.filterOption}
+              >
+                <Text style={[styles.filterOptionText, statusFilter === filter.key && styles.semesterOptionSelected]}>
+                  {filter.label}
                 </Text>
-              </View>
-              <View style={[styles.statBox, { borderLeftColor: COLORS.error }]}>
-                <Text style={styles.statLabel}>Vắng mặt</Text>
-                <Text style={[styles.statNumber, { color: COLORS.error }]}>
-                  {absentCount}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* Record List or Empty State */}
-          {records.length === 0 ? (
-            <Card style={styles.emptyCard}>
-              <Text style={styles.emptyStateIcon}>📋</Text>
-              <Text style={styles.emptyStateTitle}>Chưa có lịch sử điểm danh</Text>
-              <Text style={styles.emptyStateText}>
-                Bạn chưa được chỉ định vào phiên điểm danh nào hoặc chưa có bản ghi
-                nào được tạo.
-              </Text>
-            </Card>
-          ) : (
-            records.map((item) => (
-              <Card key={item.id.toString()} style={styles.recordCard}>
-                {/* Title & Status */}
-                <View style={styles.recordHeader}>
-                  <View style={styles.titleWrapper}>
-                    <Text style={styles.recordTitle}>{item.sessionTitle}</Text>
-                    <Text style={styles.sessionStatusBadge}>
-                      {getSessionStatusText(item.sessionStatus)}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.badgeContainer,
-                      { backgroundColor: `${getStatusColor(item.status)}15` },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.recordStatus,
-                        { color: getStatusColor(item.status) },
-                      ]}
-                    >
-                      {getStatusBadge(item.status)}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Check-in Time */}
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Thời gian điểm danh:</Text>
-                  <Text
-                    style={[
-                      styles.infoValue,
-                      item.checkedInAt ? styles.checkedInText : styles.unCheckedText,
-                    ]}
-                  >
-                    {item.checkedInAt
-                      ? new Date(item.checkedInAt).toLocaleString('vi-VN')
-                      : 'Chưa điểm danh'}
-                  </Text>
-                </View>
-
-                {/* Session Time Range */}
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Thời gian buổi học:</Text>
-                  <Text style={styles.infoValueSub}>
-                    {new Date(item.openAt).toLocaleTimeString('vi-VN', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}{' '}
-                    -{' '}
-                    {new Date(item.closeAt).toLocaleTimeString('vi-VN', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}{' '}
-                    ({new Date(item.openAt).toLocaleDateString('vi-VN')})
-                  </Text>
-                </View>
-
-                {/* GPS & Device details if checked in */}
-                {item.checkedInAt && (
-                  <View style={styles.gpsDetailsBox}>
-                    <View style={styles.gpsRow}>
-                      <Text style={styles.gpsLabel}>📍 Khoảng cách tới phòng:</Text>
-                      <Text style={styles.gpsValue}>
-                        {item.distanceMeters !== null
-                          ? `${item.distanceMeters}m / Bán kính ${item.radius}m`
-                          : `Trong bán kính ${item.radius}m`}
-                      </Text>
-                    </View>
-
-                    {item.accuracy !== null && (
-                      <View style={styles.gpsRow}>
-                        <Text style={styles.gpsLabel}>🎯 Độ chính xác GPS:</Text>
-                        <Text style={styles.gpsValue}>±{item.accuracy}m</Text>
-                      </View>
-                    )}
-
-                    {item.deviceId && (
-                      <View style={styles.gpsRow}>
-                        <Text style={styles.gpsLabel}>📱 Thiết bị ghi nhận:</Text>
-                        <Text style={styles.gpsValueSmall} numberOfLines={1}>
-                          {item.deviceId}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
-              </Card>
-            ))
-          )}
+                {statusFilter === filter.key && <MaterialCommunityIcons name="check" size={18} color={COLORS.primary} />}
+              </Pressable>
+            ))}
+          </View>
         </View>
-      </ScrollView>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 16,
-  },
-  centerWrapper: {
-    width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    paddingHorizontal: 16,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: COLORS.text.secondary,
-  },
+  screen: { flex: 1, backgroundColor: '#FFFFFF' },
+  loadingScreen: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
+  loadingText: { marginTop: 10, color: '#738078', fontSize: 13 },
   header: {
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#F8FAFC',
-    textAlign: 'center',
-  },
-  lastLoginBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#334155',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    marginTop: 8,
-    alignSelf: 'center',
-  },
-  lastLoginIcon: {
-    fontSize: 13,
-    marginRight: 6,
-  },
-  lastLoginText: {
-    fontSize: 12,
-    color: '#94A3B8',
-    fontWeight: '500',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginBottom: 16,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: '#1E293B',
-    paddingVertical: 12,
+    minHeight: 52,
     paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#94A3B8',
-    fontWeight: '600',
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#F8FAFC',
-    marginTop: 4,
-  },
-  recordCard: {
-    marginBottom: 14,
-    padding: 16,
-    borderRadius: 14,
-    backgroundColor: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  recordHeader: {
+    paddingBottom: 8,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E8ECE9',
   },
-  titleWrapper: {
+  backButton: { width: 36, height: 36, alignItems: 'flex-start', justifyContent: 'center' },
+  headerTitle: { color: '#26352D', fontSize: 16, fontWeight: '800' },
+  headerTitleGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  headerSpacer: { width: 36 },
+  controlsRow: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 14, paddingVertical: 10 },
+  semesterButton: {
     flex: 1,
-    marginRight: 8,
-  },
-  recordTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.text.primary,
-  },
-  sessionStatusBadge: {
-    fontSize: 11,
-    color: COLORS.text.secondary,
-    marginTop: 3,
-  },
-  badgeContainer: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  recordStatus: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 3,
-  },
-  infoLabel: {
-    fontSize: 12,
-    color: COLORS.text.secondary,
-  },
-  infoValue: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  infoValueSub: {
-    fontSize: 12,
-    color: COLORS.text.primary,
-    fontWeight: '500',
-  },
-  checkedInText: {
-    color: COLORS.success,
-  },
-  unCheckedText: {
-    color: COLORS.error,
-  },
-  gpsDetailsBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 10,
-    gap: 4,
+    height: 37,
+    paddingHorizontal: 11,
+    borderRadius: 9,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.35)',
-  },
-  gpsRow: {
+    borderColor: '#E5EAE7',
+    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  gpsLabel: {
-    fontSize: 11,
-    color: '#EF4444',
-    fontWeight: '600',
-  },
-  gpsValue: {
-    fontSize: 11,
-    color: '#EF4444',
-    fontWeight: '700',
-  },
-  gpsValueSmall: {
-    fontSize: 10,
-    color: '#EF4444',
-    maxWidth: '55%',
-  },
-  emptyCard: {
+  semesterButtonText: { color: '#34443A', fontSize: 12, fontWeight: '600' },
+  filterButton: {
+    width: 38,
+    height: 37,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#E5EAE7',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
   },
-  emptyStateIcon: {
-    fontSize: 44,
-    marginBottom: 12,
-  },
-  emptyStateTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: COLORS.text.primary,
+  filterButtonActive: { borderColor: '#A8D5BA', backgroundColor: '#EFF8F2' },
+  semesterMenu: {
+    marginHorizontal: 14,
     marginBottom: 6,
-    textAlign: 'center',
+    paddingHorizontal: 10,
+    borderRadius: 11,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E7ECE9',
+    shadowColor: '#183B2A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  emptyStateText: {
-    fontSize: 13,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
+  semesterOption: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E8ECE9' },
+  semesterOptionText: { color: '#4E5B53', fontSize: 12 },
+  semesterOptionSelected: { color: COLORS.primary, fontWeight: '700' },
+  errorBanner: { marginHorizontal: 14, marginBottom: 8, padding: 10, borderRadius: 8, backgroundColor: '#FFF1EF', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  errorText: { flex: 1, color: '#A43A34', fontSize: 11 },
+  retryText: { color: COLORS.primary, fontSize: 11, fontWeight: '700', marginLeft: 10 },
+  listContent: { paddingHorizontal: 14, flexGrow: 1 },
+  emptyList: { flexGrow: 1 },
+  recordRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 5 },
+  recordRowPressed: { opacity: 0.62 },
+  recordDateTime: { width: 76 },
+  recordDate: { color: '#34443A', fontSize: 9, fontWeight: '600' },
+  recordTime: { marginTop: 2, color: '#68736D', fontSize: 9 },
+  recordSubject: { flex: 1, color: '#29372F', fontSize: 10, fontWeight: '600' },
+  statusBadge: { maxWidth: 83, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 4 },
+  statusText: { fontSize: 8, fontWeight: '700', textAlign: 'center' },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: '#E8ECE9' },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 70 },
+  emptyTitle: { marginTop: 12, color: '#34443A', fontSize: 14, fontWeight: '700' },
+  emptyDescription: { marginTop: 6, color: '#7B8580', fontSize: 11, lineHeight: 16, textAlign: 'center' },
+  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20, 31, 24, 0.28)' },
+  filterSheet: { paddingHorizontal: 18, paddingTop: 10, borderTopLeftRadius: 20, borderTopRightRadius: 20, backgroundColor: '#FFFFFF' },
+  sheetHandle: { width: 38, height: 4, borderRadius: 2, alignSelf: 'center', backgroundColor: '#D6DDD8', marginBottom: 14 },
+  sheetTitle: { marginBottom: 8, color: '#26352D', fontSize: 15, fontWeight: '800' },
+  filterOption: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E8ECE9' },
+  filterOptionText: { color: '#4E5B53', fontSize: 12 },
 });

@@ -1,13 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import { StudentAttendanceHistoryItemDto } from '@gps-attendance/shared';
+import {
+  AttendanceHistoryEventDto,
+  StudentAttendanceHistoryItemDto,
+} from '@gps-attendance/shared';
 import { AttendanceRecord } from '../attendance-record.model';
-import { IAttendanceRecordRepository } from '../attendance-record.repository';
+import {
+  CreateAttendanceHistoryEventInput,
+  IAttendanceRecordRepository,
+} from '../attendance-record.repository';
 
 @Injectable()
 export class MockAttendanceRecordRepository
   implements IAttendanceRecordRepository
 {
   private records: AttendanceRecord[] = [];
+  private historyEvents: Array<{
+    userId: number;
+    event: AttendanceHistoryEventDto;
+  }> = [];
   private attempts = new Map<string, number>();
 
   async getRecord(
@@ -46,6 +56,34 @@ export class MockAttendanceRecordRepository
     return this.records.filter((r) => r.sessionId === sessionId);
   }
 
+  async createHistoryEvent(
+    event: CreateAttendanceHistoryEventInput,
+  ): Promise<void> {
+    this.historyEvents.unshift({
+      userId: event.userId,
+      event: {
+        id: this.historyEvents.length + 1,
+        sessionId: event.sessionId,
+        sessionTitle: `Session ${event.sessionId}`,
+        eventType: event.eventType,
+        status: event.status ?? null,
+        attemptResult: event.attemptResult ?? null,
+        reasons: event.reasons ?? [],
+        note: event.note ?? null,
+        actorName: null,
+        createdAt: new Date().toISOString(),
+      },
+    });
+  }
+
+  async findHistoryEventsByUser(
+    userId: number,
+  ): Promise<AttendanceHistoryEventDto[]> {
+    return this.historyEvents
+      .filter((entry) => entry.userId === userId)
+      .map((entry) => entry.event);
+  }
+
   async findDetailedHistoryByUser(
     userId: number,
   ): Promise<StudentAttendanceHistoryItemDto[]> {
@@ -68,5 +106,10 @@ export class MockAttendanceRecordRepository
       accuracy: r.accuracy,
       distanceMeters: r.distanceMeters,
     }));
+  }
+
+  async findById(id: number): Promise<StudentAttendanceHistoryItemDto | null> {
+    const list = await this.findDetailedHistoryByUser(1);
+    return list.find((item) => item.id === id) ?? null;
   }
 }

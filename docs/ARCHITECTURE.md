@@ -1,263 +1,371 @@
-# Kiến trúc dự án GPS Attendance
+# Kiến trúc hệ thống GPS Attendance
 
-## 1. Tổng quan kiến trúc
+## 1. Tổng quan
 
-Dự án GPS Attendance được tổ chức theo mô hình monorepo với 3 nền tảng chính:
-- backend API trên NestJS
-- dashboard web trên React + Vite
-- mobile app trên Expo + React Native
-- shared package dùng chung cho types và contract
+Hệ thống GPS Attendance là một monorepo dùng để quản lý điểm danh theo vị trí GPS cho môi trường học tập. Dự án gồm 4 thành phần chính:
 
-## 2. Lớp kiến trúc và trách nhiệm
+- Backend NestJS: cung cấp API, xác thực, nghiệp vụ điểm danh, kiểm tra GPS và quyền truy cập.
+- Web dashboard: giao diện quản trị cho giảng viên và admin.
+- Mobile app: giao diện cho sinh viên, dùng GPS để check-in và xem lịch sử.
+- Shared package: định nghĩa type, DTO, chuẩn lỗi và contract dùng chung giữa các phần.
 
-```text
-┌─────────────────────────────────────────────┐
-│            Client Layer                     │
-│  - Mobile app (Expo / React Native)        │
-│  - Admin dashboard (React / Vite)          │
-└─────────────────────────────────────────────┘
-                     │
-                     │ HTTP + JWT
-                     ▼
-┌─────────────────────────────────────────────┐
-│            API Layer (NestJS)               │
-│  Auth / Users / Sessions / Check-in        │
-│  Validation / Geo / Attendance Records     │
-└─────────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────┐
-│         Data / Persistence Layer           │
-│  Prisma schema + PostgreSQL (planned/partial)│
-│  In-memory stores in prototype phases      │
-└─────────────────────────────────────────────┘
-```
+Mục tiêu của hệ thống là cho phép:
 
-## 3. Mối quan hệ giữa các phần
+- Sinh viên check-in trong phạm vi địa lý của phiên điểm danh.
+- Giảng viên/admin tạo, xem và đóng phiên điểm danh.
+- Hệ thống chặn các hình thức gian lận như mock location, trùng thiết bị, số lần thử quá mức và vị trí ngoài bán kính.
+- Dữ liệu được lưu trữ trung tâm trên PostgreSQL thông qua Prisma.
 
-### Mobile app
-- Lấy vị trí GPS của sinh viên
-- Gửi yêu cầu check-in với JWT
-- Hiển thị kết quả điểm danh và lịch sử
+---
 
-### Dashboard web
-- Dành cho lecturer/admin
-- Tạo session và xem chi tiết
-- Tương tác với API session và auth
-
-### Backend API
-- Xác thực người dùng
-- Kiểm tra session đang mở
-- Tính khoảng cách từ vị trí đến tâm session
-- Áp dụng anti-fraud validation
-- Lưu sự kiện điểm danh
-
-## 4. Module backend chính
+## 2. Kiến trúc tổng thể
 
 ```text
-server/attendance/src/
-├── app.module.ts
-├── auth/
-├── users/
-├── account/
-├── attendance-sessions/
-├── attendance-check-in/
-├── attendance-validation/
-├── attendance-record/
-├── geo/
-├── common/
-└── main.ts
-```
-
-### Các module cụ thể
-- `auth`: login, JWT, guards, role-based access
-- `users`: thông tin người dùng và truy vấn dữ liệu user
-- `attendance-sessions`: CRUD session
-- `attendance-check-in`: `POST /attendance/check-in`
-- `attendance-validation`: validate vị trí và độ tin cậy
-- `attendance-record`: lịch sử điểm danh
-- `geo`: tính khoảng cách GPS
-
-## 5. Luồng check-in
-
-```text
-Sinh viên mở app
-    ↓
-App lấy location + device info
-    ↓
-Gửi POST /attendance/check-in với JWT
-    ↓
-Backend xác thực token
-    ↓
-Kiểm tra session hợp lệ và đang mở
-    ↓
-Tính khoảng cách đến tâm session
-    ↓
-Phát hiện mock-location và integrity issue
-    ↓
-Trả về approved/review/rejected
-```
-
-## 6. Luồng auth
-
-```text
-Client -> Login endpoint
-    ↓
-Backend validate username/password
-    ↓
-Generate JWT
-    ↓
-Client gửi Bearer token trên request cần bảo vệ
-    ↓
-JwtAuthGuard xác thực
-```
-
-## 7. Quy ước response
-
-Dự án dùng chuẩn `ApiResponse` từ shared package:
-
-```ts
-{
-  success: true,
-  data: { ... }
-}
-```
-
-và lỗi:
-
-```ts
-{
-  success: false,
-  code: 'ERROR_CODE',
-  message: 'Mô tả lỗi'
-}
-```
-
-## 8. Database và dữ liệu
-
-Schema Prisma hiện có cơ sở dữ liệu mục tiêu dựa trên các model:
-- `Account`
-- `User`
-- `AttendanceSession`
-- `AttendanceRecord`
-- `AttendanceAttempt`
-
-Tuy nhiên, trong giai đoạn hiện tại, nhiều phần của dự án vẫn đang dùng mock/in-memory store để phát triển nhanh.
-
-## 9. Điểm cần lưu ý về trạng thái hiện tại
-
-- Backend đang làm việc với nhiều module rõ ràng nhưng chưa hoàn toàn kết nối database thật.
-- Dashboard và mobile app có kiến trúc cơ bản, đủ để phát triển tiếp.
-- Shared package là trung tâm để kiểm soát contract kiểu dữ liệu giữa các phần.
-- Dự án đang trong giai đoạn chuyển từ prototype sang phần mềm có thể triển khai thực tế.
-
-## 10. Tài liệu liên quan
-
-- [../README.md](../README.md)
-- [../docs/system-overview.md](system-overview.md)
-- [../docs/QUICK_REFERENCE.md](QUICK_REFERENCE.md)
-- [../docs/conventions](conventions)
-
-Step 1: Login
-┌──────────────┐
-│ Mobile/Admin │
-└────┬─────────┘
-     │ POST /auth/login
-     │ { username, password }
-     │
-     ▼
-┌──────────────────────────┐
-│  AuthService.login()     │
-│  • Hash password         │
-│  • Compare with DB       │
-│  • Validate credentials  │
-└────┬─────────────────────┘
-     │ Found → Generate JWT
-     │ payload: {
-     │   userId: 5,
-     │   role: 'student',
-     │   iat: 1234567890,
-     │   exp: 1234654290
-     │ }
-     │
-     ▼
-┌──────────────────────────┐
-│  Return JWT Token        │
-│  "eyJhbGciOiJIUzI1NiIs" │
-└────┬─────────────────────┘
-     │
-     ▼
-┌──────────────┐
-│ Client store │ (secure storage on mobile)
-│ token        │
-└──────────────┘
-
-Step 2: Authenticated Request
-┌──────────────────────────────┐
-│ GET /users/me                │
-│ Authorization:               │
-│   Bearer eyJhbGciOiJIUzI1NiIs│
-└────┬─────────────────────────┘
-     │
-     ▼
-┌────────────────────────────┐
-│ JwtAuthGuard               │
-│ • Extract token from header│
-│ • Verify signature         │
-│ • Check expiration         │
-│ • Decode payload           │
-└────┬───────────────────────┘
-     │ Valid
-     │ Extract: userId, role, ...
-     │
-     ▼
-┌──────────────────────────┐
-│ @CurrentUser() decorator │
-│ Returns: { userId, role }│
-└────┬─────────────────────┘
-     │
-     ▼
-┌────────────────────┐
-│ Route handler      │
-│ can access user    │
-│ context            │
-└────────────────────┘
-
-Step 3: Permission Checks
-If route protected by @Roles('lecturer', 'admin'):
-┌─────────────────────────────────┐
-│ RolesGuard                       │
-│ • Extract user role from token  │
-│ • Check against @Roles() array  │
-│ • Allow or reject               │
-└─────────────────────────────────┘
+                    ┌──────────────────────────────┐
+                    │       packages/shared        │
+                    │  types / DTO / api contract  │
+                    │  error codes / shared utils  │
+                    └──────────────┬───────────────┘
+                                   │
+          ┌────────────────────────────┼────────────────────────────┐
+          ▼                            ▼                            ▼
+┌──────────────────────┐    ┌────────────────────────────┐    ┌─────────────────────────────┐
+│ Mobile client        │    │ Admin dashboard           │    │ Backend API (NestJS)         │
+│ Expo + React Native │    │ React + Vite + TS         │    │ server/attendance            │
+│ Student app          │    │ Lecturer/Admin UI         │    │ Auth / Sessions / Check-in   │
+└──────────┬───────────┘    └──────────────┬────────────┘    └──────────────┬──────────────┘
+           │                               │                              │
+           └──────────────┬────────────────┴──────────────────────────────┘
+                          │ HTTP + Bearer JWT
+                          ▼
+                 ┌────────────────────┐
+                 │ PostgreSQL + Prisma │
+                 │  Sessions / Users   │
+                 │  Records / Attempts │
+                 └────────────────────┘
+                          │
+                          ▼
+                       Redis / cache
 ```
 
 ---
 
-## 🛡️ Validation Scoring Deep Dive
+## 3. Cấu trúc monorepo
 
-### Location Check Algorithm
-
+```text
+gps-attendance-main/
+├── README.md
+├── package.json
+├── pnpm-workspace.yaml
+├── docker-compose.yml
+├── scripts/
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── SYSTEM.md
+│   ├── QUICK_REFERENCE.md
+│   └── conventions/
+├── client/
+│   ├── admin-dashboard/
+│   └── mobile-client/
+├── packages/
+│   └── shared/
+├── server/
+│   └── attendance/
+├── presentation/
+└── .github/
 ```
-Input:
-  user_location = (lat_user, lon_user)
-  session_location = (lat_session, lon_session)
-  session_radius = 50 meters
 
-Calculate:
-  distance = Haversine(
-    (lat_user, lon_user),
-    (lat_session, lon_session)
-  )
-  // Returns distance in meters
+### Các package trong monorepo
 
-  locationCoefficient = min(1.0, distance / radiusLimit)
-  
-  Examples:
-  ├─ distance = 10m, radius = 50m
-  │  → coeff = 10/50 = 0.2 (inside, low coefficient)
-  ├─ distance = 50m, radius = 50m
+| Package | Mục đích |
+|---|---|
+| [README.md](README.md) | Tổng quan toàn bộ monorepo và scripts chạy dự án |
+| [server/attendance](../server/attendance) | Backend chính, thực thi nghiệp vụ và API |
+| [client/admin-dashboard](../client/admin-dashboard) | Giao diện web cho giảng viên/admin |
+| [client/mobile-client](../client/mobile-client) | Ứng dụng di động cho sinh viên |
+| [packages/shared](../packages/shared) | Contract dùng chung: types, DTO, error codes |
+| [presentation](../presentation) | Slide, tài liệu thuyết trình và hình ảnh demo |
+
+---
+
+## 4. Mô hình triển khai
+
+### 4.1 Môi trường local
+
+Dự án dùng Docker Compose cho các service nền:
+
+| Service | Port | Chức năng |
+|---|---:|---|
+| PostgreSQL | 5432 | Cơ sở dữ liệu chính |
+| Redis | 6379 | Cache / blacklist token / cấu hình nhanh |
+| Backend NestJS | 3000 | API hệ thống |
+| Admin dashboard | 8080 | Phục vụ build static của dashboard |
+
+### 4.2 Mobile runtime
+
+Ứng dụng mobile không chạy trong Docker. Nó chạy trên Expo Go hoặc Simulator/Device và cần trỏ đến IP LAN của máy chạy backend, ví dụ:
+
+```env
+EXPO_PUBLIC_API_URL=http://192.168.1.16:3000
+```
+
+Điều này quan trọng vì thiết bị thật không thể dùng localhost như máy chủ backend.
+
+### 4.3 Web dashboard
+
+Dashboard chạy bằng React + Vite. Nó gọi API backend qua JWT token và hiển thị dữ liệu điểm danh, phiên, người dùng và báo cáo quyền.
+
+---
+
+## 5. Backend NestJS
+
+### 5.1 Vị trí code
+
+Backend nằm trong [server/attendance](../server/attendance). Cấu trúc chính:
+
+```text
+server/attendance/src/
+├── app.module.ts
+├── app.controller.ts
+├── app.service.ts
+├── main.ts
+├── account/
+├── auth/
+├── attendance-check-in/
+├── attendance-record/
+├── attendance-sessions/
+├── attendance-validation/
+├── common/
+├── geo/
+├── health/
+├── redis/
+├── tags/
+├── units/
+├── users/
+└── prisma/
+```
+
+### 5.2 Mỗi module làm gì
+
+| Module | Trách nhiệm |
+|---|---|
+| auth | Xác thực người dùng, JWT, refresh token và Guards |
+| account | Quản lý thông tin tài khoản đăng nhập |
+| users | Hồ sơ người dùng và truy vấn dữ liệu user |
+| attendance-sessions | Tạo, xem, đóng, xóa phiên điểm danh |
+| attendance-check-in | Xử lý check-in của sinh viên |
+| attendance-validation | Kiểm tra vị trí, mock-location, độ tin cậy, giới hạn quyền |
+| attendance-record | Lưu và truy vấn lịch sử điểm danh |
+| geo | Tính khoảng cách Haversine giữa vị trí người dùng và tâm phiên |
+| health | Health check và monitoring tình trạng hệ thống |
+| common | Exception filter, logging, request-id, shared utilities |
+| units / tags | Nền tảng lọc và phân nhóm sinh viên theo đơn vị / nhãn |
+
+### 5.3 Bootstrap và chuẩn runtime
+
+Nút khởi động là [server/attendance/src/main.ts](../server/attendance/src/main.ts). Ở đây backend thực hiện:
+
+- bật CORS
+- dùng ValidationPipe để validate input
+- dùng global exception filter để chuẩn hóa lỗi API
+- thêm Swagger docs tại `/api-docs`
+- lắng nghe trên `0.0.0.0` và cổng cấu hình hoặc 3000
+
+---
+
+## 6. Xác thực và phân quyền
+
+Hệ thống dùng JWT với hai nhánh auth riêng:
+
+- `/v0/user/auth/*` cho sinh viên
+- `/v0/admin/auth/*` cho giảng viên/admin
+
+### Luồng auth
+
+```text
+Client -> Login endpoint
+  -> validate username/password
+  -> generate access token + refresh token
+  -> client gửi Bearer token trên các request cần bảo vệ
+  -> JwtAuthGuard verify token
+  -> RolesGuard kiểm tra quyền theo role
+  -> controller/service xử lý request
+```
+
+### Vai trò chính
+
+- `student`: sinh viên, chỉ check-in và xem phiên/record của mình
+- `lecturer`: giảng viên, tạo và quản lý phiên của chính mình
+- `admin`: quản trị, có quyền xem toàn bộ hệ thống
+
+---
+
+## 7. Luồng nghiệp vụ điểm danh
+
+### 7.1 Tạo phiên
+
+Giảng viên/admin gửi request tạo phiên với thông tin:
+
+- title
+- tọa độ latitude, longitude
+- radius (mét)
+- openAt, closeAt
+- tiêu chí tham gia (nếu có)
+
+Backend tạo `AttendanceSession` và sinh ra các `AttendanceRecord` cho người dùng phù hợp với tiêu chí. Mỗi bản ghi mặc định ở trạng thái `absent` để chờ sinh viên check-in.
+
+### 7.2 Sinh viên check-in
+
+Luồng thực thi:
+
+```text
+Sinh viên mở app
+  -> lấy GPS + device info + app integrity
+  -> gửi POST /attendance/check-in với JWT
+  -> backend xác thực token
+  -> kiểm tra phiên đang mở và người dùng thuộc phiên
+  -> kiểm tra số lần thử / thiết bị / trạng thái duplicate
+  -> tính khoảng cách từ vị trí người dùng đến tâm phiên
+  -> áp dụng các rule chống gian lận
+  -> lưu record và trả về kết quả approve / rejected / flagged
+```
+
+### 7.3 Các nguyên tắc chống gian lận
+
+Hệ thống phân tích các yếu tố sau:
+
+- khoảng cách đến tâm phiên (Haversine)
+- độ chính xác GPS (accuracy)
+- mock-location / giả lập vị trí
+- số lần thử check-in thất bại
+- thiết bị lặp lại / deviceId
+- điểm tin cậy của dữ liệu vị trí
+
+Nếu vị trí ngoài bán kính hoặc độ tin cậy thấp, backend sẽ trả về lỗi hoặc trạng thái từ chối phù hợp.
+
+---
+
+## 8. Cấu trúc dữ liệu
+
+Dữ liệu chính được quản lý qua Prisma và PostgreSQL. Các entity quan trọng gồm:
+
+- `User`: người dùng hệ thống
+- `Account`: thông tin đăng nhập, mật khẩu hash
+- `AttendanceSession`: phiên điểm danh
+- `AttendanceRecord`: bản ghi theo người dùng cho từng phiên
+- `AttendanceAttempt`: số lần check-in thử
+
+Quan hệ điển hình:
+
+```text
+User 1 --- N AttendanceRecord
+User 1 --- N AttendanceAttempt
+AttendanceSession 1 --- N AttendanceRecord
+AttendanceSession 1 --- N AttendanceAttempt
+```
+
+---
+
+## 9. API và chuẩn response
+
+Hệ thống dùng chuẩn giao tiếp thống nhất qua shared package. Mỗi response có dạng:
+
+```ts
+{
+  success: true,
+  data: {...}
+}
+```
+
+Và lỗi có dạng:
+
+```ts
+{
+  success: false,
+  code: 'ATTENDANCE_SESSION_NOT_FOUND',
+  message: 'Phiên điểm danh không tồn tại'
+}
+```
+
+Điều này giúp frontend và mobile xử lý lỗi theo cùng một chuẩn, thay vì phụ thuộc vào từng controller trả text hay object riêng lẻ.
+
+---
+
+## 10. Web dashboard và mobile app
+
+### 10.1 Dashboard web
+
+Dashboard được xây dựng bằng React + Vite. Nó tập trung vào:
+
+- đăng nhập admin/lecturer
+- tạo và xem các phiên điểm danh
+- xem danh sách sinh viên trong từng phiên
+- tracking trạng thái check-in
+- thao tác xóa phiên và xem chi tiết
+
+### 10.2 Mobile app
+
+Mobile app sử dụng Expo + React Native. Nó cho phép:
+
+- đăng nhập sinh viên
+- xem danh sách phiên được gán
+- kiểm tra vị trí người dùng
+- thực hiện điểm danh bằng GPS
+- hiển thị kết quả thành công/thất bại với lý do rõ ràng
+
+---
+
+## 11. Shared package
+
+Package [packages/shared](../packages/shared) là lớp “contract” của hệ thống. Nó chứa:
+
+- type dữ liệu dùng chung giữa client và server
+- enum / error code
+- DTO chuẩn hóa
+- các helper request/response API
+
+Vì vậy, mọi thay đổi về API contract nên được làm ở shared package trước khi mở rộng frontend hoặc backend.
+
+---
+
+## 12. Quy trình phát triển và kiểm tra
+
+Các lệnh chính ở root:
+
+```bash
+pnpm install
+pnpm build:shared
+pnpm dev:attendance
+pnpm dev:admin
+pnpm dev:mobile
+pnpm build
+```
+
+Mỗi phần của monorepo có trách nhiệm riêng nhưng cùng sử dụng chung shared package, nên khi sửa contract hoặc DTO, cần rebuild và kiểm tra cả backend lẫn frontend liên quan.
+
+---
+
+## 13. Kết luận
+
+GPS Attendance là một hệ thống monorepo hướng nghiệp vụ, trong đó backend là trung tâm điều phối quy trình điểm danh, còn web/mobile là giao diện tương tác. Cấu trúc hiện tại rất phù hợp cho việc mở rộng vì:
+
+- role-based access rõ ràng
+- module hóa theo nghiệp vụ
+- contract chung được quản lý ở shared package
+- validation GPS và anti-fraud được tách riêng khỏi controller
+- dữ liệu được lưu trữ trung tâm qua Prisma/PostgreSQL
+
+Đây là kiến trúc nền tảng đủ mạnh để tiếp tục phát triển cho phiên bản production, đồng thời vẫn dễ kiểm thử và bảo trì.
+
+---
+
+## 14. Tài liệu liên quan
+
+- [README.md](../README.md)
+- [docs/SYSTEM.md](SYSTEM.md)
+- [docs/QUICK_REFERENCE.md](QUICK_REFERENCE.md)
+- [docs/conventions](conventions)
+
   │  → coeff = 50/50 = 1.0 (on boundary)
   └─ distance = 100m, radius = 50m
      → coeff = 100/50 = 1.0 (capped at 1.0, far outside)

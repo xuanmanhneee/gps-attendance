@@ -38,9 +38,19 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
+        name="schedule"
+        options={{
+          title: 'Lịch học',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="calendar-month" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
         name="history"
         options={{
-          title: 'Lịch Sử',
+          title: 'Lịch sử',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="history" size={size} color={color} />
           ),
