@@ -60,6 +60,7 @@ describe('AttendanceCheckInService', () => {
       deviceCheck as any,
       deviceUsageRepository as any,
       attemptRepository as any,
+      {} as any,
     );
 
     const dto = {

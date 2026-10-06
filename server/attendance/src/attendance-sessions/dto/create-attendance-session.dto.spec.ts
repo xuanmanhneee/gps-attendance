@@ -23,7 +23,7 @@ describe('CreateAttendanceSessionDto participantCriteria', () => {
     const errors = await validate(dto, { whitelist: true });
 
     expect(errors).toHaveLength(0);
-    expect(dto.participantCriteria.codeFilter?.addCodes).toEqual([
+    expect(dto.participantCriteria?.codeFilter?.addCodes).toEqual([
       '2312686',
       '2312716',
     ]);
@@ -40,5 +40,19 @@ describe('CreateAttendanceSessionDto participantCriteria', () => {
     const errors = await validate(dto, { whitelist: true });
 
     expect(errors).not.toHaveLength(0);
+  });
+
+  it('accepts a registry-backed request without client coordinates or participant filters', async () => {
+    const dto = plainToInstance(CreateAttendanceSessionDto, {
+      title: 'Scheduled session',
+      openAt: '2026-10-05T01:00:00.000Z',
+      closeAt: '2026-10-05T02:00:00.000Z',
+      courseSectionId: 41,
+      timetableSlotId: 9,
+    });
+
+    const errors = await validate(dto, { whitelist: true });
+
+    expect(errors).toHaveLength(0);
   });
 });

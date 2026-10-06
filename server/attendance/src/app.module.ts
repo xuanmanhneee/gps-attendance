@@ -21,6 +21,8 @@ import { TagModule } from './tags/tag.module';
 import { AllExceptionsFilter } from './common/filters/all-exception.filter';
 import { UnitOfWorkModule } from './common/unit-of-work/unit-of-work.module';
 import { UnitModule } from './units/units.module';
+import { LocationRegistryModule } from './location-registry/location-registry.module';
+import { DeviceTrustModule } from './device-trust/device-trust.module';
 
 @Module({
   imports: [
@@ -28,7 +30,9 @@ import { UnitModule } from './units/units.module';
       isGlobal: true,
     }),
     ThrottlerModule.forRoot({
-      throttlers: [{ limit: 5, ttl: 60000 }],
+      // General dashboard/mobile traffic includes several parallel reads;
+      // stricter limits remain configured on login and check-in endpoints.
+      throttlers: [{ limit: 120, ttl: 60000 }],
     }),
     DatabaseModule,
     PrismaModule,
@@ -39,6 +43,8 @@ import { UnitModule } from './units/units.module';
     AuthModule,
     UsersModule,
     AttendanceSessionsModule,
+    LocationRegistryModule,
+    DeviceTrustModule,
     GeoModule,
     AttendanceValidationModule,
     AttendanceCheckInModule,

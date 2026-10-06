@@ -12,7 +12,8 @@
       "infoPlist": {
         "UIStatusBarHidden": true,
         "UIViewControllerBasedStatusBarAppearance": false,
-        "NSLocationWhenInUseUsageDescription": "Ứng dụng cần vị trí để hiển thị toạ độ hiện tại"
+        "NSLocationWhenInUseUsageDescription": "Ứng dụng cần vị trí để hiển thị toạ độ hiện tại",
+        "NSCameraUsageDescription": "Ứng dụng cần camera để quét QR của phiên điểm danh"
       }
     },
     "androidStatusBar": {
@@ -44,7 +45,14 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-location"
+      "expo-location",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Cho phép ứng dụng dùng camera để quét QR phiên điểm danh.",
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

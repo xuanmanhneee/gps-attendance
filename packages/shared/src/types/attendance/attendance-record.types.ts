@@ -4,19 +4,27 @@ import type { UserResponse } from '../users';
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
 export type AttendanceHistoryEventType =
+  | 'SESSION_CREATED'
   | 'SESSION_ASSIGNED'
   | 'CHECK_IN_ATTEMPT'
+  | 'GPS_VALIDATED'
+  | 'GPS_REVIEW'
+  | 'GPS_REJECTED'
+  | 'DEVICE_REJECTED'
+  | 'ATTEMPT_REJECTED'
   | 'REVIEW_DECISION'
   | 'RECORD_UPDATED';
 
 export interface AttendanceHistoryEventDto {
   id: number;
   sessionId: number;
+  attemptId?: number | null;
   sessionTitle: string;
   eventType: AttendanceHistoryEventType;
   status: AttendanceStatus | null;
   attemptResult: 'APPROVED' | 'REVIEW' | 'REJECTED' | null;
   reasons: string[];
+  reviewReason?: string | null;
   note: string | null;
   actorName: string | null;
   createdAt: string;

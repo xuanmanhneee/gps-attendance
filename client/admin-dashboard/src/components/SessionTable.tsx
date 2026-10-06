@@ -9,6 +9,8 @@ import { ConfirmModal } from './ConfirmModal';
 import { Pagination } from './Pagination';
 import { LoadingSkeleton } from './LoadingSkeleton';
 import { EmptyState } from './EmptyState';
+import { toast } from 'react-toastify';
+import { ApiError } from '@gps-attendance/shared';
 
 interface SessionTableProps {
   sessions: AttendanceSessionResponse[];
@@ -136,6 +138,13 @@ const SessionTable = ({
       setModalState((prev) => ({ ...prev, isOpen: false }));
     } catch (err) {
       console.error('Lỗi khi thực hiện thao tác:', err);
+      toast.error(
+        err instanceof ApiError && err.status === 429
+          ? 'Bạn thao tác quá nhanh. Vui lòng đợi một chút rồi thử lại.'
+          : err instanceof Error
+            ? err.message
+            : 'Không thực hiện được thao tác. Vui lòng thử lại.',
+      );
     } finally {
       setModalState((prev) => ({ ...prev, isSubmitting: false }));
     }

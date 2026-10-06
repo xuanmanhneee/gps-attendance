@@ -19,5 +19,4 @@ export interface IAttendanceCheckInAttemptRepository {
     reasons: string[],
   ): Promise<void>;
   getAttemptCount(sessionId: number, userId: number): Promise<number>;
-  resetAttempts(sessionId: number, userId: number): Promise<void>;
 }

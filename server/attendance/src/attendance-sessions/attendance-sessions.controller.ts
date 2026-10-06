@@ -22,6 +22,9 @@ import { AttendanceSessionQueryService } from './attendance-session-query.servic
 import { toAttendanceSessionResponse } from './attendance-session.mapper';
 import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
 import { ReviewAttendanceAttemptDto } from './dto/review-attendance-attempt.dto';
+import { ImportSectionRosterDto } from './dto/import-section-roster.dto';
+import { CreateCourseSectionDto } from './dto/create-course-section.dto';
+import { ImportCoursesDto } from './dto/import-courses.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -43,11 +46,12 @@ export class AttendanceSessionsController {
   @Post()
   async create(
     @Body() dto: CreateAttendanceSessionDto,
-    @CurrentUser() user: { userId: number },
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ApiResponse<AttendanceSessionResponse>> {
     const session = await this.attendanceSessionsService.create(
       dto,
       user.userId,
+      user.role,
     );
     return { success: true, data: toAttendanceSessionResponse(session) };
   }
@@ -74,6 +78,84 @@ export class AttendanceSessionsController {
   ): Promise<ApiResponse<MyAttendanceSessionResponse[]>> {
     const data = await this.attendanceSessionQueryService.getMySessions(user.userId);
     return { success: true, data };
+  }
+
+  @ApiOperation({ summary: 'Danh sách lớp và lịch được giảng viên phụ trách' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('lecturer', 'admin')
+  @Get('teaching-sections')
+  async getTeachingSections(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ApiResponse<Awaited<ReturnType<AttendanceSessionQueryService['getTeachingSections']>>>> {
+    const data = await this.attendanceSessionQueryService.getTeachingSections(
+      user.userId,
+      user.role === 'admin',
+    );
+    return { success: true, data };
+  }
+
+  @ApiOperation({ summary: 'Danh mục giảng viên và phòng để tạo lớp học phần (admin)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Get('sections/creation-options')
+  async getCourseSectionCreationOptions() {
+    return {
+      success: true,
+      data: await this.attendanceSessionQueryService.getCourseSectionCreationOptions(),
+    };
+  }
+
+  @ApiOperation({ summary: 'Nhập danh mục mã học phần (admin)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('courses/import')
+  async importCourses(@Body() dto: ImportCoursesDto) {
+    return {
+      success: true,
+      data: await this.attendanceSessionQueryService.importCourses(dto.courses),
+    };
+  }
+
+  @ApiOperation({ summary: 'Tạo lớp học phần (admin)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('sections')
+  async createCourseSection(@Body() dto: CreateCourseSectionDto) {
+    return {
+      success: true,
+      data: await this.attendanceSessionQueryService.createCourseSection(dto),
+    };
+  }
+
+  @ApiOperation({ summary: 'Danh sách sinh viên đang ghi danh trong lớp học phần (admin)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'lecturer')
+  @Get('sections/:sectionId/roster')
+  async getSectionRoster(
+    @Param('sectionId', ParseIntPipe) sectionId: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return {
+      success: true,
+      data: await this.attendanceSessionQueryService.getSectionRoster(sectionId, user),
+    };
+  }
+
+  @ApiOperation({ summary: 'Nhập danh sách sinh viên vào lớp học phần (admin)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('sections/:sectionId/roster/import')
+  async importSectionRoster(
+    @Param('sectionId', ParseIntPipe) sectionId: number,
+    @Body() dto: ImportSectionRosterDto,
+  ) {
+    return {
+      success: true,
+      data: await this.attendanceSessionQueryService.importSectionRoster(
+        sectionId,
+        dto.studentCodes,
+      ),
+    };
   }
 
   @ApiOperation({ summary: 'Danh sách session do chính tôi tạo (lecturer)' })
@@ -147,6 +229,7 @@ export class AttendanceSessionsController {
       user.role,
       dto.decision,
       dto.note,
+      dto.reviewReason,
     );
     return { success: true, data: null };
   }

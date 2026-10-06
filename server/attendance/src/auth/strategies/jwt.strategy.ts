@@ -10,6 +10,10 @@ export interface JwtPayload {
   sub: number;
   username: string;
   role: Role;
+  jti?: string;
+  iss?: string;
+  aud?: string;
+  iat?: number;
 }
 
 @Injectable()
@@ -18,10 +22,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     configService: ConfigService,
     private readonly redisService: RedisService,
   ) {
+    const issuer = configService.get<string>('JWT_ISSUER') ?? 'gps-attendance';
+    const audience = configService.get<string>('JWT_AUDIENCE') ?? 'gps-attendance-app';
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
+      issuer,
+      audience,
       passReqToCallback: true,
     });
   }
@@ -32,6 +41,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException({
         code: AuthErrorCode.INVALID_TOKEN,
         message: 'Token has been revoked',
+      });
+    }
+
+    if (payload.jti && (await this.redisService.isTokenBlacklisted(payload.jti, 'jti'))) {
+      throw new UnauthorizedException({
+        code: AuthErrorCode.INVALID_TOKEN,
+        message: 'Session token has been revoked',
       });
     }
 

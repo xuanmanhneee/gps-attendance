@@ -76,6 +76,30 @@ describe('AttendanceValidationService', () => {
   });
 
   describe('Kiểm tra cự ly (distance so với radius)', () => {
+    it('đưa vào REVIEW khi accuracy vượt threshold đã snapshot dù tọa độ nằm trong radius', () => {
+      const calibratedSession = { ...mockSession, gpsAccuracyThreshold: 20 };
+      const location: LocationPayload = {
+        latitude: calibratedSession.latitude + 0.00008,
+        longitude: calibratedSession.longitude,
+        accuracy: 25,
+        timestamp: Date.now(),
+        isMockLocation: false,
+      };
+
+      const result = validationService.validate({
+        session: calibratedSession,
+        userId: 10,
+        existingRecordCount: 0,
+        checkedInAt: new Date(),
+        location,
+        device: defaultDevice,
+        integrity: defaultIntegrity,
+      });
+
+      expect(result.status).toBe('REVIEW');
+      expect(result.reasons).toContain('LOW_LOCATION_ACCURACY');
+    });
+
     it('nên trả về VALID khi tọa độ nằm trong bán kính và độ tin cậy cao', () => {
       // Tọa độ gần tâm (~10m)
       const validLocation: LocationPayload = {
@@ -99,6 +123,33 @@ describe('AttendanceValidationService', () => {
       expect(result.status).toBe('VALID');
       expect(result.reasons).toHaveLength(0);
       expect(result.distance).toBeLessThan(mockSession.radius);
+    });
+
+    it('nên gắn REVIEW hoặc REJECTED khi độ tin cậy GPS thấp và integrity yếu dù điểm vào trong bán kính', () => {
+      const weakLocation: LocationPayload = {
+        latitude: mockSession.latitude + 0.00015,
+        longitude: mockSession.longitude,
+        accuracy: 65,
+        timestamp: Date.now(),
+        isMockLocation: false,
+      };
+
+      const result = validationService.validate({
+        session: mockSession,
+        userId: 10,
+        existingRecordCount: 0,
+        checkedInAt: new Date(),
+        location: weakLocation,
+        device: defaultDevice,
+        integrity: { integrityToken: '' },
+      });
+
+      expect(['REVIEW', 'REJECTED']).toContain(result.status);
+      expect(result.reasons).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/LOW_LOCATION_ACCURACY|LOW_CONFIDENCE_SCORE/),
+        ]),
+      );
     });
 
     it('nên từ chối (REJECTED) với lý do OUT_OF_RANGE khi khoảng cách vượt quá xa bán kính', () => {
@@ -171,7 +222,9 @@ describe('AttendanceValidationService', () => {
       });
 
       expect(result.status).toBe('REVIEW');
-      expect(result.reasons).toEqual(['LOW_LOCATION_ACCURACY']);
+      expect(result.reasons).toEqual(
+        expect.arrayContaining(['LOW_LOCATION_ACCURACY']),
+      );
       expect(result.distance).toBeCloseTo(8.69, 0);
     });
 

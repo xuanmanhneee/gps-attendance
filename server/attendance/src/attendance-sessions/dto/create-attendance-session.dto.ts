@@ -4,8 +4,10 @@ import {
   IsLatitude,
   IsLongitude,
   IsNotEmpty,
+  IsInt,
   IsNumber,
   IsObject,
+  IsOptional,
   IsPositive,
   IsString,
   ValidateNested,
@@ -21,20 +23,23 @@ export class CreateAttendanceSessionDto implements CreateAttendanceSessionReques
   title!: string;
 
   @ApiProperty({ example: 21.028511 })
+  @IsOptional()
   @IsLatitude()
-  latitude!: number;
+  latitude?: number;
 
   @ApiProperty({ example: 105.804817 })
+  @IsOptional()
   @IsLongitude()
-  longitude!: number;
+  longitude?: number;
 
   @ApiProperty({
     example: 50,
     description: 'Bán kính hợp lệ, đơn vị mét',
   })
+  @IsOptional()
   @IsNumber()
   @IsPositive()
-  radius!: number;
+  radius?: number;
 
   @ApiProperty({ example: '2026-08-16T07:00:00.000Z' })
   @IsDateString()
@@ -44,7 +49,20 @@ export class CreateAttendanceSessionDto implements CreateAttendanceSessionReques
   @IsDateString()
   closeAt!: string;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  courseSectionId?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  timetableSlotId?: number;
+
   @ApiProperty({
+    required: false,
     type: () => UserFilterCriteriaDto,
     example: {
       codeFilter: {
@@ -52,8 +70,9 @@ export class CreateAttendanceSessionDto implements CreateAttendanceSessionReques
       },
     },
   })
+  @IsOptional()
   @IsObject()
   @ValidateNested()
   @Type(() => UserFilterCriteriaDto)
-  participantCriteria!: CreateAttendanceSessionRequest['participantCriteria'];
+  participantCriteria?: CreateAttendanceSessionRequest['participantCriteria'];
 }

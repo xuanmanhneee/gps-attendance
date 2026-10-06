@@ -2,6 +2,7 @@
 import type { UserFilterCriteria } from '../users';
 import type {
   AttendanceParticipantResponse,
+  AttendanceHistoryEventDto,
   AttendanceStatus,
 } from './attendance-record.types';
 
@@ -13,6 +14,16 @@ export interface AttendanceSessionResponse {
   latitude: number;
   longitude: number;
   radius: number; // mét
+  gpsAccuracyThreshold?: number | null;
+  lecturerValidationRadius?: number | null;
+  buildingId?: number | null;
+  roomId?: number | null;
+  timetableSlotId?: number | null;
+  locationSource?: 'MANUAL' | 'BUILDING_REGISTRY';
+  location?: {
+    building: { id: number; code: string; name: string } | null;
+    room: { id: number; code: string; name: string; floor: string | null } | null;
+  };
   openAt: string;
   closeAt: string;
   status: SessionStatus;
@@ -28,6 +39,8 @@ export interface AttendanceAttemptDto {
   accuracy: number;
   distanceToCenter: number;
   deviceId: string;
+  registeredDeviceId?: number | null;
+  deviceTrustStatus?: 'UNVERIFIED' | 'TRUSTED' | 'BLOCKED' | null;
   isMockLocation: boolean;
   serverTimestamp: string;
   result: 'APPROVED' | 'REVIEW' | 'REJECTED' | null;
@@ -35,6 +48,7 @@ export interface AttendanceAttemptDto {
   reviewedAt?: string | null;
   reviewedBy?: number | null;
   reviewNote?: string | null;
+  reviewReason?: string | null;
 }
 
 export interface LecturerAttendanceAnalytics {
@@ -59,9 +73,17 @@ export interface LecturerAttendanceAnalytics {
 
 export type AttendanceReviewDecision = 'APPROVED' | 'REJECTED';
 
+export type AttendanceReviewReason =
+  | 'OUTSIDE_GEOFENCE'
+  | 'GPS_INACCURATE'
+  | 'MOCK_LOCATION'
+  | 'DEVICE_ISSUE'
+  | 'OTHER';
+
 export interface AttendanceSessionDetailResponse extends AttendanceSessionResponse {
   participants: AttendanceParticipantResponse[];
   attempts?: AttendanceAttemptDto[];
+  historyEvents?: AttendanceHistoryEventDto[];
 }
 
 export interface MyAttendanceSessionResponse extends AttendanceSessionResponse {
@@ -73,12 +95,14 @@ export interface MyAttendanceSessionResponse extends AttendanceSessionResponse {
 
 export interface CreateAttendanceSessionPayload {
   title: string;
-  latitude: number;
-  longitude: number;
-  radius: number;
+  latitude?: number;
+  longitude?: number;
+  radius?: number;
   openAt: string;
   closeAt: string;
-  participantCriteria: UserFilterCriteria;
+  participantCriteria?: UserFilterCriteria;
+  courseSectionId?: number;
+  timetableSlotId?: number;
 }
 
 export type CreateAttendanceSessionRequest = CreateAttendanceSessionPayload;

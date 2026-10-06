@@ -60,17 +60,34 @@ export class PrismaAttendanceCheckInStore
           reasons,
         },
       });
+
+      const auditEventType =
+        result === 'APPROVED'
+          ? 'GPS_VALIDATED'
+          : result === 'REVIEW'
+            ? 'GPS_REVIEW'
+            : reasons.includes('DUPLICATE_DEVICE') || reasons.includes('DEVICE_BLOCKED')
+              ? 'DEVICE_REJECTED'
+              : reasons.includes('TOO_MANY_ATTEMPTS')
+                ? 'ATTEMPT_REJECTED'
+                : 'GPS_REJECTED';
+      await transaction.attendanceHistoryEvent.create({
+        data: {
+          sessionId: attempt.sessionId,
+          userId: attempt.userId,
+          actorId: attempt.userId,
+          attemptId: attempt.id,
+          eventType: auditEventType,
+          status: result === 'APPROVED' || result === 'REVIEW' ? 'present' : null,
+          attemptResult: result,
+          reasons,
+        },
+      });
     });
   }
 
   async getAttemptCount(sessionId: number, userId: number): Promise<number> {
     return this.prisma.attendanceAttempt.count({
-      where: { sessionId, userId },
-    });
-  }
-
-  async resetAttempts(sessionId: number, userId: number): Promise<void> {
-    await this.prisma.attendanceAttempt.deleteMany({
       where: { sessionId, userId },
     });
   }

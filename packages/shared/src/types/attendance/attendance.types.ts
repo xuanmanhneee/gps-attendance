@@ -67,5 +67,10 @@ export interface CheckInRequestPayload {
 
 export interface CheckInResponsePayload {
   status: AttendanceValidationStatus;
-  reasons: (AttendanceValidationReason | 'TOO_MANY_ATTEMPTS')[];
+  reasons: (
+    | AttendanceValidationReason
+    | 'TOO_MANY_ATTEMPTS'
+    | 'DEVICE_UNVERIFIED'
+    | 'DEVICE_BLOCKED'
+  )[];
 }

@@ -8,7 +8,10 @@ import {
 } from 'react-icons/md';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import type { AttendanceSessionDetailResponse } from '@gps-attendance/shared';
+import type {
+  AttendanceReviewReason,
+  AttendanceSessionDetailResponse,
+} from '@gps-attendance/shared';
 
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -16,6 +19,7 @@ import { Pagination } from '../components/Pagination';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorFallback } from '../components/ErrorFallback';
+import { useAuth } from '../hooks/useAuth';
 
 const PARTICIPANTS_PAGE_SIZE = 10;
 const ATTEMPTS_PAGE_SIZE = 10;
@@ -27,6 +31,29 @@ const reasonLabels: Record<string, string> = {
   TOO_MANY_ATTEMPTS: 'Đã vượt quá số lần thử cho phép (3 lần)',
   LOW_CONFIDENCE_SCORE: 'Độ tin cậy vị trí thấp',
   LOW_LOCATION_ACCURACY: 'Sai số GPS lớn, vị trí chưa chắc chắn nằm gọn trong phạm vi',
+  DEVICE_UNVERIFIED: 'Thiết bị chưa được admin xác minh',
+  DEVICE_BLOCKED: 'Thiết bị đã bị admin chặn',
+};
+
+const reviewReasonLabels: Record<AttendanceReviewReason, string> = {
+  OUTSIDE_GEOFENCE: 'Ngoài vùng địa lý',
+  GPS_INACCURATE: 'GPS không đủ chính xác',
+  MOCK_LOCATION: 'Có dấu hiệu mock GPS',
+  DEVICE_ISSUE: 'Vấn đề thiết bị',
+  OTHER: 'Lý do khác',
+};
+
+const auditEventLabels: Record<string, string> = {
+  SESSION_CREATED: 'Tạo phiên',
+  SESSION_ASSIGNED: 'Gán sinh viên',
+  CHECK_IN_ATTEMPT: 'Nỗ lực điểm danh',
+  GPS_VALIDATED: 'GPS hợp lệ',
+  GPS_REVIEW: 'GPS cần xem xét',
+  GPS_REJECTED: 'GPS bị từ chối',
+  DEVICE_REJECTED: 'Thiết bị bị từ chối',
+  ATTEMPT_REJECTED: 'Từ chối do giới hạn lượt thử',
+  REVIEW_DECISION: 'Quyết định giảng viên',
+  RECORD_UPDATED: 'Cập nhật bản ghi',
 };
 
 const formatReason = (reason: string) => reasonLabels[reason] ?? reason;
@@ -42,6 +69,7 @@ const normalizeSessionDetail = (
 const SessionDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [session, setSession] =
     useState<AttendanceSessionDetailResponse | null>(null);
@@ -50,6 +78,7 @@ const SessionDetailPage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [reviewSubmittingId, setReviewSubmittingId] = useState<number | null>(null);
+  const [deviceUpdatingId, setDeviceUpdatingId] = useState<number | null>(null);
 
   // Pagination states
   const [participantPage, setParticipantPage] = useState(1);
@@ -116,6 +145,21 @@ const SessionDetailPage = () => {
     decision: 'APPROVED' | 'REJECTED',
   ) => {
     if (!session || reviewSubmittingId !== null) return;
+    let reviewReason: AttendanceReviewReason | undefined;
+    if (decision === 'REJECTED') {
+      const reason = window.prompt(
+        `Chọn mã lý do từ chối:\n${Object.entries(reviewReasonLabels)
+          .map(([code, label]) => `${code}: ${label}`)
+          .join('\n')}`,
+        'OTHER',
+      );
+      if (reason === null) return;
+      if (!(reason in reviewReasonLabels)) {
+        window.alert('Mã lý do không hợp lệ.');
+        return;
+      }
+      reviewReason = reason as AttendanceReviewReason;
+    }
     const note = window.prompt(
       decision === 'APPROVED'
         ? 'Ghi chú lý do duyệt điểm danh:'
@@ -134,6 +178,7 @@ const SessionDetailPage = () => {
         attemptId,
         decision,
         note.trim(),
+        reviewReason,
       );
       const updated = normalizeSessionDetail(
         await attendanceSessionsApi.getDetail(session.id),
@@ -144,6 +189,35 @@ const SessionDetailPage = () => {
       window.alert('Không thể lưu quyết định. Vui lòng tải lại phiên và thử lại.');
     } finally {
       setReviewSubmittingId(null);
+    }
+  };
+
+  const handleDeviceTrust = async (
+    registeredDeviceId: number,
+    trustStatus: 'TRUSTED' | 'BLOCKED',
+  ) => {
+    const note = window.prompt(
+      trustStatus === 'TRUSTED'
+        ? 'Ghi chú xác minh thiết bị:'
+        : 'Ghi chú lý do chặn thiết bị:',
+      '',
+    );
+    if (note === null) return;
+    try {
+      setDeviceUpdatingId(registeredDeviceId);
+      await attendanceSessionsApi.updateDeviceTrust(
+        registeredDeviceId,
+        trustStatus,
+        note.trim() || undefined,
+      );
+      setSession(
+        normalizeSessionDetail(await attendanceSessionsApi.getDetail(Number(id))),
+      );
+    } catch (trustError) {
+      console.error('Không cập nhật được device trust:', trustError);
+      window.alert('Không cập nhật được trạng thái thiết bị.');
+    } finally {
+      setDeviceUpdatingId(null);
     }
   };
 
@@ -293,6 +367,8 @@ const SessionDetailPage = () => {
   );
 
   const attemptsList = session.attempts ?? [];
+  const hasAuditEvidence =
+    attemptsList.length > 0 || (session.historyEvents?.length ?? 0) > 0;
   const totalAttemptPages = Math.ceil(
     attemptsList.length / ATTEMPTS_PAGE_SIZE,
   );
@@ -303,10 +379,15 @@ const SessionDetailPage = () => {
 
   // Map student code to latest attempt for showing rejection/review reasons
   const studentAttemptMap = new Map<string, (typeof attemptsList)[0]>();
+  const attemptCountByStudent = new Map<string, number>();
   for (const attempt of attemptsList) {
     if (!studentAttemptMap.has(attempt.userCode)) {
       studentAttemptMap.set(attempt.userCode, attempt);
     }
+    attemptCountByStudent.set(
+      attempt.userCode,
+      (attemptCountByStudent.get(attempt.userCode) ?? 0) + 1,
+    );
   }
 
   return (
@@ -367,6 +448,8 @@ const SessionDetailPage = () => {
 
             <button
               type="button"
+              disabled={hasAuditEvidence}
+              title={hasAuditEvidence ? 'Session có audit/evidence nên không thể xóa' : 'Xóa phiên chưa có evidence'}
               onClick={() =>
                 setModalState({
                   isOpen: true,
@@ -374,10 +457,10 @@ const SessionDetailPage = () => {
                   isSubmitting: false,
                 })
               }
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
               <MdDeleteForever className="h-4 w-4" />
-              Xóa phiên
+              {hasAuditEvidence ? 'Giữ audit' : 'Xóa phiên'}
             </button>
           </div>
         </div>
@@ -401,7 +484,7 @@ const SessionDetailPage = () => {
             </div>
           </div>
 
-          <div className="grid gap-3 p-4 sm:grid-cols-2 md:grid-cols-4 md:p-5">
+          <div className="grid gap-3 p-4 sm:grid-cols-2 md:grid-cols-5 md:p-5">
             <div className="rounded-lg bg-slate-50 px-4 py-3">
               <p className="text-xs text-slate-500 font-medium">Thời gian mở</p>
               <p className="mt-1 text-sm font-semibold text-slate-900">
@@ -424,7 +507,14 @@ const SessionDetailPage = () => {
             </div>
 
             <div className="rounded-lg bg-slate-50 px-4 py-3">
-              <p className="text-xs text-slate-500 font-medium">Tọa độ tâm phòng học</p>
+              <p className="text-xs text-slate-500 font-medium">Phòng / tòa</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">
+                {session.location?.room?.code ?? '—'} / {session.location?.building?.code ?? 'MANUAL'}
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-slate-50 px-4 py-3">
+              <p className="text-xs text-slate-500 font-medium">Tâm session (snapshot)</p>
               <p className="mt-1 text-sm font-semibold text-slate-900 font-mono">
                 {session.latitude}, {session.longitude}
               </p>
@@ -494,7 +584,7 @@ const SessionDetailPage = () => {
                   const studentAttempt = studentAttemptMap.get(participant.user.code);
                   const isPresent = participant.status === 'present';
                   const isRejected = !isPresent && studentAttempt && studentAttempt.result === 'REJECTED';
-                  const isReview = studentAttempt && studentAttempt.result === 'REVIEW';
+                  const isReview = studentAttempt?.result === 'REVIEW';
 
                   return (
                     <div
@@ -526,7 +616,7 @@ const SessionDetailPage = () => {
                           </div>
                         )}
 
-                        {isReview && !isPresent && (
+                        {isReview && studentAttempt && (
                           <div className="mt-1.5">
                             <div className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-xs text-amber-800 border border-amber-200">
                               <span className="font-bold">⚠️ Cần xem xét:</span>
@@ -536,6 +626,9 @@ const SessionDetailPage = () => {
                                   : 'Có dấu hiệu bất thường'}
                               </span>
                             </div>
+                            <p className="mt-1.5 text-[11px] text-slate-600">
+                              Distance {studentAttempt.distanceToCenter}m · Accuracy ±{studentAttempt.accuracy}m · Radius {session.radius}m · Mock GPS {studentAttempt.isMockLocation ? 'YES' : 'NO'} · Device {studentAttempt.deviceTrustStatus ?? 'UNVERIFIED'} · {attemptCountByStudent.get(studentAttempt.userCode) ?? 1} lần thử
+                            </p>
                             <div className="mt-2 flex gap-2">
                               <button
                                 type="button"
@@ -561,14 +654,18 @@ const SessionDetailPage = () => {
                       <div className="sm:text-right shrink-0">
                         <span
                           className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                            isPresent
+                            isReview
+                              ? 'bg-amber-100 text-amber-800'
+                              : isPresent
                               ? 'bg-emerald-100 text-emerald-700'
                               : isRejected
                               ? 'bg-rose-100 text-rose-700'
                               : 'bg-slate-100 text-slate-600'
                           }`}
                         >
-                          {isPresent
+                          {isReview
+                            ? '⚠️ Chờ duyệt'
+                            : isPresent
                             ? '✅ Đã điểm danh'
                             : isRejected
                             ? '❌ Điểm danh thất bại'
@@ -633,6 +730,8 @@ const SessionDetailPage = () => {
                       <th className="px-4 py-3">Khoảng cách / Sai số</th>
                       <th className="px-4 py-3">Mock GPS</th>
                       <th className="px-4 py-3">Thiết bị (Device ID)</th>
+                      <th className="px-4 py-3">Trust</th>
+                      <th className="px-4 py-3">Lần thử</th>
                       <th className="px-4 py-3">Lý do từ chối</th>
                     </tr>
                   </thead>
@@ -669,6 +768,11 @@ const SessionDetailPage = () => {
                               {attempt.reviewNote ? ` · ${attempt.reviewNote}` : ''}
                             </p>
                           )}
+                          {attempt.reviewReason && (
+                            <p className="mt-1 max-w-48 text-[11px] text-slate-500">
+                              Lý do duyệt: {reviewReasonLabels[attempt.reviewReason as AttendanceReviewReason] ?? attempt.reviewReason}
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-2.5 text-xs">
                           <span className="font-semibold text-slate-800">{attempt.distanceToCenter}m</span>
@@ -685,6 +789,30 @@ const SessionDetailPage = () => {
                         </td>
                         <td className="px-4 py-2.5 text-xs font-mono text-slate-600 truncate max-w-[140px]" title={attempt.deviceId}>
                           {attempt.deviceId}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-amber-700">
+                          <span className={attempt.deviceTrustStatus === 'TRUSTED' ? 'text-emerald-700' : attempt.deviceTrustStatus === 'BLOCKED' ? 'text-rose-700' : 'text-amber-700'}>
+                            {attempt.deviceTrustStatus ?? 'UNVERIFIED'}
+                          </span>
+                          {user?.role === 'admin' && attempt.registeredDeviceId && (
+                            <div className="mt-1 flex gap-1">
+                              <button
+                                type="button"
+                                disabled={deviceUpdatingId === attempt.registeredDeviceId}
+                                onClick={() => void handleDeviceTrust(attempt.registeredDeviceId!, 'TRUSTED')}
+                                className="rounded bg-emerald-50 px-1.5 py-1 text-[10px] font-semibold text-emerald-800 disabled:opacity-50"
+                              >Trust</button>
+                              <button
+                                type="button"
+                                disabled={deviceUpdatingId === attempt.registeredDeviceId}
+                                onClick={() => void handleDeviceTrust(attempt.registeredDeviceId!, 'BLOCKED')}
+                                className="rounded bg-rose-50 px-1.5 py-1 text-[10px] font-semibold text-rose-800 disabled:opacity-50"
+                              >Block</button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-slate-700">
+                          {attemptCountByStudent.get(attempt.userCode) ?? 1}
                         </td>
                         <td className="px-4 py-2.5 text-xs text-rose-600 font-medium">
                           {attempt.reasons && attempt.reasons.length > 0
@@ -707,6 +835,42 @@ const SessionDetailPage = () => {
                 />
               </div>
             </>
+          )}
+        </section>
+
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+          <div className="border-b border-slate-200 bg-slate-50 px-5 py-3 md:px-6">
+            <h2 className="text-base font-bold text-slate-900">Audit timeline</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Lịch sử append-only; raw attempt vẫn được giữ kể cả sau quyết định review.
+            </p>
+          </div>
+          {(session.historyEvents ?? []).length === 0 ? (
+            <p className="p-5 text-sm text-slate-500">Chưa có history event.</p>
+          ) : (
+            <ol className="divide-y divide-slate-100">
+              {(session.historyEvents ?? []).map((event) => (
+                <li key={event.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {auditEventLabels[event.eventType] ?? event.eventType}
+                      {event.attemptId ? ` · Attempt #${event.attemptId}` : ''}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-600">
+                      {event.reasons.map(formatReason).join(', ')}
+                      {event.reviewReason
+                        ? ` · Lý do review: ${reviewReasonLabels[event.reviewReason as AttendanceReviewReason] ?? event.reviewReason}`
+                        : ''}
+                    </p>
+                    {event.note && <p className="mt-1 text-xs text-slate-500">{event.note}</p>}
+                  </div>
+                  <div className="text-right text-[11px] text-slate-500">
+                    <p>{new Date(event.createdAt).toLocaleString('vi-VN')}</p>
+                    <p>{event.actorName ?? 'System'}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
           )}
         </section>
 

@@ -1,9 +1,9 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
-import { UserFilterService } from '../users/user-filter.service';
 import { AttendanceSession } from './attendance-session.model';
 import { IAttendanceSessionRepository } from './attendance-session.repository';
 import { AttendanceSessionsService } from './attendance-sessions.service';
+import { PrismaService } from '../common/database/prisma.service';
 
 describe('AttendanceSessionsService.cancel', () => {
   let service: AttendanceSessionsService;
@@ -35,8 +35,8 @@ describe('AttendanceSessionsService.cancel', () => {
 
     service = new AttendanceSessionsService(
       repository as unknown as IAttendanceSessionRepository,
-      {} as UserFilterService,
       {} as AttendanceRecordsService,
+      {} as PrismaService,
     );
   });
 

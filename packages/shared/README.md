@@ -25,8 +25,9 @@ src/
 │   ├── index.ts
 │   ├── device.types.ts
 │   ├── auth/
-│   ├── users/
-│   └── attendance/
+│   ├── users/                 # Role, profile, filter criteria
+│   ├── units/                 # Unit hierarchy contracts
+│   └── attendance/            # Session, check-in, validation, records
 └── api/
     ├── index.ts
     ├── http.ts / http-client.ts / fetch-client.ts / create-http-client.ts
@@ -50,15 +51,17 @@ Login request/response, JWT payload shapes dùng chung client.
 
 | File | Nội dung |
 |---|---|
-| `user.types.ts` | Role, profile DTO (`code`, `role`, `fullname`) |
-| `user-filter.types.ts` | `UserFilterCriteria`: `unitFilter`, `tagFilter`, `codeFilter` (`addCodes`, `excludeCodes`). **Backend hiện chỉ dùng `codeFilter.addCodes`.** Unit/Tag chưa có bảng DB. |
+| `user.types.ts` | Role và user profile contracts |
+| `user-filter.types.ts` | `UserFilterCriteria`: lọc theo đơn vị, thẻ và mã; semantics thực thi nằm trong backend `UserFilterService` |
+
+`types/units/` định nghĩa contract đơn vị phân cấp. Database có model Unit, Tag và UserTag; không nên ghi semantics lọc thay cho service backend.
 
 ### Attendance (`types/attendance/`)
 
 | File | Nội dung |
 |---|---|
 | `attendance.types.ts` | Barrel / type chung |
-| `attendance-session.types.ts` | Session response, `SessionStatus` (`pending` \| `open` \| `closed`), create request, detail (participants + attempts) |
+| `attendance-session.types.ts` | Session request/response, status, detail (participants + attempts), analytics/history contracts |
 | `attendance-check-in.types.ts` | Payload check-in, location, result `VALID` \| `REVIEW` \| `REJECTED` |
 | `attendance-validation.types.ts` | `AttendanceValidationReason` (OUT_OF_RANGE, MOCK_LOCATION, …) |
 | `attendance-record.types.ts` | Record + `StudentAttendanceHistoryItemDto` |
@@ -75,35 +78,27 @@ Login request/response, JWT payload shapes dùng chung client.
 
 ```ts
 { success: true, data: T }
-{ success: false, code: string, message: string }
+{ success: false, code: ApiErrorCode, message: string }
 ```
 
 `api-response.types.ts`, class `ApiError` (`api-error.ts`).
 
 ### Error codes (theo domain)
 
-| File | Ví dụ code |
-|---|---|
-| `common-error.codes.ts` | INTERNAL_ERROR, VALIDATION_ERROR, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, TOO_MANY_REQUESTS, UNKNOWN_ERROR |
-| `auth-error.codes.ts` | AUTH_INVALID_CREDENTIALS, AUTH_ACCOUNT_NOT_LINKED, AUTH_ROLE_NOT_ALLOWED, AUTH_TOKEN_EXPIRED, AUTH_INVALID_TOKEN, AUTH_UNAUTHORIZED |
-| `user-error.codes.ts` | USER_NOT_FOUND, USER_ALREADY_EXISTS, USER_INVALID_ROLE |
-| `attendance-session-error.codes.ts` | ATTENDANCE_SESSION_NOT_FOUND, INVALID_TIME_RANGE, INVALID_RADIUS, CREATION_FORBIDDEN, SESSION_NOT_OPEN |
-| `attendance-check-in-error.codes.ts` | USER_NOT_IN_SESSION, ALREADY_CHECKED_IN, TOO_MANY_ATTEMPTS, DUPLICATE_DEVICE, OUT_OF_RANGE, MOCK_LOCATION, LOW_CONFIDENCE_SCORE |
-| `attendance-record-error.codes.ts` | ATTENDANCE_RECORD_NOT_FOUND, ALREADY_EXISTS, INVALID_STATUS |
-| `api-error.codes.ts` | union / re-export |
+Các code được export từ `api/response/error_codes/index.ts`, theo domain common, auth, user, unit, attendance session, check-in và attendance record. `api-error.codes.ts` gom các domain thành union `ApiErrorCode`.
 
-Backend `ApiExceptionFilter` map exception sang các code này.
+Khi thêm code, đặt trong file đúng domain, cập nhật barrel export, backend và cách UI hiển thị. Không giả định mọi Nest exception đã được gán code chuyên biệt.
 
 ### HTTP client (dashboard dùng)
 
 | File | Việc |
 |---|---|
 | `http-client.ts` | Interface client + `TokenProvider` |
-| `fetch-client.ts` | Implement fetch, gắn Bearer, unwrap `ApiResponse`, ném `ApiError` |
+| `fetch-client.ts` | Implement fetch, gắn Bearer và header ngrok, unwrap `ApiResponse`, ném `ApiError` |
 | `create-http-client.ts` | Factory `createHttpClient(baseUrl, getToken, onUnauthorized?)` |
 | `http.ts` | Re-export helper |
 
-Mobile **không** dùng client này; mobile có `src/api/api.ts` riêng.
+Fetch client trả `result.data` khi envelope thành công; HTTP lỗi hoặc `success: false` sẽ ném lỗi. HTTP 401 gọi `onUnauthorized` nếu có callback. Client **không tự refresh token**. Mobile dùng wrapper riêng tại `client/mobile-client/src/api/api.ts`.
 
 ### API module stubs
 
@@ -121,7 +116,7 @@ pnpm dev:shared    # tsc --watch
 pnpm clean:shared
 ```
 
-Đổi type ở đây mà không build lại → backend/client lệch `dist/` cũ.
+Đổi type ở đây mà không build lại có thể khiến consumer đọc `dist/` cũ. Các root scripts `predev:*`/`build:*` sẽ build shared trước ở những luồng được khai báo trong `package.json`.
 
 ---
 
@@ -129,6 +124,13 @@ pnpm clean:shared
 
 | Consumer | Dùng |
 |---|---|
-| `server/attendance` | DTO, ApiResponse, error codes, CheckIn payload/result |
-| `admin-dashboard` | Login, session types, `createHttpClient`, `ApiError` |
-| `mobile-client` | Check-in types, session, history DTO, `ApiResponse` (HTTP riêng) |
+| `server/attendance` | DTO/API response, roles, filters, attendance contracts, error codes |
+| `admin-dashboard` | Auth/session/location/course-section contracts, `createHttpClient`, `ApiError` |
+| `mobile-client` | Auth, attendance/check-in/history types; HTTP wrapper riêng |
+
+## 7. Thay đổi contract
+
+1. Sửa type trong domain tương ứng dưới `src/types/` hoặc `src/api/`.
+2. Cập nhật barrel exports và implementation backend/client liên quan.
+3. Chạy `pnpm build:shared` từ root, sau đó build/test các package consumer.
+4. Nếu đổi response/error semantics, cập nhật tài liệu API backend và xử lý UI.

@@ -1,43 +1,39 @@
+import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { IoClose } from 'react-icons/io5';
 import {
-  MdMyLocation,
-  MdLocationOn,
   MdAccessTime,
-  MdGroup,
   MdOutlineTitle,
+  MdSchool,
 } from 'react-icons/md';
 import { toast } from 'react-toastify';
-import type { UserFilterCriteria } from '@gps-attendance/shared';
+import type { CreateAttendanceSessionRequest } from '@gps-attendance/shared';
+import { attendanceSessionsApi } from '../api/attendance-sessions.api';
+import type {
+  LecturerGpsEvidence,
+  SectionRoster,
+  TeachingSectionOption,
+} from '../api/attendance-sessions.api';
 
-export interface CreateSessionFormData {
-  title: string;
-  latitude: number;
-  longitude: number;
-  radius: number;
-  openAt: string;
-  closeAt: string;
-  participantCriteria: UserFilterCriteria;
-}
+export type CreateSessionFormData = CreateAttendanceSessionRequest;
 
 interface CreateSessionFormValues {
   title: string;
-  latitude: number;
-  longitude: number;
-  radius: number;
+  courseSectionId: number;
+  timetableSlotId: number;
   openDate: string;
   openTime: string;
   closeDate: string;
   closeTime: string;
-  // Vùng nhập tạm thời: text thô, phân cách bởi dấu phẩy.
-  // TODO: thay bằng UI chọn unit/tag khi có sẵn.
-  studentCodesText: string;
 }
 
 interface CreateSessionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmitSuccess?: (data: CreateSessionFormData) => void;
+  onSubmitSuccess?: (
+    data: CreateSessionFormData,
+    lecturerGps?: LecturerGpsEvidence,
+  ) => Promise<void> | void;
 }
 
 // Hàm chuyển đổi Date sang chuỗi YYYY-MM-DDTHH:mm theo giờ local (tránh bị lệch múi giờ UTC)
@@ -51,21 +47,16 @@ const formatDateTimeLocal = (date: Date): string => {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
-// Parse chuỗi mã sinh viên phân cách bằng dấu phẩy -> mảng code đã trim, loại rỗng, dedup
-const parseStudentCodes = (raw: string): string[] => {
-  const seen = new Set<string>();
-  for (const part of raw.split(',')) {
-    const code = part.trim();
-    if (code) seen.add(code);
-  }
-  return Array.from(seen);
-};
-
 export const CreateSessionModal = ({
   isOpen,
   onClose,
   onSubmitSuccess,
 }: CreateSessionModalProps) => {
+  const [sections, setSections] = useState<TeachingSectionOption[]>([]);
+  const [sectionRoster, setSectionRoster] = useState<SectionRoster | null>(null);
+  const [isLoadingRoster, setIsLoadingRoster] = useState(false);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+  const [isLoadingSections, setIsLoadingSections] = useState(false);
   const now = new Date();
   const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 
@@ -79,43 +70,84 @@ export const CreateSessionModal = ({
   } = useForm<CreateSessionFormValues>({
     defaultValues: {
       title: '',
-      radius: 50,
+      courseSectionId: 0,
+      timetableSlotId: 0,
       openDate: formatDateTimeLocal(now).split('T')[0],
       openTime: formatDateTimeLocal(now).split('T')[1],
       closeDate: formatDateTimeLocal(twoHoursLater).split('T')[0],
       closeTime: formatDateTimeLocal(twoHoursLater).split('T')[1],
-      studentCodesText: '',
     },
   });
 
-  const studentCodesText = useWatch({
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    setIsLoadingSections(true);
+    attendanceSessionsApi
+      .getTeachingSections()
+      .then((data) => {
+        if (active) setSections(data);
+      })
+      .catch((error: unknown) => {
+        if (active) toast.error(error instanceof Error ? error.message : 'Không tải được danh sách lớp học phần');
+      })
+      .finally(() => {
+        if (active) setIsLoadingSections(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
+
+  const courseSectionId = useWatch({
     control,
-    name: 'studentCodesText',
+    name: 'courseSectionId',
   });
+  const timetableSlotId = useWatch({ control, name: 'timetableSlotId' });
+  const selectedSection = sections.find((section) => section.id === courseSectionId);
+  const selectedSlot = selectedSection?.timetable.find(
+    (slot) => slot.id === timetableSlotId,
+  );
+  const selectedRoom = selectedSlot?.room ?? selectedSection?.room;
+  const selectedBuilding = selectedRoom?.building;
+  const needsTimetableSlot = (selectedSection?.timetable.length ?? 0) > 0;
+  const isSelectedLocationReady =
+    selectedBuilding?.type === 'BUILDING' &&
+    selectedBuilding.verified &&
+    selectedBuilding.geofenceRadius !== null &&
+    selectedBuilding.gpsAccuracyThreshold !== null;
 
-  if (!isOpen) return null;
-
-  const studentCodesPreviewCount = parseStudentCodes(studentCodesText).length;
-
-  // Lấy tọa độ GPS hiện tại từ trình duyệt
-  const handleGetCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error('Trình duyệt không hỗ trợ định vị GPS');
+  useEffect(() => {
+    if (!isOpen || !courseSectionId || courseSectionId <= 0) {
+      setSectionRoster(null);
+      setRosterError(null);
+      setIsLoadingRoster(false);
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setValue('latitude', parseFloat(position.coords.latitude.toFixed(6)));
-        setValue('longitude', parseFloat(position.coords.longitude.toFixed(6)));
-        toast.success('Đã lấy tọa độ hiện tại thành công!');
-      },
-      (error) => {
-        toast.error('Không thể lấy vị trí: ' + error.message);
-      },
-      { enableHighAccuracy: true },
-    );
-  };
+    let active = true;
+    setSectionRoster(null);
+    setRosterError(null);
+    setIsLoadingRoster(true);
+    attendanceSessionsApi
+      .getSectionRoster(courseSectionId)
+      .then((data) => {
+        if (active) setSectionRoster(data);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setRosterError(error instanceof Error ? error.message : 'Không tải được danh sách sinh viên.');
+      })
+      .finally(() => {
+        if (active) setIsLoadingRoster(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [courseSectionId, isOpen]);
+
+  if (!isOpen) return null;
 
   const handleFormSubmit = async (values: CreateSessionFormValues) => {
     try {
@@ -126,32 +158,59 @@ export const CreateSessionModal = ({
         toast.error('Thời gian kết thúc phải sau thời gian bắt đầu');
         return;
       }
-
-      const openAt = openDateObj.toISOString();
-      const closeAt = closeDateObj.toISOString();
-
-      const codes = parseStudentCodes(values.studentCodesText);
+      if (!selectedSection || values.courseSectionId <= 0) {
+        toast.error('Vui lòng chọn lớp học phần');
+        return;
+      }
+      if (needsTimetableSlot && values.timetableSlotId <= 0) {
+        toast.error('Vui lòng chọn ca học trong thời khóa biểu');
+        return;
+      }
+      if (!isSelectedLocationReady) {
+        toast.error('Phòng học chưa liên kết với Building đã hiệu chuẩn GPS');
+        return;
+      }
 
       const data: CreateSessionFormData = {
         title: values.title,
-        latitude: values.latitude,
-        longitude: values.longitude,
-        radius: values.radius,
-        openAt,
-        closeAt,
-        participantCriteria: {
-          codeFilter: { addCodes: codes },
-        },
+        openAt: openDateObj.toISOString(),
+        closeAt: closeDateObj.toISOString(),
+        courseSectionId: selectedSection.id,
+        ...(values.timetableSlotId > 0
+          ? { timetableSlotId: values.timetableSlotId }
+          : {}),
       };
 
+      const lecturerGps = await new Promise<LecturerGpsEvidence | undefined>(
+        (resolve) => {
+          if (!navigator.geolocation) {
+            resolve(undefined);
+            return;
+          }
+          navigator.geolocation.getCurrentPosition(
+            (position) =>
+              resolve({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                timestamp: new Date(position.timestamp).toISOString(),
+              }),
+            () => resolve(undefined),
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 },
+          );
+        },
+      );
+      if (!lecturerGps) {
+        toast.info('Không lấy được GPS giảng viên; session vẫn dùng tọa độ cố định của Building.');
+      }
       if (onSubmitSuccess) {
-        await onSubmitSuccess(data);
+        await onSubmitSuccess(data, lecturerGps);
       }
       toast.success('Tạo phiên điểm danh thành công!');
       reset();
       onClose();
-    } catch (error: any) {
-      toast.error(error?.message || 'Có lỗi xảy ra khi tạo phiên');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Có lỗi xảy ra khi tạo phiên');
     }
   };
 
@@ -204,73 +263,119 @@ export const CreateSessionModal = ({
             )}
           </div>
 
-          {/* Section 2: Tọa độ GPS & Bán kính */}
-          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
-                <MdLocationOn className="text-blue-600 text-sm" />
-                Vị trí & Bán kính GPS cho phép{' '}
-                <span className="text-red-500">*</span>
-              </label>
-              <button
-                type="button"
-                onClick={handleGetCurrentLocation}
-                className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200 cursor-pointer"
-              >
-                <MdMyLocation />
-                Lấy vị trí hiện tại
-              </button>
-            </div>
+          {/* Section 2: Lớp học phần → lịch → phòng → tòa */}
+          <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+              <MdSchool className="text-blue-600 text-sm" />
+              Lớp học phần <span className="text-red-500">*</span>
+            </label>
+            <select
+              {...register('courseSectionId', {
+                required: 'Vui lòng chọn lớp học phần',
+                min: { value: 1, message: 'Vui lòng chọn lớp học phần' },
+                valueAsNumber: true,
+              })}
+              onChange={(event) => {
+                setValue('courseSectionId', Number(event.target.value));
+                setValue('timetableSlotId', 0);
+              }}
+              disabled={isLoadingSections || sections.length === 0}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value={0}>
+                {isLoadingSections ? 'Đang tải lớp học phần…' : 'Chọn lớp học phần'}
+              </option>
+              {sections.map((section) => (
+                <option key={section.id} value={section.id}>
+                  {section.course.code} — {section.course.name} ({section.code}) · {section.term.name}
+                </option>
+              ))}
+            </select>
+            {errors.courseSectionId && (
+              <p className="text-xs text-red-600">{errors.courseSectionId.message}</p>
+            )}
+            {!isLoadingSections && sections.length === 0 && (
+              <p className="text-xs text-amber-800">
+                Chưa có lớp học phần được phân công. Cần nạp CourseSection, enrollment và timetable trước khi tạo session theo registry.
+              </p>
+            )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {selectedSection && needsTimetableSlot && (
               <div>
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Vĩ độ (Latitude)
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Ca học trong thời khóa biểu <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="number"
-                  step="any"
-                  placeholder="21.028511"
-                  {...register('latitude', {
-                    required: 'Thiếu vĩ độ',
+                <select
+                  {...register('timetableSlotId', {
                     valueAsNumber: true,
+                    validate: (value) =>
+                      !needsTimetableSlot || value > 0 || 'Vui lòng chọn ca học',
                   })}
-                  className="w-full px-3 py-1.5 text-base bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
-                />
+                  onChange={(event) => setValue('timetableSlotId', Number(event.target.value))}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                >
+                  <option value={0}>Chọn ca học</option>
+                  {selectedSection.timetable.map((slot) => (
+                    <option key={slot.id} value={slot.id}>
+                      Thứ {slot.dayOfWeek} · {Math.floor(slot.startMinute / 60).toString().padStart(2, '0')}:{(slot.startMinute % 60).toString().padStart(2, '0')}–{Math.floor(slot.endMinute / 60).toString().padStart(2, '0')}:{(slot.endMinute % 60).toString().padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
+                {errors.timetableSlotId && (
+                  <p className="text-xs text-red-600">{errors.timetableSlotId.message}</p>
+                )}
               </div>
+            )}
 
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Kinh độ (Longitude)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  placeholder="105.804817"
-                  {...register('longitude', {
-                    required: 'Thiếu kinh độ',
-                    valueAsNumber: true,
-                  })}
-                  className="w-full px-3 py-1.5 text-base bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
-                />
+            {selectedSection && (
+              <div className="rounded-lg border border-white bg-white p-3 text-sm">
+                <p className="font-semibold text-gray-800">
+                  {selectedRoom ? `${selectedRoom.code} — ${selectedRoom.name}` : 'Chưa gán phòng học'}
+                  {selectedRoom?.floor ? ` · Tầng ${selectedRoom.floor}` : ''}
+                </p>
+                <p className="mt-1 text-xs text-gray-600">
+                  {selectedSection.activeEnrollmentCount} sinh viên đang active
+                </p>
+                <div className="mt-2 border-t border-gray-100 pt-2">
+                  <p className="mb-1 text-xs font-semibold text-gray-700">Danh sách sinh viên sẽ được thêm vào phiên</p>
+                  {isLoadingRoster ? (
+                    <p className="text-xs text-gray-500">Đang tải roster…</p>
+                  ) : rosterError ? (
+                    <p role="alert" className="text-xs text-red-700">{rosterError}</p>
+                  ) : sectionRoster?.students.length ? (
+                    <div className="max-h-32 space-y-1 overflow-y-auto pr-1">
+                      {sectionRoster.students.map((student) => (
+                        <div key={student.id} className="flex items-center justify-between gap-3 text-xs">
+                          <span className="truncate text-gray-700">{student.fullname}</span>
+                          <span className="shrink-0 font-mono text-gray-500">{student.code}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-amber-700">Lớp hiện chưa có sinh viên active; phiên sẽ được tạo không có attendance record.</p>
+                  )}
+                  <p className="mt-2 text-[11px] text-gray-500">Backend sẽ chụp lại toàn bộ enrollment active tại thời điểm tạo phiên.</p>
+                </div>
+                {selectedBuilding ? (
+                  <p className="mt-1 text-xs text-gray-600">
+                    {selectedBuilding.code} — {selectedBuilding.name} · {selectedBuilding.type}
+                    {' · '}{selectedBuilding.verified ? 'Đã xác minh' : 'Chưa xác minh'}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-amber-800">Phòng chưa liên kết với Building trong Location Registry.</p>
+                )}
+                {selectedBuilding?.verified && (
+                  <p className="mt-1 font-mono text-[11px] text-gray-500">
+                    Tâm cố định: {selectedBuilding.latitude}, {selectedBuilding.longitude}
+                  </p>
+                )}
+                {!isSelectedLocationReady && (
+                  <p className="mt-2 text-xs font-medium text-red-700">
+                    Session chỉ mở được sau khi Building là BUILDING, tọa độ đã xác minh và radius/accuracy đã hiệu chuẩn.
+                  </p>
+                )}
               </div>
-
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">
-                  Bán kính (mét)
-                </label>
-                <input
-                  type="number"
-                  placeholder="50"
-                  {...register('radius', {
-                    required: 'Thiếu bán kính',
-                    min: 5,
-                    valueAsNumber: true,
-                  })}
-                  className="w-full px-3 py-1.5 text-base bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-blue-600"
-                />
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Section 3: Thời gian */}
@@ -341,35 +446,8 @@ export const CreateSessionModal = ({
             </div>
           </div>
 
-          {/* Section 4: Mã sinh viên tham gia */}
-          <div>
-            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5">
-              <MdGroup className="text-blue-600 text-sm" />
-              Mã sinh viên tham gia{' '}
-              <span className="text-xs font-normal text-gray-500">
-                (để trống nếu áp dụng cho toàn bộ sinh viên)
-              </span>
-            </label>
-            <textarea
-              rows={3}
-              placeholder="Để trống để áp dụng cho tất cả sinh viên, hoặc nhập: 2312686, 2312716, 2312718..."
-              {...register('studentCodesText')}
-              className="w-full px-3.5 py-2 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 resize-none"
-            />
-            <div className="mt-1.5 flex items-center justify-between">
-              {studentCodesPreviewCount > 0 ? (
-                <span className="text-xs text-blue-600 font-medium">
-                  Đã chỉ định {studentCodesPreviewCount} sinh viên cụ thể
-                </span>
-              ) : (
-                <span className="text-xs text-emerald-600 font-medium">
-                  Áp dụng cho toàn bộ sinh viên trong hệ thống
-                </span>
-              )}
-              <span className="text-xs text-gray-400">
-                Phân cách các mã bằng dấu phẩy
-              </span>
-            </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            Sinh viên tham gia được lấy từ enrollment active của lớp. GPS giảng viên chỉ là bằng chứng phụ; tâm và bán kính session được snapshot từ Building.
           </div>
 
           {/* Modal Actions */}
@@ -383,7 +461,15 @@ export const CreateSessionModal = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                isLoadingSections ||
+                isLoadingRoster ||
+                !!rosterError ||
+                !selectedSection ||
+                !isSelectedLocationReady ||
+                (needsTimetableSlot && timetableSlotId <= 0)
+              }
               className="px-5 py-2 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? 'Đang tạo...' : 'Tạo phiên điểm danh'}

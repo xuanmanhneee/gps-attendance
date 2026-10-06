@@ -60,7 +60,11 @@ export type AttendanceValidationReason =
 // -----------------------------------------------------------------------------
 
 export type AttendanceCheckInReason =
-  AttendanceValidationReason | 'TOO_MANY_ATTEMPTS' | 'DUPLICATE_DEVICE';
+  | AttendanceValidationReason
+  | 'TOO_MANY_ATTEMPTS'
+  | 'DUPLICATE_DEVICE'
+  | 'DEVICE_UNVERIFIED'
+  | 'DEVICE_BLOCKED';
 
 export interface CheckInRequest {
   /** Phiên điểm danh */

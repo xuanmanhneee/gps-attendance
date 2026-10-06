@@ -41,6 +41,7 @@ export class AttendanceValidationService {
     );
     const integrityCheck = this.integrityCheck.evaluate(input.integrity);
     const distance = locationCheck.distance;
+    const gpsAccuracy = Math.max(0, input.location.accuracy ?? 0);
 
     if (mockCheck.coefficient === 0) {
       return {
@@ -50,7 +51,6 @@ export class AttendanceValidationService {
       };
     }
 
-    // Vòng sai số GPS nằm hoàn toàn ngoài bán kính → chắc chắn vắng
     if (locationCheck.certainty === 'OUTSIDE') {
       return {
         status: 'REJECTED',
@@ -59,12 +59,43 @@ export class AttendanceValidationService {
       };
     }
 
-    // Vị trí có thể nằm cả trong lẫn ngoài vùng: cần người có thẩm quyền xem xét.
-    // Nếu mức độ toàn vẹn thiết bị thấp, trường hợp này không được phép tự động qua.
+    const sessionAccuracyThreshold =
+      input.session.gpsAccuracyThreshold ?? null;
+
+    if (
+      sessionAccuracyThreshold != null &&
+      gpsAccuracy > sessionAccuracyThreshold
+    ) {
+      return {
+        status: 'REVIEW',
+        reasons: ['LOW_LOCATION_ACCURACY'],
+        distance,
+      };
+    }
+
+    if (locationCheck.certainty === 'INSIDE' && gpsAccuracy >= 35 && integrityCheck.coefficient < 0.8) {
+      return {
+        status: 'REVIEW',
+        reasons: ['LOW_LOCATION_ACCURACY', 'LOW_CONFIDENCE_SCORE'],
+        distance,
+      };
+    }
+
     if (locationCheck.certainty === 'UNCERTAIN') {
       const nearSessionBoundary = distance >= input.session.radius * 0.75;
+      const riskySignal = gpsAccuracy >= 60 || integrityCheck.coefficient < 0.7;
 
-      if (integrityCheck.coefficient < 0.75 && nearSessionBoundary) {
+      if (integrityCheck.coefficient < 0.75 && gpsAccuracy >= 35) {
+        return {
+          status: nearSessionBoundary ? 'REJECTED' : 'REVIEW',
+          reasons: nearSessionBoundary
+            ? ['LOW_LOCATION_ACCURACY', 'LOW_CONFIDENCE_SCORE']
+            : ['LOW_LOCATION_ACCURACY', 'LOW_CONFIDENCE_SCORE'],
+          distance,
+        };
+      }
+
+      if (riskySignal && nearSessionBoundary) {
         return {
           status: 'REJECTED',
           reasons: ['LOW_LOCATION_ACCURACY', 'LOW_CONFIDENCE_SCORE'],
@@ -85,6 +116,10 @@ export class AttendanceValidationService {
       integrityCheck.coefficient * this.INTEGRITY_WEIGHT;
 
     const reasons: AttendanceValidationReason[] = [];
+
+    if (gpsAccuracy > 30 && integrityCheck.coefficient < 0.75) {
+      reasons.push('LOW_CONFIDENCE_SCORE');
+    }
 
     if (score < 80) {
       reasons.push('LOW_CONFIDENCE_SCORE');

@@ -172,6 +172,7 @@ export class PrismaAttendanceRecordRepository
         status: event.status ?? null,
         attemptResult: event.attemptResult ?? null,
         reasons: event.reasons ?? [],
+        reviewReason: event.reviewReason ?? null,
         note: event.note ?? null,
       },
     });
@@ -190,11 +191,13 @@ export class PrismaAttendanceRecordRepository
     return events.map((event) => ({
       id: event.id,
       sessionId: event.sessionId,
+      attemptId: event.attemptId,
       sessionTitle: event.session.title,
       eventType: event.eventType,
       status: event.status,
       attemptResult: event.attemptResult,
       reasons: event.reasons,
+      reviewReason: event.reviewReason,
       note: event.note,
       actorName: event.actor?.fullname ?? null,
       createdAt: event.createdAt.toISOString(),

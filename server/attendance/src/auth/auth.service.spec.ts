@@ -33,8 +33,17 @@ describe('AuthService', () => {
       verify: jest.fn(),
     };
     configService = {
-      getOrThrow: jest.fn().mockReturnValue('mock-refresh-secret'),
-      get: jest.fn().mockReturnValue('14d'),
+      getOrThrow: jest.fn().mockImplementation((key: string) => {
+        if (key === 'JWT_SECRET') return 'mock-jwt-secret';
+        if (key === 'REFRESH_TOKEN_SECRET') return 'mock-refresh-secret';
+        return 'mock-secret';
+      }),
+      get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'JWT_ISSUER' || key === 'JWT_AUDIENCE') return undefined;
+        if (key === 'JWT_EXPIRES_IN') return '15m';
+        if (key === 'REFRESH_TOKEN_EXPIRES_IN') return '14d';
+        return '14d';
+      }),
     };
     redisService = {
       setBlacklistToken: jest.fn().mockResolvedValue(undefined),
@@ -105,6 +114,22 @@ describe('AuthService', () => {
       expect(tokens).toHaveProperty('accessToken');
       expect(tokens).toHaveProperty('refreshToken');
       expect(jwtService.sign).toHaveBeenCalled();
+    });
+
+    it('nên gắn issuer, audience và jti vào payload để tăng an toàn JWT', () => {
+      authService.login(mockUser);
+
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sub: mockUser.userId,
+          username: mockUser.username,
+          role: mockUser.role,
+          iss: 'gps-attendance',
+          aud: 'gps-attendance-app',
+          jti: expect.any(String),
+        }),
+        expect.anything(),
+      );
     });
   });
 

@@ -7,6 +7,7 @@ import { useAttendanceSessions } from '../hooks/useAttendanceSessions';
 import { useEffect, useState } from 'react';
 import type { LecturerAttendanceAnalytics } from '@gps-attendance/shared';
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
+import { toast } from 'react-toastify';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
@@ -98,8 +99,23 @@ const DashboardPage = () => {
         <CreateSessionModal
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
-          onSubmitSuccess={async (data) => {
-            await createSession(data);
+          onSubmitSuccess={async (data, lecturerGps) => {
+            const created = await createSession(data);
+            if (lecturerGps) {
+              try {
+                const verification = await attendanceSessionsApi.verifyLecturerLocation(
+                  created.id,
+                  lecturerGps,
+                );
+                if (verification.status === 'WARNING') {
+                  toast.warning(`GPS giảng viên: WARNING (${verification.distanceMeters.toFixed(1)}m); session vẫn dùng tâm Building cố định.`);
+                } else {
+                  toast.success(`GPS giảng viên PASS (${verification.distanceMeters.toFixed(1)}m từ tâm Building).`);
+                }
+              } catch {
+                toast.warning('Không lưu được xác minh GPS giảng viên; tâm session không bị thay đổi.');
+              }
+            }
             setIsCreateModalOpen(false);
           }}
         />

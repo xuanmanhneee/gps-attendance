@@ -22,7 +22,7 @@ Mọi thứ trong `server/attendance/` thuộc backend này: `src/` (Nest module
 | Auth | Passport local + JWT, bcryptjs |
 | DB | Prisma 7 + `@prisma/adapter-pg` + PostgreSQL 16 |
 | HTTP | class-validator / class-transformer, Swagger (`/api-docs`) |
-| Bảo vệ | `@nestjs/throttler` (5 req/60s global; login 5/60s; check-in 3/60s) |
+| Bảo vệ | `@nestjs/throttler` (120 req/60s global; login 5/60s; check-in 3/60s) |
 | Log | Winston JSON, request-id, HTTP interceptor |
 | Test | Jest unit (`*.spec.ts` trong `src/`), e2e (`test/`) |
 
@@ -34,12 +34,12 @@ Mọi thứ trong `server/attendance/` thuộc backend này: `src/` (Nest module
 
 - Logger: `WinstonJsonLogger`
 - Global filter: `ApiExceptionFilter` → `{ success: false, code, message }`
-- CORS mở (`enableCors()`)
+- CORS allowlist: localhost defaults cộng các origin trong `CORS_ORIGIN` (comma-separated)
 - `ValidationPipe` (`whitelist`, `transform`)
 - Swagger: `http://localhost:3000/api-docs` (Bearer)
 - Listen `0.0.0.0`, cổng `PORT` hoặc `3000`
 
-`src/app.module.ts` import: Config (global), Throttler, Database, Auth, Users, AttendanceSessions, Geo, AttendanceValidation, AttendanceCheckIn, Logging, Health.
+`src/app.module.ts` import: Config, Throttler, Database/Prisma, Redis, Auth/Account, Users/Units/Tags, AttendanceSessions/Records/CheckIn/Validation, LocationRegistry, DeviceTrust, Logging và Health.
 
 - Middleware: `RequestIdMiddleware` mọi route
 - Guard toàn cục: `ThrottlerGuard`
@@ -57,12 +57,15 @@ src/
 ├── auth/
 ├── account/
 ├── users/
+├── units/ / tags/
 ├── attendance-sessions/
 ├── attendance-check-in/
 ├── attendance-validation/
 ├── attendance-record/
+├── location-registry/ / device-trust/
 ├── geo/
 ├── health/
+├── prisma/ / redis/
 └── common/
 ```
 
@@ -72,8 +75,8 @@ src/
 |---|---|
 | `auth.module.ts` | JwtModule async (`JWT_SECRET`, `EXPIRES_IN`), import Users + Account |
 | `auth.service.ts` | validate bcrypt, `login()` access+refresh, `refresh()` |
-| `controllers/user-auth.controller.ts` | `POST /v0/user/auth/login` (chỉ student), `POST /v0/user/auth/refresh` |
-| `controllers/admin-auth.controller.ts` | `POST /v0/admin/auth/login` (lecturer/admin), `POST /v0/admin/auth/refresh` |
+| `controllers/user-auth.controller.ts` | Login/refresh/logout cho student |
+| `controllers/admin-auth.controller.ts` | Login/refresh/logout cho lecturer/admin |
 | `strategies/local.strategy.ts` | username/password |
 | `strategies/jwt.strategy.ts` | Bearer, payload `{ sub, username, role }` |
 | `guards/local-auth.guard.ts` | login |
@@ -86,7 +89,7 @@ src/
 | `types/authenticated-request.ts` | Request + user |
 | `auth.service.spec.ts`, `guards/roles.guard.spec.ts` | unit test |
 
-**Chưa có** `POST .../logout` (revoke token).
+Logout endpoint tồn tại ở cả hai controller. `AuthService` dùng Redis blacklist để thu hồi token; client vẫn phải xóa token local.
 
 ### 4.2 `account/` — tài khoản đăng nhập
 
@@ -106,9 +109,9 @@ Không có HTTP controller riêng; Auth dùng service này.
 | File | Việc |
 |---|---|
 | `users.module.ts` | PrismaUserRepository, UsersService, UserFilterService |
-| `user.controller.ts` | `GET /users/me`, `GET /users` (admin), `GET /users/:id` (admin) |
+| `user.controller.ts` | `GET/PATCH /v0/users/me`, `GET /v0/users` và `GET /v0/users/:id` (admin), test-filter endpoint |
 | `users.service.ts` | CRUD đọc user |
-| `user-filter.service.ts` | phân bổ SV khi tạo session (`codeFilter.addCodes`, ALL, fallback toàn bộ SV) |
+| `user-filter.service.ts` | phân bổ sinh viên theo code/unit/tag criteria; đây là nguồn sự thật về include/exclude semantics |
 | `user.model.ts` | domain User |
 | `user.repository.ts` + `user.repository.token.ts` | interface + token |
 | `repositories/prisma-user.repository.ts` | production |
@@ -119,14 +122,14 @@ Không có HTTP controller riêng; Auth dùng service này.
 | File | Việc |
 |---|---|
 | `attendance-sessions.module.ts` | service, query, Prisma repo |
-| `attendance-sessions.controller.ts` | dual path `attendance-sessions` và `v0/attendance-sessions` |
-| `attendance-sessions.service.ts` | tạo (transaction + record absent), list, xóa cascade, đóng sớm |
-| `attendance-session-query.service.ts` | `GET :id/detail` (SV + attempts) |
+| `attendance-sessions.controller.ts` | Routes dưới `/v0/attendance-sessions` |
+| `attendance-sessions.service.ts` | Tạo phiên từ lớp học phần/enrollment active; tạo records và history trong transaction; close/cancel/delete |
+| `attendance-session-query.service.ts` | Teaching sections, roster/import/create course section, analytics, detail, review/audit |
 | `attendance-session.model.ts` | domain + status computed `pending/open/closed` |
 | `attendance-session.mapper.ts` | entity → `AttendanceSessionResponse` |
 | `attendance-session.repository.ts` + `*.token.ts` | interface |
 | `repositories/prisma-attendance-session.repository.ts` | production |
-| `dto/create-attendance-session.dto.ts` | title, GPS, radius, openAt/closeAt, participantCriteria |
+| `dto/create-attendance-session.dto.ts` | title, openAt/closeAt, courseSectionId/timetableSlotId; vị trí lấy từ Building Registry |
 | `dto/check-location.dto.ts` | DTO vị trí (phụ) |
 | `attendance-session.seeder.ts` | seed phiên test — **không đăng ký trong module**, không chạy lúc boot |
 
@@ -137,7 +140,7 @@ Route HTTP: xem mục 5.
 | File | Việc |
 |---|---|
 | `attendance-check-in.module.ts` | wire store Prisma, AttemptCheck, DeviceCheck |
-| `attendance-check-in.controller.ts` | `POST /attendance/check-in` và `v0/...`, role student, throttle 3/60s |
+| `attendance-check-in.controller.ts` | `POST /v0/attendance/check-in`, role student, throttle 3/60s |
 | `attendance-check-in.service.ts` | pipeline: session → attempt → record → device → validation → present |
 | `attendance-check-in.dto.ts` | location, device, integrity (class-validator) |
 | `attendance-check-in.token.ts` | DI attempt + device usage |
@@ -152,11 +155,11 @@ Route HTTP: xem mục 5.
 | File | Việc |
 |---|---|
 | `attendance-validation.module.ts` | export service |
-| `attendance-validation.service.ts` | trọng số location 40, mock 25, integrity 35; VALID / REVIEW / REJECTED |
+| `attendance-validation.service.ts` | Confidence weights: location 40, mock-location 25, integrity 35; kết quả VALID / REVIEW / REJECTED |
 | `attendance-validation.types.ts` | input/result nội bộ |
 | `checks/location.check.ts` | Haversine + accuracy vs radius |
 | `checks/mock-location.check.ts` | `isMockLocation` |
-| `checks/integrity.check.ts` | token có → 0.7, không → 0.5; **chưa verify Play Integrity / App Attest** |
+| `checks/integrity.check.ts` | Heuristic parse payload/token và trả coefficient; **không verify chữ ký/provider Play Integrity hoặc App Attest** |
 | `*.spec.ts` | unit test service + location |
 
 ### 4.7 `attendance-record/` — bản ghi điểm danh
@@ -164,14 +167,14 @@ Route HTTP: xem mục 5.
 | File | Việc |
 |---|---|
 | `attendance-record.module.ts` | Prisma repo + service + controller |
-| `attendance-record.controller.ts` | `GET /attendance/records/mine` và `v0/...` |
+| `attendance-record.controller.ts` | `GET /v0/attendance/records/mine`, `summary`, `events/mine`, `:id` |
 | `attendance-records.service.ts` | lịch sử chi tiết, `markPresent`, `getBySessionAndUser` |
 | `attendance-record.model.ts` | domain record |
 | `attendance-record.repository.ts` + `*.token.ts` | interface |
 | `repositories/prisma-attendance-record.repository.ts` | production |
 | `repositories/mock-attendance-record.repository.ts` | **chỉ test** |
 
-Không có API chi tiết 1 record theo id (mobile `getAttendanceRecord` sẽ fail cứng).
+`GET /v0/attendance/records/:id` trả record thuộc về user hiện tại; controller kiểm tra quyền truy cập.
 
 ### 4.8 `geo/` — khoảng cách
 
@@ -185,7 +188,7 @@ Không có API chi tiết 1 record theo id (mobile `getAttendanceRecord` sẽ fa
 
 | File | Việc |
 |---|---|
-| `health.controller.ts` | `GET /health` và `/v0/health`; 200 hoặc 503 |
+| `health.controller.ts` | `GET /v0/health`; 200 hoặc 503 |
 | `health.service.ts` | `SELECT 1` DB, đếm `_prisma_migrations`, RAM/CPU, `ok/degraded/error` |
 | `health.module.ts` | module |
 | `health.service.spec.ts` | unit test |
@@ -212,7 +215,7 @@ Không có API chi tiết 1 record theo id (mobile `getAttendanceRecord` sẽ fa
 
 ## 5. Danh sách API
 
-Nhiều controller khai báo **cả path cũ và `v0/`**.
+Các controller versioned dùng prefix `/v0`; riêng ping root là `/`. Các API có JWT cần `Authorization: Bearer <accessToken>` trừ login/refresh và health.
 
 ### Auth
 
@@ -220,8 +223,10 @@ Nhiều controller khai báo **cả path cũ và `v0/`**.
 |---|---|---|
 | POST | `/v0/user/auth/login` | student |
 | POST | `/v0/user/auth/refresh` | body `refreshToken` |
+| POST | `/v0/user/auth/logout` | student, revoke token |
 | POST | `/v0/admin/auth/login` | lecturer/admin |
 | POST | `/v0/admin/auth/refresh` | |
+| POST | `/v0/admin/auth/logout` | lecturer/admin, revoke token |
 
 Trả `{ accessToken, refreshToken }`. Access: `JWT_SECRET` / `EXPIRES_IN` (mặc định 1h). Refresh: `REFRESH_TOKEN_SECRET` / `REFRESH_TOKEN_EXPIRES_IN` (mặc định 14d).
 
@@ -229,66 +234,99 @@ Trả `{ accessToken, refreshToken }`. Access: `JWT_SECRET` / `EXPIRES_IN` (mặ
 
 | Method | Path |
 |---|---|
-| GET | `/`, `/health`, `/v0/health` |
+| GET | `/` | Liveness/ping |
+| GET | `/v0/health` | DB/migration/resource health; có thể trả 503 |
 
-### Users
+### Users — `/v0/users`
 
-| Method | Path | Role |
-|---|---|---|
-| GET | `/users/me` | JWT |
-| GET | `/users` | admin |
-| GET | `/users/:id` | admin |
+| Method | Path | Quyền | Mục đích |
+|---|---|---|---|
+| GET | `/me` | JWT | Hồ sơ hiện tại |
+| PATCH | `/me` | JWT | Cập nhật profile hiện tại |
+| GET | `/` | admin | Danh sách users |
+| GET | `/:id` | admin | User theo id |
+| POST | `/test-filter` | hiện chưa có guard | Test `UserFilterService`; không dùng như endpoint production công khai |
 
-### Sessions (`/attendance-sessions` và `/v0/attendance-sessions`)
+### Attendance sessions — `/v0/attendance-sessions`
 
-| Method | Path | Role |
-|---|---|---|
-| POST | `/` | admin, lecturer |
-| GET | `/mine` | student |
-| GET | `/created-by-me` | lecturer, admin |
-| GET | `/created-by?userId=` | admin |
-| GET | `/` | admin tất cả; lecturer của mình |
-| DELETE | `/:id` | admin hoặc người tạo |
-| POST | `/:id/close` | admin hoặc người tạo |
-| GET | `/by-user/:userId` | admin |
-| GET | `/:id/detail` | admin, lecturer |
-| GET | `/:id` | admin, lecturer |
+| Method | Path | Quyền | Mục đích |
+|---|---|---|---|
+| POST | `/` | lecturer/admin | Tạo phiên từ lớp học phần, Building đã xác minh và enrollment active |
+| GET | `/me` | student | Phiên/attendance của sinh viên hiện tại |
+| GET | `/mine` | student | Sessions được gán |
+| GET | `/teaching-sections` | lecturer/admin | Lớp được phân công; admin thấy toàn bộ |
+| GET | `/sections/creation-options` | admin | Lecturer, room, course cho form |
+| POST | `/courses/import` | admin | Nhập danh mục mã học phần |
+| POST | `/sections` | admin | Tạo course/term nếu cần và tạo lớp học phần |
+| GET | `/sections/:sectionId/roster` | admin hoặc giảng viên được phân công | Roster active |
+| POST | `/sections/:sectionId/roster/import` | admin | Ghi danh student codes đã có tài khoản |
+| GET | `/analytics` | lecturer/admin | Thống kê chuyên cần |
+| GET | `/created-by-me` | lecturer/admin | Phiên do user hiện tại tạo |
+| GET | `/created-by?userId=` | admin | Phiên theo người tạo |
+| GET | `/` | lecturer/admin | Danh sách phiên; lecturer bị giới hạn theo user |
+| POST | `/:id/attempts/:attemptId/review` | lecturer/admin | Duyệt/từ chối attempt |
+| DELETE | `/:id` | lecturer/admin, ownership được kiểm tra | Xóa phiên và dữ liệu liên quan |
+| POST | `/:id/close` | lecturer/admin, ownership được kiểm tra | Đóng phiên |
+| PATCH | `/:id/cancel` | lecturer/admin, ownership được kiểm tra | Hủy phiên |
+| GET | `/by-user/:userId` | admin | Sessions theo sinh viên |
+| GET | `/:id/detail` | lecturer/admin | Chi tiết participants, attempts, history |
+| GET | `/:id` | lecturer/admin | Thông tin phiên |
+| POST | `/:id/lecturer-location-verification` | lecturer/admin | Lưu GPS evidence của giảng viên |
 
-Status phiên **không lưu DB**: `now < openAt` → pending; trong `[openAt, closeAt]` → open; sau `closeAt` → closed.
+Status `SessionStatus` được tính từ thời gian phiên và trạng thái hủy; xem model/service để biết quy tắc hiện hành. Tạo phiên snapshot các enrollment `active` thành attendance records `absent` và history events trong cùng transaction.
 
-### Check-in / records
+### Check-in và attendance records
 
-| Method | Path | Role |
-|---|---|---|
-| POST | `/attendance/check-in` (`v0`) | student |
-| GET | `/attendance/records/mine` (`v0`) | JWT |
+| Method | Path | Quyền | Mục đích |
+|---|---|---|---|
+| POST | `/v0/attendance/check-in` | student; limit 3/phút | Gửi GPS/device/integrity evidence |
+| GET | `/v0/attendance/records/mine` | JWT | Lịch sử điểm danh |
+| GET | `/v0/attendance/records/summary` | JWT | Summary hiện tại |
+| GET | `/v0/attendance/records/events/mine` | JWT | History events |
+| GET | `/v0/attendance/records/:id` | JWT + ownership | Một attendance record |
 
-Kết quả check-in: `VALID` | `REVIEW` | `REJECTED` (+ `reasons`).
+Validation trả kết quả `VALID`, `REVIEW` hoặc `REJECTED` cùng reasons. `REVIEW` có thể được lecturer/admin xử lý qua route review session.
+
+### Location, device và các domain phụ
+
+| Method | Path | Quyền | Mục đích |
+|---|---|---|---|
+| GET | `/v0/location-registry/buildings?includeInactive=` | admin/lecturer + JWT | Building registry |
+| PATCH | `/v0/location-registry/buildings/:id` | admin | Tọa độ/radius/accuracy/verify/status |
+| GET | `/v0/location-registry/rooms?includeInactive=` | admin/lecturer + JWT | Rooms và liên kết Building |
+| POST | `/v0/location-registry/rooms` | admin | Tạo phòng và link Building |
+| PATCH | `/v0/location-registry/rooms/:id` | admin | Cập nhật room/Building link |
+| PATCH | `/v0/admin/devices/:id/trust` | admin | Trust/block thiết bị |
+| POST | `/v0/accounts` | hiện không có guard | Tạo user/account |
+| GET | `/v0/accounts/:id` | hiện không có guard | Đọc account an toàn (không trả password hash) |
+| GET/POST/PATCH | `/units`, `/units/tree`, `/units/:id` | controller hiện không gắn guard | CRUD/tree đơn vị |
+| GET/POST/DELETE | `/tags` và các route `/:tagId/users/:userId` | JWT, ownership trong service | Quản lý tag và gán user |
+
+`/v0/accounts` và `/units` hiện không có auth guard ở controller; cần bảo vệ trước khi expose ra môi trường không tin cậy. `tags` yêu cầu JWT nhưng không dùng `RolesGuard`.
 
 ---
 
 ## 6. Database (Prisma)
 
-`prisma/schema.prisma` — PostgreSQL.
+`prisma/schema.prisma` — PostgreSQL. Schema khai báo Account/User, Unit/Tag, Course/AcademicTerm/CourseSection/ClassEnrollment/TimetableSlot/Room/Building, AttendanceSession/Record/Attempt/HistoryEvent, LecturerLocationVerification, Notification/NotificationState, PushToken, RegisteredDevice, DeviceIntegrityCheck và AuditLog.
 
 | Model | Bảng | Ý nghĩa |
 |---|---|---|
 | `Account` | `accounts` | username unique, password hash |
 | `User` | `users` | code unique, role, fullname, 1-1 Account |
-| `AttendanceSession` | `attendance_sessions` | tâm GPS, radius, openAt/closeAt, createdBy |
+| `CourseSection` / `ClassEnrollment` | `course_sections` / `class_enrollments` | Lớp học phần và enrollment theo status |
+| `AttendanceSession` | `attendance_sessions` | thời gian, Building/room/timetable và GPS snapshot |
 | `AttendanceRecord` | `attendance_records` | unique (sessionId, userId); absent/present/late/excused |
 | `AttendanceAttempt` | `attendance_attempts` | mỗi lần thử; APPROVED/REVIEW/REJECTED; reasons[] |
+| `AttendanceHistoryEvent` / `AuditLog` | `attendance_history_events` / `audit_logs` | timeline nghiệp vụ và audit |
+| `Building` / `Room` | `buildings` / `rooms` | Location Registry và phòng học |
+| Device models | `registered_devices`, `device_integrity_checks`, `push_tokens` | device trust/integrity/push identity |
 
-Enum: `Role`, `AttendanceStatus`, `AttendanceAttemptResult`.
+Các enum gồm role, session/enrollment/attendance status, attempt result, location, device trust, notification và audit event. Xem schema làm nguồn sự thật về field, relation, index và enum.
 
-Migration:
+Migration tuần tự nằm trong `prisma/migrations/`; không sửa migration đã áp dụng. Tạo migration mới khi đổi schema.
 
-- `20260912000000_init`
-- `20260918000000_phase1_indexes`
-- `20260918000100_attendance_attempt_audit`
-- `20260919000000_relax_gps_accuracy_check`
-
-`prisma/seed.ts`: chỉ khi `NODE_ENV=development`. Username: `admin`, `quangtn`, SV `2312686`… Mật khẩu lấy từ `SEED_*_PASSWORD`; nếu các biến mật khẩu sinh viên bị bỏ trống thì mặc định là `123456` trong môi trường dev.
+`prisma/seed.ts`: chỉ dùng cho development; tạo/cập nhật các demo accounts/users. Mật khẩu lấy từ `SEED_*_PASSWORD`; dùng giá trị riêng trong `.env`, không dựa vào giá trị mặc định hoặc đưa credentials vào tài liệu/commit.
 
 ---
 
@@ -298,15 +336,18 @@ File mẫu: `.env.example`
 
 ```text
 PORT=3000
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/gps_attendance
-JWT_SECRET=...
+CORS_ORIGIN=comma,separated,origins
+DATABASE_URL=postgresql://<user>:<password>@localhost:5432/gps_attendance
+JWT_SECRET=<random-secret>
 EXPIRES_IN=1h
-REFRESH_TOKEN_SECRET=...
+REFRESH_TOKEN_SECRET=<different-random-secret>
 REFRESH_TOKEN_EXPIRES_IN=14d
-SEED_ADMIN_PASSWORD=...
-SEED_LECTURER_PASSWORD=...
-SEED_STUDENT_1_PASSWORD … SEED_STUDENT_5_PASSWORD
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+SEED_ADMIN_PASSWORD / SEED_LECTURER_PASSWORD / SEED_STUDENT_*_PASSWORD
 ```
+
+Không commit giá trị thật. `prisma/seed.ts` chỉ cho phép chạy `NODE_ENV=development`; mật khẩu seed lấy từ `SEED_*_PASSWORD`.
 
 ---
 
@@ -314,7 +355,7 @@ SEED_STUDENT_1_PASSWORD … SEED_STUDENT_5_PASSWORD
 
 `Dockerfile`: multi-stage Node 20 Alpine, build shared + `prisma generate` + `nest build`, chạy production.
 
-Compose (root): service `backend` cổng 3000, health `GET /health`, phụ thuộc Postgres healthy.
+Compose (root): PostgreSQL `5432`, Redis `6379`, backend `3000`, dashboard `8080`. Backend code cung cấp `GET /v0/health`; `docker-compose.yml` hiện đang healthcheck `/health`, vì vậy cần đồng bộ cấu hình này nếu container bị đánh unhealthy.
 
 Unit: `src/**/*.spec.ts` (auth, geo, validation, health, request-id, roles).
 
@@ -325,6 +366,8 @@ pnpm --filter @gps-attendance/attendance test
 pnpm --filter @gps-attendance/attendance test:e2e
 ```
 
+E2E dùng `test/jest-e2e.json`; cần database/test environment phù hợp.
+
 ---
 
 ## 9. Chạy local
@@ -333,23 +376,28 @@ Từ root:
 
 ```bash
 pnpm install
-docker compose up postgres -d
-# copy .env.example → .env, migrate, seed (dev)
-pnpm dev:attendance
+docker compose up -d postgres redis
+# tạo server/attendance/.env từ .env.example và điền local secrets
+cd server/attendance
+pnpm exec prisma migrate dev
+pnpm exec prisma db seed
+cd ../..
+pnpm build:shared
+pnpm --filter @gps-attendance/attendance dev
 ```
 
-Trong package: `pnpm dev` (`nest start --watch`), `pnpm build`, `pnpm start`, `pnpm lint`.
+Để dùng script root có ngrok: `pnpm dev:attendance` (cần cài/xác thực ngrok; script mở tunnel rồi chạy Nest). Trên mạng LAN/local có thể dùng package command ở trên. Script package: `dev`, `debug`, `build`, `start`, `clean`, `lint`, `test`, `test:watch`, `test:cov`, `test:e2e`.
 
-`predev` ở package xóa tsbuildinfo. Root `predev:attendance` build shared trước.
+`predev` xóa tsbuildinfo; root `predev:attendance` build shared trước.
 
 ---
 
-## 10. Hạn chế thuộc backend
+## 10. Security và giới hạn hiện tại
 
-- CORS mở mọi origin
-- Integrity token chưa verify Google/Apple
-- Không logout/revoke JWT
-- `unitFilter` / `tagFilter` chưa có bảng
-- Fallback gán mọi SV khi mã không khớp
-- `AttendanceSessionSeeder` và `response.interceptor` tồn tại nhưng không gắn runtime
-- Mock repositories chỉ cho test, không phải đường production
+- Global rate limit: 120 request/phút; login 5/phút; check-in 3/phút. Các mức này cấu hình trong `src/app.module.ts` và controller tương ứng.
+- CORS mặc định giới hạn localhost; thêm origin bằng `CORS_ORIGIN`. Không dùng wildcard cho credentialed production traffic.
+- GPS/device integrity pipeline có scoring/review; presence of an integrity token không đồng nghĩa với xác thực trực tiếp qua Google Play Integrity hoặc Apple App Attest provider.
+- `/v0/users/test-filter` hiện không có auth guard; chỉ dùng trong môi trường tin cậy và cần bảo vệ/gỡ nếu không phục vụ production.
+- `src/prisma/prisma.seed.ts` là seed flow khác, không phải seed được `prisma.config.ts` cấu hình; seed chuẩn hiện tại là `prisma/seed.ts`.
+- `AttendanceSessionSeeder` và response interceptor tồn tại trong source nhưng không được gắn runtime trong `AppModule`.
+- Không chạy `prisma migrate reset` trên dữ liệu cần giữ; không sửa migration đã deploy.

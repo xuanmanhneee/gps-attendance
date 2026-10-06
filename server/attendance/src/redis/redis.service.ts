@@ -125,17 +125,24 @@ export class RedisService implements OnModuleDestroy {
     }
   }
 
-  async setBlacklistToken(token: string, ttlSec = 86400): Promise<void> {
+  async setBlacklistToken(
+    token: string,
+    ttlSec = 86400,
+    namespace: 'token' | 'jti' | 'session' = 'token',
+  ): Promise<void> {
     try {
-      await this.redis.set(`bl:${token}`, '1', 'EX', ttlSec);
+      await this.redis.set(`bl:${namespace}:${token}`, '1', 'EX', ttlSec);
     } catch (err) {
       this.logger.warn(`Failed to blacklist token in Redis: ${(err as Error).message}`);
     }
   }
 
-  async isTokenBlacklisted(token: string): Promise<boolean> {
+  async isTokenBlacklisted(
+    token: string,
+    namespace: 'token' | 'jti' | 'session' = 'token',
+  ): Promise<boolean> {
     try {
-      const exists = await this.redis.exists(`bl:${token}`);
+      const exists = await this.redis.exists(`bl:${namespace}:${token}`);
       return exists === 1;
     } catch (err) {
       this.logger.warn(`Failed to check token blacklist in Redis: ${(err as Error).message}`);

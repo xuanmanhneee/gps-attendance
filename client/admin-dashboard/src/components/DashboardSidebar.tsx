@@ -1,4 +1,5 @@
 import type { UserProfileDto } from '@gps-attendance/shared';
+import { NavLink } from 'react-router-dom';
 
 interface DashboardSidebarProps {
   user: UserProfileDto | null;
@@ -7,18 +8,18 @@ interface DashboardSidebarProps {
 
 interface NavItemProps {
   label: string;
-  active?: boolean;
+  to: string;
 }
 
-const NavItem = ({ label, active = false }: NavItemProps) => (
-  <button
-    type="button"
-    className={`w-full px-3 py-2 rounded-lg text-left text-[13.5px] ${
-      active ? 'bg-blue-600 text-white font-medium' : 'hover:bg-[#1e2130]'
-    }`}
-  >
-    {label}
-  </button>
+const NavItem = ({ label, to }: NavItemProps) => (
+  <NavLink
+    to={to}
+    className={({ isActive }) =>
+      `w-full rounded-lg px-3 py-2 text-left text-[13.5px] ${
+        isActive ? 'bg-blue-600 font-medium text-white' : 'hover:bg-[#1e2130]'
+      }`
+    }
+  >{label}</NavLink>
 );
 
 const DashboardSidebar = ({ user, onLogout }: DashboardSidebarProps) => (
@@ -28,10 +29,11 @@ const DashboardSidebar = ({ user, onLogout }: DashboardSidebarProps) => (
     </div>
 
     <nav className="flex flex-col gap-0.5" aria-label="Điều hướng chính">
-      <NavItem label="Phiên điểm danh" active />
-      <NavItem label="Thống kê" />
-      <NavItem label="Sinh viên" />
-      <NavItem label="Cài đặt" />
+      <NavItem label="Phiên điểm danh" to="/dashboard" />
+      {user?.role === 'admin' && (
+        <NavItem label="Lớp học phần" to="/course-sections" />
+      )}
+      <NavItem label="Location Registry" to="/locations" />
     </nav>
 
     <div className="mt-auto pt-4 border-t border-gray-700 text-sm flex flex-col gap-3">

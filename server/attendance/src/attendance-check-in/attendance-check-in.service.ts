@@ -8,9 +8,11 @@ import {
 import { AttendanceSessionsService } from '../attendance-sessions/attendance-sessions.service';
 import { AttendanceValidationService } from '../attendance-validation/attendance-validation.service';
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
+import { PrismaService } from '../common/database/prisma.service';
 import { CheckInRequestDto } from './attendance-check-in.dto';
 import {
   AttendanceCheckInErrorCode,
+  AttendanceCheckInReason,
   AttendanceCheckInResult,
   AttendanceSessionErrorCode,
 } from '@gps-attendance/shared';
@@ -34,6 +36,7 @@ export class AttendanceCheckInService {
     private readonly deviceUsageRepository: IAttendanceCheckInDeviceUsageRepository,
     @Inject(ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY)
     private readonly attemptRepository: IAttendanceCheckInAttemptRepository,
+    private readonly prisma: PrismaService,
   ) {}
 
   async checkIn(
@@ -123,6 +126,47 @@ export class AttendanceCheckInService {
       };
     }
 
+    const registeredDevice = await this.prisma.registeredDevice.upsert({
+      where: {
+        userId_deviceId: { userId, deviceId: dto.device.deviceId },
+      },
+      create: {
+        userId,
+        deviceId: dto.device.deviceId,
+        platform: dto.device.platform,
+        model: dto.device.model,
+        trustStatus: 'UNVERIFIED',
+      },
+      update: {
+        platform: dto.device.platform,
+        model: dto.device.model,
+        lastSeenAt: new Date(),
+      },
+      select: { id: true, trustStatus: true },
+    });
+
+    await this.prisma.deviceIntegrityCheck.create({
+      data: {
+        userId,
+        registeredDeviceId: registeredDevice.id,
+        sessionId: dto.sessionId,
+        provider: dto.device.platform === 'ios' ? 'APP_ATTEST' : 'PLAY_INTEGRITY',
+        verdict: dto.integrity.integrityToken
+          ? 'TOKEN_PRESENT_UNVERIFIED'
+          : 'TOKEN_MISSING',
+        reasons: ['PLATFORM_ATTESTATION_VALIDATOR_NOT_CONFIGURED'],
+      },
+    });
+
+    if (registeredDevice.trustStatus === 'BLOCKED') {
+      await this.attemptRepository.completeAttempt(
+        attempt.attemptId,
+        'REJECTED',
+        ['DEVICE_BLOCKED'],
+      );
+      return { status: 'REJECTED', reasons: ['DEVICE_BLOCKED'] };
+    }
+
     const device = await this.deviceCheck.evaluate({
       sessionId: dto.sessionId,
       deviceId: dto.device.deviceId,
@@ -157,15 +201,25 @@ export class AttendanceCheckInService {
       integrity: dto.integrity,
     });
 
+    const reasons: AttendanceCheckInReason[] = [...validation.reasons];
+    const finalStatus =
+      validation.status === 'VALID' &&
+      registeredDevice.trustStatus === 'UNVERIFIED'
+        ? 'REVIEW'
+        : validation.status;
+    if (registeredDevice.trustStatus === 'UNVERIFIED') {
+      reasons.push('DEVICE_UNVERIFIED');
+    }
+
     if (validation.status === 'REJECTED') {
       await this.attemptRepository.completeAttempt(
         attempt.attemptId,
         'REJECTED',
-        validation.reasons,
+        reasons,
       );
       return {
         status: 'REJECTED',
-        reasons: validation.reasons as [
+        reasons: reasons as [
           any,
           ...any[],
         ],
@@ -193,11 +247,11 @@ export class AttendanceCheckInService {
 
     await this.attemptRepository.completeAttempt(
       attempt.attemptId,
-      validation.status === 'VALID' ? 'APPROVED' : 'REVIEW',
-      validation.reasons,
+      finalStatus === 'VALID' ? 'APPROVED' : 'REVIEW',
+      reasons,
     );
 
-    if (validation.status === 'VALID') {
+    if (finalStatus === 'VALID') {
       return {
         status: 'VALID',
       };
@@ -205,7 +259,7 @@ export class AttendanceCheckInService {
 
     return {
       status: 'REVIEW',
-      reasons: validation.reasons as [
+      reasons: reasons as [
         any,
         ...any[],
       ],

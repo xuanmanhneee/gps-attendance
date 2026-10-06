@@ -6,10 +6,13 @@ import { AttendanceRecordModule } from '../attendance-record/attendance-record.m
 import { PrismaAttendanceSessionRepository } from './repositories/prisma-attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
 import { AttendanceSessionQueryService } from './attendance-session-query.service';
+import { GeoModule } from '../geo/geo.module';
+import { LecturerLocationVerificationController } from './lecturer-location-verification.controller';
+import { LecturerLocationVerificationService } from './lecturer-location-verification.service';
 
 @Module({
-  imports: [UsersModule, AttendanceRecordModule],
-  controllers: [AttendanceSessionsController],
+  imports: [UsersModule, AttendanceRecordModule, GeoModule],
+  controllers: [AttendanceSessionsController, LecturerLocationVerificationController],
   providers: [
     AttendanceSessionsService,
     {
@@ -17,6 +20,7 @@ import { AttendanceSessionQueryService } from './attendance-session-query.servic
       useClass: PrismaAttendanceSessionRepository,
     },
     AttendanceSessionQueryService,
+    LecturerLocationVerificationService,
   ],
   exports: [AttendanceSessionsService],
 })

@@ -33,6 +33,7 @@ export const useAttendanceSessions = () => {
     }
 
     setSessions((prev) => [created, ...prev]);
+    return created;
   };
 
   const closeSession = async (id: number) => {

@@ -29,6 +29,31 @@ enum SessionStatus {
   cancelled
 }
 
+enum RegistryLocationType {
+  BUILDING
+  FACILITY
+}
+
+enum RegistryLocationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum RoomStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum SessionLocationSource {
+  MANUAL
+  BUILDING_REGISTRY
+}
+
+enum LecturerLocationVerificationStatus {
+  PASS
+  WARNING
+}
+
 enum AttendanceStatus {
   absent
   present
@@ -43,8 +68,14 @@ enum AttendanceAttemptResult {
 }
 
 enum AttendanceHistoryEventType {
+  SESSION_CREATED
   SESSION_ASSIGNED
   CHECK_IN_ATTEMPT
+  GPS_VALIDATED
+  GPS_REVIEW
+  GPS_REJECTED
+  DEVICE_REJECTED
+  ATTEMPT_REJECTED
   REVIEW_DECISION
   RECORD_UPDATED
 }
@@ -130,44 +161,82 @@ model Unit {
 }
 
 model User {
-  id                 Int                 @id @default(autoincrement())
-  code               String              @unique @db.VarChar(50)
-  role               Role
-  fullname           String              @db.VarChar(150)
-  unitId             Int?                @map("unit_id")
-  email              String?             @db.VarChar(254)
-  phone              String?             @db.VarChar(30)
-  dateOfBirth        String?             @map("date_of_birth") @db.VarChar(10)
-  gender             String?             @db.VarChar(30)
-  address            String?             @db.VarChar(255)
-  programName        String?             @map("program_name") @db.VarChar(150)
-  cohort             String?             @db.VarChar(50)
-  studyMode          String?             @map("study_mode") @db.VarChar(50)
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
+  id                         Int                        @id @default(autoincrement())
+  code                       String                     @unique @db.VarChar(50)
+  role                       Role
+  fullname                   String                     @db.VarChar(150)
+  unitId                     Int?                       @map("unit_id")
+  email                      String?                    @db.VarChar(254)
+  phone                      String?                    @db.VarChar(30)
+  dateOfBirth                String?                    @map("date_of_birth") @db.VarChar(10)
+  gender                     String?                    @db.VarChar(30)
+  address                    String?                    @db.VarChar(255)
+  programName                String?                    @map("program_name") @db.VarChar(150)
+  cohort                     String?                    @db.VarChar(50)
+  studyMode                  String?                    @map("study_mode") @db.VarChar(50)
+  createdAt                  DateTime                   @default(now()) @map("created_at")
+  updatedAt                  DateTime                   @updatedAt @map("updated_at")
 
-  unit               Unit?               @relation(fields: [unitId], references: [id], onDelete: Restrict)
-  account            Account?
-  taughtSections     CourseSection[]     @relation("SectionLecturer")
-  classEnrollments   ClassEnrollment[]
-  notificationsCreated Notification[]    @relation("NotificationCreator")
-  notificationStates UserNotificationState[]
-  pushTokens         PushToken[]
-  registeredDevices  RegisteredDevice[]
-  integrityChecks    DeviceIntegrityCheck[]
-  auditLogs          AuditLog[]           @relation("AuditActor")
-  createdSessions    AttendanceSession[] @relation("SessionCreator")
-  attendanceRecords  AttendanceRecord[]
-  updatedRecords     AttendanceRecord[]  @relation("RecordUpdater")
-  attempts           AttendanceAttempt[]
-  reviewedAttempts   AttendanceAttempt[]  @relation("AttemptReviewer")
-  attendanceHistoryEvents AttendanceHistoryEvent[] @relation("AttendanceHistorySubject")
-  actedAttendanceHistoryEvents AttendanceHistoryEvent[] @relation("AttendanceHistoryActor")
-  tags               UserTag[]
+  unit                       Unit?                      @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  account                    Account?
+  taughtSections             CourseSection[]            @relation("SectionLecturer")
+  classEnrollments           ClassEnrollment[]
+  notificationsCreated       Notification[]             @relation("NotificationCreator")
+  notificationStates         UserNotificationState[]
+  pushTokens                 PushToken[]
+  registeredDevices          RegisteredDevice[]
+  integrityChecks            DeviceIntegrityCheck[]
+  auditLogs                  AuditLog[]                 @relation("AuditActor")
+  createdSessions            AttendanceSession[]        @relation("SessionCreator")
+  attendanceRecords          AttendanceRecord[]
+  updatedRecords             AttendanceRecord[]        @relation("RecordUpdater")
+  attempts                   AttendanceAttempt[]
+  reviewedAttempts           AttendanceAttempt[]        @relation("AttemptReviewer")
+  lecturerLocationVerifications LecturerLocationVerification[]
+  attendanceHistoryEvents    AttendanceHistoryEvent[]   @relation("AttendanceHistorySubject")
+  actedAttendanceHistoryEvents AttendanceHistoryEvent[]  @relation("AttendanceHistoryActor")
+  tags                       UserTag[]
 
   @@index([role])
   @@index([unitId])
+  @@index([role, unitId])
   @@map("users")
+}
+
+model Campus {
+  id        Int        @id @default(autoincrement())
+  code      String     @unique @db.VarChar(50)
+  name      String     @db.VarChar(150)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  buildings Building[]
+
+  @@map("campuses")
+}
+
+model Building {
+  id                   Int                    @id @default(autoincrement())
+  campusId             Int                    @map("campus_id")
+  code                 String                 @unique @db.VarChar(50)
+  name                 String                 @db.VarChar(150)
+  latitude             Decimal                @db.Decimal(10, 7)
+  longitude            Decimal                @db.Decimal(10, 7)
+  geofenceRadius       Decimal?               @map("geofence_radius") @db.Decimal(8, 2)
+  gpsAccuracyThreshold Decimal?               @map("gps_accuracy_threshold") @db.Decimal(8, 2)
+  lecturerValidationRadius Decimal?            @map("lecturer_validation_radius") @db.Decimal(8, 2)
+  type                 RegistryLocationType
+  verified             Boolean                @default(false)
+  status               RegistryLocationStatus @default(ACTIVE)
+  createdAt            DateTime               @default(now()) @map("created_at")
+  updatedAt            DateTime               @updatedAt @map("updated_at")
+
+  campus             Campus              @relation(fields: [campusId], references: [id], onDelete: Restrict)
+  rooms              Room[]
+  attendanceSessions AttendanceSession[]
+
+  @@index([campusId, type, status])
+  @@map("buildings")
 }
 
 model AttendanceSession {
@@ -176,25 +245,38 @@ model AttendanceSession {
   latitude          Decimal            @db.Decimal(10, 7)
   longitude         Decimal            @db.Decimal(10, 7)
   radius            Decimal            @db.Decimal(8, 2)
+  gpsAccuracyThreshold Decimal?         @map("gps_accuracy_threshold") @db.Decimal(8, 2)
+  lecturerValidationRadius Decimal?     @map("lecturer_validation_radius") @db.Decimal(8, 2)
   openAt            DateTime           @map("open_at")
   closeAt           DateTime           @map("close_at")
   status            SessionStatus      @default(draft)
   createdBy         Int                @map("created_by")
   courseSectionId   Int?               @map("course_section_id")
+  buildingId        Int?               @map("building_id")
+  roomId            Int?               @map("room_id")
+  timetableSlotId   Int?               @map("timetable_slot_id")
+  locationSource    SessionLocationSource @default(MANUAL) @map("location_source")
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
   creator           User               @relation("SessionCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   courseSection     CourseSection?     @relation(fields: [courseSectionId], references: [id], onDelete: SetNull)
+  building          Building?          @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  room              Room?              @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  timetableSlot     TimetableSlot?     @relation(fields: [timetableSlotId], references: [id], onDelete: SetNull)
   attendanceRecords AttendanceRecord[]
   attempts          AttendanceAttempt[]
   historyEvents     AttendanceHistoryEvent[]
   integrityChecks   DeviceIntegrityCheck[]
   notifications     Notification[]
+  lecturerLocationVerifications LecturerLocationVerification[]
 
   @@index([createdBy])
   @@index([createdBy, openAt, closeAt])
   @@index([courseSectionId])
+  @@index([buildingId])
+  @@index([roomId])
+  @@index([timetableSlotId])
   @@index([openAt, closeAt])
   @@map("attendance_sessions")
 }
@@ -219,8 +301,7 @@ model AttendanceRecord {
   updater        User?             @relation("RecordUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
 
   @@unique([sessionId, userId])
-  @@index([sessionId, deviceId])
-  @@index([userId, updatedAt])
+  @@index([sessionId, deviceId])  @@index([sessionId, status, checkedInAt])  @@index([userId, updatedAt])
   @@map("attendance_records")
 }
 
@@ -240,6 +321,7 @@ model AttendanceAttempt {
   reviewedBy       Int?                     @map("reviewed_by")
   reviewedAt       DateTime?                @map("reviewed_at")
   reviewNote       String?                  @map("review_note") @db.VarChar(500)
+  reviewReason     String?                  @map("review_reason") @db.VarChar(50)
   createdAt        DateTime                 @default(now()) @map("created_at")
 
   session          AttendanceSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -250,6 +332,7 @@ model AttendanceAttempt {
   @@index([sessionId, userId, createdAt])
   @@index([sessionId, deviceId, createdAt])
   @@index([sessionId, userId, serverTimestamp])
+  @@index([userId, result, createdAt])
   @@map("attendance_attempts")
 }
 
@@ -263,6 +346,7 @@ model AttendanceHistoryEvent {
   status        AttendanceStatus?
   attemptResult AttendanceAttemptResult?   @map("attempt_result")
   reasons       String[]                   @default([])
+  reviewReason  String?                    @map("review_reason") @db.VarChar(50)
   note          String?                    @db.VarChar(500)
   createdAt     DateTime                   @default(now()) @map("created_at")
 
@@ -275,6 +359,28 @@ model AttendanceHistoryEvent {
   @@index([sessionId, userId, createdAt])
   @@index([attemptId])
   @@map("attendance_history_events")
+}
+
+model LecturerLocationVerification {
+  id             Int                                @id @default(autoincrement())
+  sessionId      Int                                @map("session_id")
+  lecturerId     Int                                @map("lecturer_id")
+  latitude       Decimal                            @db.Decimal(10, 7)
+  longitude      Decimal                            @db.Decimal(10, 7)
+  accuracy       Decimal                            @db.Decimal(8, 2)
+  clientTimestamp DateTime                          @map("client_timestamp")
+  serverTimestamp DateTime                          @default(now()) @map("server_timestamp")
+  distanceMeters Decimal                            @map("distance_meters") @db.Decimal(8, 2)
+  status         LecturerLocationVerificationStatus
+  reasons        String[]                           @default([])
+  createdAt      DateTime                           @default(now()) @map("created_at")
+
+  session  AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  lecturer User              @relation(fields: [lecturerId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId, createdAt])
+  @@index([lecturerId, createdAt])
+  @@map("lecturer_location_verifications")
 }
 
 model AcademicTerm {
@@ -315,6 +421,9 @@ model Room {
   code      String          @unique @db.VarChar(50)
   name      String          @db.VarChar(100)
   building  String?         @db.VarChar(100)
+  buildingId Int?           @map("building_id")
+  floor     String?         @db.VarChar(30)
+  status    RoomStatus      @default(ACTIVE)
   latitude  Decimal?        @db.Decimal(10, 7)
   longitude Decimal?        @db.Decimal(10, 7)
   createdAt DateTime        @default(now()) @map("created_at")
@@ -322,7 +431,10 @@ model Room {
 
   sections  CourseSection[]
   slots     TimetableSlot[]
+  registryBuilding Building? @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  attendanceSessions AttendanceSession[]
 
+  @@index([buildingId, floor, status])
   @@map("rooms")
 }
 
@@ -363,6 +475,7 @@ model ClassEnrollment {
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([courseSectionId, userId])
+  @@index([courseSectionId, status])
   @@index([userId, status])
   @@map("class_enrollments")
 }
@@ -379,6 +492,7 @@ model TimetableSlot {
 
   courseSection   CourseSection @relation(fields: [courseSectionId], references: [id], onDelete: Cascade)
   room            Room?         @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  attendanceSessions AttendanceSession[]
 
   @@index([courseSectionId, dayOfWeek])
   @@index([roomId, dayOfWeek])

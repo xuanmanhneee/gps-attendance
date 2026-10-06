@@ -144,4 +144,5 @@ export class CheckInRequestDto implements CheckInRequest {
   @ValidateNested()
   @Type(() => DeviceIntegrityDto)
   integrity!: DeviceIntegrityDto;
+
 }

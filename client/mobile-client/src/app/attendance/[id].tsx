@@ -373,7 +373,6 @@ export default function AttendanceSessionDetailScreen() {
       appAlert('Đã điểm danh', 'Bạn đã có trạng thái điểm danh cho phiên này.');
       return;
     }
-
     const currentLocation = await requestCurrentLocation(true);
     if (!currentLocation) return;
 
@@ -567,7 +566,9 @@ export default function AttendanceSessionDetailScreen() {
             </View>
             <View style={styles.sessionHeading}>
               <Text style={styles.sessionTitle}>{session.title}</Text>
-              <Text style={styles.sessionSubtitle}>Phiên #{session.id} · Bán kính {session.radius} m</Text>
+                <Text style={styles.sessionSubtitle}>
+                  Phiên #{session.id} · {session.location?.room?.code ?? 'Chưa gán phòng'} · Bán kính {session.radius} m
+                </Text>
             </View>
             <View style={[styles.statusBadge, session.status === 'open' ? styles.openBadge : styles.pendingBadge]}>
               <Text style={[styles.statusBadgeText, session.status === 'open' ? styles.openText : styles.pendingText]}>
@@ -585,6 +586,19 @@ export default function AttendanceSessionDetailScreen() {
 
         <Text style={styles.sectionTitle}>Thông tin điểm danh</Text>
         <Card style={styles.detailsCard}>
+          <InfoRow
+            icon="domain"
+            label="Phòng / tòa"
+            value={[
+              session.location?.room?.code,
+              session.location?.building?.code,
+            ].filter(Boolean).join(' · ') || 'Địa điểm chưa liên kết'}
+          />
+          <InfoRow
+            icon="crosshairs-gps"
+            label="Tâm GPS cố định"
+            value={`${session.latitude.toFixed(6)}, ${session.longitude.toFixed(6)}`}
+          />
           <InfoRow
             icon="clock-outline"
             label="Thời gian điểm danh"
@@ -608,6 +622,11 @@ export default function AttendanceSessionDetailScreen() {
             icon="map-marker-distance"
             label="Khoảng cách"
             value={distanceMeters === null ? 'Chưa xác định' : `${distanceMeters} m / bán kính ${session.radius} m`}
+          />
+          <InfoRow
+            icon="target"
+            label="GPS Accuracy thiết bị"
+            value={location ? `±${Math.round(location.coords.accuracy ?? 0)} m` : 'Chưa xác định'}
           />
           <Pressable accessibilityRole="button" onPress={() => void handleGpsPress()} style={styles.infoRow}>
             <View style={styles.infoLabelGroup}>
@@ -636,7 +655,7 @@ export default function AttendanceSessionDetailScreen() {
         </Card>
 
         <Text style={styles.hintText}>
-          Để điểm danh, hãy ở trong bán kính lớp học và bật GPS. Chạm vào GPS hoặc Wi‑Fi nếu cần mở cài đặt.
+          GPS xác minh vị trí của thiết bị trong khu vực học tập, không chứng minh danh tính người đang cầm thiết bị. Chạm GPS hoặc Wi‑Fi nếu cần mở cài đặt.
         </Text>
       </ScrollView>
 

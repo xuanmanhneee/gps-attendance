@@ -15,6 +15,7 @@ export interface CreateAttendanceHistoryEventInput {
   status?: AttendanceStatus | null;
   attemptResult?: 'APPROVED' | 'REVIEW' | 'REJECTED' | null;
   reasons?: string[];
+  reviewReason?: string | null;
   note?: string | null;
 }
 

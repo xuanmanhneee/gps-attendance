@@ -10,7 +10,7 @@ Tổng quan: [../../README.md](../../README.md). API: [../../server/attendance/R
 
 Mọi file trong `client/mobile-client/` thuộc app này: Expo Router `src/app/`, API, context, GPS/device, theme, assets.
 
-**Không** nằm trong Docker Compose. Giảng viên/admin không dùng app này (`POST /v0/user/auth/login` chỉ nhận `student`).
+**Không** nằm trong Docker Compose. Đây là app dành chủ yếu cho sinh viên; màn login có toggle chọn admin endpoint (`/v0/admin/auth/login`) cho lecturer/admin, còn luồng chính/tab được thiết kế cho student.
 
 ---
 
@@ -59,12 +59,16 @@ Root `_layout.tsx`: `AuthProvider`, theme dark/light, Stack (`index`, `login`, `
 |---|---|---|
 | `index.tsx` | `/` | Redirect: signed in → `/(tabs)`, chưa → `/login`. Phần template Expo phía trên file đã comment. |
 | `login.tsx` | `/login` | Form MSSV/mật khẩu, logo DLU, campus footer. Không chọn giảng viên sẽ gọi `user/auth/login`; chọn giảng viên sẽ gọi `admin/auth/login`. |
-| `(tabs)/_layout.tsx` | tabs | Điểm Danh / Lịch Sử / Thông Tin |
-| `(tabs)/index.tsx` | tab check-in | GPS watch, list session `/mine`, gửi check-in, modal kết quả |
-| `(tabs)/history.tsx` | tab lịch sử | `GET /attendance/records/mine`, pull-to-refresh |
-| `(tabs)/profile.tsx` | tab hồ sơ | Thông tin user, confirm logout |
-| `home.tsx` | `/home` | Màn placeholder “Chào mừng…” — **không nằm trong Stack chính** |
-| `explore.tsx` | `/explore` | Màn demo Expo template — **không dùng luồng điểm danh** |
+| `(tabs)/_layout.tsx` | tabs | Điểm danh, Lịch học, Lịch sử, Thông tin |
+| `(tabs)/index.tsx` | tab điểm danh | Tải phiên của sinh viên, vị trí/GPS và gửi check-in |
+| `(tabs)/schedule.tsx` | tab lịch học | Danh sách phiên/lịch học liên quan đến sinh viên |
+| `(tabs)/history.tsx` | tab lịch sử | Summary, record history và history events |
+| `(tabs)/profile.tsx` | tab hồ sơ | Thông tin user và logout |
+| `attendance/[id].tsx` | `/attendance/:id` | Chi tiết phiên/attendance cho check-in |
+| `attendance-location/[id].tsx` | `/attendance-location/:id` | Màn vị trí phiên/check-in |
+| `profile/details.tsx` | `/profile/details` | Chi tiết hồ sơ sinh viên |
+| `notifications.tsx` | `/notifications` | Notification từ history events và reminder phiên |
+| `home.tsx`, `explore.tsx` | route phụ/demo | Không thuộc tab điểm danh chính |
 
 ---
 
@@ -75,16 +79,19 @@ Root `_layout.tsx`: `AuthProvider`, theme dark/light, Stack (`index`, `login`, `
 - Restore session lúc mở app (`getSession`)
 - Decode JWT (sub, username, role); kiểm tra `exp`
 - `login` → `AuthAPI.login` → `saveSession` (access + refresh + user + lastLoginAt)
-- `logout` → gọi `AuthAPI.logout` rồi xóa storage (API logout **backend chưa có**)
+- `logout` → gọi logout API, sau đó xóa storage local dù request thất bại
+- Refresh token được lưu; context hiện không thực hiện refresh tự động. Token hết hạn bị loại bỏ khi restore session.
 - Export `useAuth`
 
 ### `api/auth.api.ts`
 
 | Hàm | HTTP |
 |---|---|
-| `login` | `POST /v0/user/auth/login` |
-| `refreshToken` | `POST /v0/user/auth/refresh` |
-| `logout` | `POST /v0/user/auth/logout` — **server chưa implement** |
+| `login` | `POST /v0/user/auth/login`; nếu chọn đăng nhập giảng viên thì `POST /v0/admin/auth/login` |
+| `refreshToken` | `POST /v0/user/auth/refresh` với `refreshToken` trong body |
+| `logout` | `POST /v0/user/auth/logout` |
+
+`api/user.api.ts` gọi `GET/PATCH /v0/users/me` để đọc/cập nhật hồ sơ.
 
 ### `services/token-storage.ts`
 
@@ -98,15 +105,17 @@ Native: `expo-secure-store`. Web: `localStorage`. Keys: `accessToken`, `refreshT
 
 | Hàm | HTTP / ghi chú |
 |---|---|
-| `getSessions` | `GET /v0/attendance-sessions/mine` |
-| `getSession` | `GET /v0/attendance-sessions/:id/detail` — **chi tiết session dành lecturer**; student có thể 403 |
-| `checkIn` | `POST /attendance/check-in` |
-| `getAttendanceHistory` | `GET /attendance/records/mine` |
-| `getAttendanceRecord` | **Không gọi mạng** — trả lỗi cứng “Backend chưa cung cấp API…” |
+| `getSessions` | `GET /v0/attendance-sessions/me` |
+| `getMySummary` | `GET /v0/attendance/records/summary` |
+| `getSession` | `GET /v0/attendance-sessions/:id/detail`; backend hiện yêu cầu role `admin` hoặc `lecturer`, nên tài khoản student có thể nhận 403 |
+| `checkIn` | `POST /v0/attendance/check-in` |
+| `getAttendanceHistory` | `GET /v0/attendance/records/mine` |
+| `getAttendanceHistoryEvents` | `GET /v0/attendance/records/events/mine` |
+| `getAttendanceRecord(id)` | `GET /v0/attendance/records/:id` |
 
 ### `api/api.ts`
 
-`BASE_URL = EXPO_PUBLIC_API_URL \|\| http://localhost:3000`. Timeout 30s. 401 → hết hạn. Lỗi mạng hướng dẫn kiểm tra Wi‑Fi / IP LAN.
+`BASE_URL` ưu tiên `EXPO_PUBLIC_API_URL`; nếu trống, suy ra host từ Expo Metro và dùng port `3000` (fallback `127.0.0.1`). Timeout 30s. Gửi header ngrok bypass; `ApiRequestError.status` là HTTP status hoặc `0` khi lỗi mạng/timeout.
 
 ### `(tabs)/index.tsx` — luồng check-in
 
@@ -183,11 +192,21 @@ Trong package: `pnpm android` / `ios` / `web`, `pnpm lint`, `pnpm clean`.
 
 ---
 
-## 10. Hạn chế thuộc mobile
+## 10. Notifications, storage và giới hạn hiện tại
 
-- Logout gọi endpoint chưa có trên server
-- Chi tiết 1 record không có API
-- `getSession` detail có thể không phù hợp role student
-- Toggle “giảng viên” trên login không đổi API
-- `home.tsx` / `explore.tsx` và nhiều component template không nằm luồng điểm danh
-- App không đóng gói Docker
+- Notifications ghép attendance history events với reminder từ phiên hiện tại; read/unread IDs được lưu local bằng AsyncStorage theo user. Đây không phải push notification từ máy chủ.
+- Token/session dùng `expo-secure-store` native và `localStorage` trên web. App lưu access token, refresh token, user và `lastLoginAt`.
+- Logout gọi backend nhưng vẫn xóa local session nếu request logout lỗi.
+- `refreshToken` và `logout` hiện cố định ở user auth routes; nếu đăng nhập bằng toggle lecturer/admin trên mobile, các thao tác đó không tự chuyển sang admin auth routes. Mobile vẫn là client hướng sinh viên.
+- Mobile đang gọi `/v0/attendance-sessions/:id/detail`, nhưng backend route này hiện chỉ cho `admin`/`lecturer`; student có thể gặp 403 khi mở chi tiết phiên. Đây là giới hạn cần xử lý ở API/role trước khi coi luồng chi tiết student là hoàn chỉnh.
+- `home.tsx`, `explore.tsx` và một số component Expo template là route/demo phụ, không thuộc luồng tab chính.
+- Mobile không được build/deploy bằng root production build hoặc Docker Compose; chạy bằng Expo scripts.
+
+## 11. Kiểm tra và sửa lỗi
+
+```bash
+pnpm lint
+pnpm web
+```
+
+Lệnh package chạy trong `client/mobile-client`; ở root dùng `pnpm dev:mobile`. Điện thoại thật không truy cập `localhost` của máy tính: đặt `EXPO_PUBLIC_API_URL` là IP LAN hoặc tunnel HTTPS và restart Metro sau khi đổi env.

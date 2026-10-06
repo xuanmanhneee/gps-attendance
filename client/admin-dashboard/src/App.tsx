@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import SessionDetailPage from './pages/SessionDetailPage';
+import LocationRegistryPage from './pages/LocationRegistryPage';
+import CourseSectionsPage from './pages/CourseSectionsPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useAuth } from './hooks/useAuth';
@@ -41,6 +43,22 @@ function App() {
           element={
             <ProtectedRoute>
               <SessionDetailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/locations"
+          element={
+            <ProtectedRoute>
+              <LocationRegistryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/course-sections"
+          element={
+            <ProtectedRoute>
+              <CourseSectionsPage />
             </ProtectedRoute>
           }
         />

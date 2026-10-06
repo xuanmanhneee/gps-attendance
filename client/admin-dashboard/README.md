@@ -22,10 +22,10 @@ Mọi file trong `client/admin-dashboard/` thuộc dashboard này: `src/` (UI + 
 | Routing | react-router-dom 7 |
 | Style | Tailwind CSS 4 (`@tailwindcss/vite`) |
 | Form / UX | react-hook-form, react-toastify, react-icons |
-| HTTP | Axios không dùng trực tiếp trên page — `createHttpClient` từ shared (fetch) |
+| HTTP | API calls dùng `createHttpClient` từ shared (fetch); Axios hiện là dependency nhưng không phải transport chính |
 | Deploy | Dockerfile → nginx:alpine, cổng host **8080** |
 
-`xlsx` có trong `package.json` nhưng **chưa dùng** trong `src/` (chưa xuất Excel).
+`xlsx` được dùng trong `CourseSectionsPage` để đọc/ghi mẫu Excel/CSV danh mục học phần và roster sinh viên. Chi tiết phiên có export CSV, không phải file Excel `.xlsx`.
 
 ---
 
@@ -48,8 +48,7 @@ client/admin-dashboard/
 │   ├── hooks/
 │   ├── api/
 │   ├── context/
-│   ├── routes/
-│   └── services/
+│   └── services/              # token service
 └── README.md
 ```
 
@@ -66,8 +65,8 @@ Bọc `AuthProvider` quanh `App`. CSS: `index.css` (Tailwind).
 - State: `user: UserProfileDto | null`, `isLoading`
 - Khởi động: nếu có token → `GET /users/me`; lỗi thì xóa token
 - `login`: `POST /v0/admin/auth/login` → lưu **accessToken** vào localStorage → `getMe`
-- `logout`: xóa token local, **không** gọi API logout (backend cũng chưa có)
-- Refresh token từ login **không được lưu** trên dashboard
+- `logout`: dashboard hiện xóa token phía client; chưa gọi endpoint logout/revoke phía backend
+- Login response có refresh token nhưng dashboard chỉ lưu access token; chưa có refresh tự động
 
 ### `hooks/useAuth.ts`
 
@@ -84,6 +83,8 @@ Key `localStorage`: `token` — get / set / remove.
 | `/login` | không | `LoginPage` |
 | `/dashboard` | có | `DashboardPage` |
 | `/sessions/:id` | có | `SessionDetailPage` |
+| `/locations` | có | `LocationRegistryPage` |
+| `/course-sections` | có | `CourseSectionsPage` |
 | `/` và `*` | — | redirect `/login` |
 
 Protected route **inline trong `App.tsx`**: loading → “Đang kiểm tra đăng nhập…”; chưa user → `/login`.
@@ -108,7 +109,8 @@ Toast: `ToastContainer` góc trên phải, 3s.
 ### `pages/DashboardPage.tsx`
 
 - Sidebar + tiêu đề “Danh sách phiên điểm danh”
-- Nút tạo phiên → `CreateSessionModal`
+- Cards thống kê chuyên cần và danh sách sinh viên có attendance risk (khi có dữ liệu)
+- Nút tạo phiên → `CreateSessionModal` chọn lớp/ca học, xem roster active, kiểm tra Building/radius/GPS accuracy và thời gian
 - `useAttendanceSessions`: load / tạo / đóng / xóa
 - `SessionTable` nhận callbacks
 - Logout: `logout()` rồi `/login`
@@ -120,8 +122,10 @@ Lecturer: API `GET /v0/attendance-sessions` chỉ trả phiên mình tạo. Admi
 - `GET /v0/attendance-sessions/:id/detail`
 - Thông tin phiên (GPS, bán kính, thời gian, trạng thái)
 - Bảng **sinh viên** (status present/absent, khoảng cách, thiết bị) — phân trang 10
-- Bảng **attempts** (kết quả, reasons tiếng Việt) — phân trang 10
-- Refresh danh sách, đóng phiên, xóa phiên (`ConfirmModal`)
+- Bảng **attempts** (kết quả, lý do) — phân trang
+- Export danh sách/chi tiết ra CSV theo chức năng trên trang
+- Review/approve/reject attempts, audit/history, thao tác thiết bị tùy quyền/endpoint
+- Đóng, hủy hoặc xóa phiên tùy trạng thái và quyền
 - Skeleton / empty / error (`ErrorFallback`)
 
 ---
@@ -130,9 +134,9 @@ Lecturer: API `GET /v0/attendance-sessions` chỉ trả phiên mình tạo. Admi
 
 | File | Việc |
 |---|---|
-| `CreateSessionModal.tsx` | Form tạo phiên: title, lat/lng (GPS trình duyệt), radius, ngày giờ local, mã SV cách nhau dấu phẩy → `codeFilter.addCodes`. TODO unit/tag trên form. |
-| `SessionTable.tsx` | Nhóm phiên theo ngày, badge pending/open/closed, phân trang 6, click vào chi tiết, confirm đóng/xóa |
-| `DashboardSidebar.tsx` | Logo, nav “Phiên điểm danh” (active). Mục Thống kê / Sinh viên / Cài đặt **chỉ UI, chưa có route**. Avatar + fullname + role, nút đăng xuất |
+| `CreateSessionModal.tsx` | Chọn lớp/ca học và xem roster active; thời gian phiên; location/radius/accuracy lấy từ Building đã hiệu chuẩn |
+| `SessionTable.tsx` | Nhóm phiên theo ngày, trạng thái, phân trang, xem chi tiết và xác nhận thao tác |
+| `DashboardSidebar.tsx` | Điều hướng phiên, Location Registry và (admin) lớp học phần; hiển thị user/role và logout |
 | `ConfirmModal.tsx` | Dialog xác nhận đóng/xóa |
 | `Pagination.tsx` | Phân trang dùng chung |
 | `EmptyState.tsx` | Không có dữ liệu |
@@ -157,7 +161,7 @@ Mọi request gắn Bearer nếu có token. Unwrap `ApiResponse` phía shared cl
 
 ### `users.api.ts`
 
-- `getMe()` → `GET /users/me`
+- `getMe()` → `GET /v0/users/me`
 
 ### `attendance-sessions.api.ts`
 
@@ -166,9 +170,28 @@ Mọi request gắn Bearer nếu có token. Unwrap `ApiResponse` phía shared cl
 | `create` | `POST /v0/attendance-sessions` |
 | `getAll` | `GET /v0/attendance-sessions` |
 | `getDetail(id)` | `GET /v0/attendance-sessions/:id/detail` |
-| `getByUser(userId)` | `GET /v0/attendance-sessions/by-user/:userId` — **khai báo nhưng chưa gọi từ UI** |
+| `getTeachingSections`, `getSectionRoster` | Lớp được phân công và roster active |
+| `getAnalytics` | `GET /v0/attendance-sessions/analytics` |
+| `reviewAttempt` | `POST /v0/attendance-sessions/:id/attempts/:attemptId/review` |
+| `verifyLecturerLocation` | Gửi GPS evidence của giảng viên |
+| `updateDeviceTrust` | Admin trust/block thiết bị |
 | `close(id)` | `POST /v0/attendance-sessions/:id/close` |
+| `cancel(id)` | `PATCH /v0/attendance-sessions/:id/cancel` |
 | `remove(id)` | `DELETE /v0/attendance-sessions/:id` |
+
+### `course-sections.api.ts`
+
+- Liệt kê teaching sections và roster.
+- Admin tạo lớp học phần; backend tạo hoặc dùng lại môn theo course code và học kỳ theo năm học + semester.
+- Nhập danh mục bằng CSV/XLSX: `ma_hoc_phan` bắt buộc; `ten_hoc_phan`, `tin_chi` tùy chọn; tối đa 1.000 dòng/5 MB. Thiếu tên thì dùng mã làm tên tạm.
+- Nhập sinh viên bằng CSV/XLSX có cột `ma_sinh_vien`; chỉ ghi danh user student đã tồn tại, tối đa 2.000 mã. Kết quả báo imported, already enrolled, unknown, duplicate và vượt sức chứa.
+
+### `location-registry.api.ts`
+
+- Liệt kê buildings/rooms.
+- Admin cập nhật tọa độ, geofence radius và GPS accuracy threshold trước khi đánh dấu Building đã xác minh; tạo phòng/liên kết phòng với Building.
+
+Phiên được tạo từ `courseSectionId` sẽ dùng snapshot vị trí Building đã xác minh và thêm attendance records `absent` cho enrollment active tại thời điểm tạo.
 
 ### `hooks/useAttendanceSessions.ts`
 
@@ -193,7 +216,8 @@ Dev: Vite **http://localhost:5173** (`pnpm dev:admin`).
 - SPA `try_files` → `index.html`
 - Gzip, header X-Frame-Options / XSS / nosniff
 - Cache static 1 năm
-- Proxy `/v0/` và `/health` → `http://backend:3000`
+- Proxy `/v0/` → `http://backend:3000/v0/`
+- Có proxy `/health` legacy, nhưng backend hiện cung cấp health tại `/v0/health`; Compose/Nginx health paths cần được đồng bộ nếu gọi trực tiếp `/health`
 - Listen 80 trong container; Compose map **8080:80**
 
 `Dockerfile`: build shared + dashboard, copy `dist` vào nginx.
@@ -208,11 +232,10 @@ Trong package: `pnpm dev`, `pnpm build` (`tsc -b && vite build`), `pnpm clean`.
 
 ---
 
-## 10. Hạn chế thuộc dashboard
+## 10. Auth, quyền và giới hạn
 
-- Không lưu / không gọi refresh token
-- Sidebar: Thống kê, Sinh viên, Cài đặt chưa có trang
-- `getByUser` API client chưa gắn UI
-- `xlsx` chưa xuất file
-- `routes/ProtectedRoute.tsx` không dùng
-- Logout chỉ xóa localStorage
+- `ProtectedRoute` trong `App.tsx` xác thực đăng nhập; role guard API ở backend mới là quyền kiểm soát cuối cùng. Course-section actions chỉ admin; lecturer chỉ xem/sửa các nội dung được endpoint cho phép.
+- Dashboard chưa lưu/refresh access token tự động; token hết hạn thì đăng nhập lại.
+- Logout hiện xóa token local, chưa gọi endpoint logout/revoke dù backend có endpoint.
+- Course-section UI hỗ trợ nhập mã môn, tạo lớp và quản lý roster; chưa phải bộ CRUD đầy đủ cho mọi dữ liệu học vụ như chỉnh sửa kỳ học hoặc timetable.
+- Không suy luận API/functionality chỉ từ dependency hoặc file component chưa được route; đối chiếu `App.tsx` và `src/api/`.
