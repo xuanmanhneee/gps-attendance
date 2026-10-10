@@ -20,7 +20,7 @@ import { useAuth } from '../context/auth-context';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { CampusFooter } from '../components/campus-footer';
-import { COLORS } from '../constants/theme';
+import { colors } from '../../theme';
 
 const logoSource = require('../../assets/images/logo-dlu.png');
 
@@ -144,7 +144,7 @@ export default function LoginScreen() {
                   <MaterialCommunityIcons
                     name="account-outline"
                     size={20}
-                    color={COLORS.primary}
+                    color={colors.primary}
                   />
                 }
               />
@@ -161,7 +161,7 @@ export default function LoginScreen() {
                   <MaterialCommunityIcons
                     name="lock-outline"
                     size={20}
-                    color={COLORS.primary}
+                    color={colors.primary}
                   />
                 }
                 rightIcon={
@@ -188,7 +188,7 @@ export default function LoginScreen() {
                       rememberMe ? 'checkbox-marked' : 'checkbox-blank-outline'
                     }
                     size={20}
-                    color={COLORS.primary}
+                    color={colors.primary}
                   />
 
                   <Text style={styles.checkText}>Ghi nhớ đăng nhập</Text>
@@ -200,7 +200,7 @@ export default function LoginScreen() {
                   <MaterialCommunityIcons
                     name="alert-circle-outline"
                     size={16}
-                    color={COLORS.primary}
+                    color={colors.primary}
                   />
                 </Pressable>
               </View>
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   },
 
   university: {
-    color: COLORS.primaryDark,
+    color: colors.primaryDark,
     fontSize: 19,
     fontWeight: '800',
     textAlign: 'center',
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   },
 
   subtitle: {
-    color: COLORS.primary,
+    color: colors.primary,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.3,
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   headerRule: {
     width: 180,
     height: 2,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     opacity: 0.25,
     marginTop: 12,
     borderRadius: 2,
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   },
 
   cardTitle: {
-    color: COLORS.primaryDark,
+    color: colors.primaryDark,
     fontSize: 25,
     fontWeight: '800',
     textAlign: 'center',
@@ -386,13 +386,13 @@ const styles = StyleSheet.create({
   },
 
   forgot: {
-    color: COLORS.primary,
+    color: colors.primary,
     fontSize: 12,
     fontWeight: '700',
   },
 
   loginButton: {
-    backgroundColor: COLORS.primaryDark,
+    backgroundColor: colors.primaryDark,
     borderRadius: 30,
     marginTop: 24,
     minHeight: 55,

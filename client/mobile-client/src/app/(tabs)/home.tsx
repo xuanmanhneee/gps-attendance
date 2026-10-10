@@ -11,40 +11,25 @@ import {
   View,
 } from 'react-native';
 
-import DebugDeviceCard from '../components/debug-device-card';
+import DebugDeviceCard from '../../components/debug-device-card';
 
 import type {
   AttendanceCheckInReason,
   MyAttendanceSessionResponse,
 } from '@gps-attendance/shared';
 
-import { attendanceSessionsApi } from '../api/attendance-sessions.api';
-import { attendanceCheckInApi } from '../api/attendance-check-in.api';
-import { colors } from '../../theme';
+import { attendanceSessionsApi } from '../../api/attendance-sessions.api';
+import { checkIn } from '../../services/attendance';
+import { LocationPermissionError } from '../../services/location';
+import { colors } from '../../../theme';
 
-// TODO: Thay bằng dữ liệu GPS/device/integrity thật.
-function buildStubCheckInPayload(sessionId: number) {
-  return {
-    sessionId,
-    location: {
-      latitude: 11.955604,
-      longitude: 108.440353,
-      accuracy: 0,
-      timestamp: Date.now(),
-      isMockLocation: false,
-    },
-    device: {
-      deviceId: 'stub-device-id',
-      platform: 'android' as const,
-      model: 'stub-model',
-    },
-    integrity: {
-      integrityToken: null,
-    },
-  };
-}
-
-type StudentSessionStatus = 'pending' | 'absent' | 'present' | 'closed';
+type StudentSessionStatus =
+  | 'pending'
+  | 'absent'
+  | 'present'
+  | 'late'
+  | 'excused'
+  | 'closed';
 
 function getStudentSessionStatus(
   session: MyAttendanceSessionResponse,
@@ -70,6 +55,12 @@ function getStudentSessionStatusLabel(status: StudentSessionStatus): string {
 
     case 'present':
       return 'Đã điểm danh';
+
+    case 'late':
+      return 'Đi trễ';
+
+    case 'excused':
+      return 'Có phép';
 
     case 'closed':
       return 'Đã kết thúc';
@@ -121,6 +112,18 @@ function getStatusStyle(status: StudentSessionStatus) {
       return {
         container: styles.statusPresent,
         text: styles.statusPresentText,
+      };
+
+    case 'late':
+      return {
+        container: styles.statusPending,
+        text: styles.statusPendingText,
+      };
+
+    case 'excused':
+      return {
+        container: styles.statusAbsent,
+        text: styles.statusAbsentText,
       };
 
     case 'absent':
@@ -183,9 +186,8 @@ export default function HomeScreen() {
       setCheckingInId(sessionId);
 
       try {
-        const result = await attendanceCheckInApi.checkIn(
-          buildStubCheckInPayload(sessionId),
-        );
+        // Payload thật: GPS + device + integrity lấy trong services/attendance.
+        const result = await checkIn(sessionId);
 
         if (result.status === 'VALID') {
           setSessions((current) =>
@@ -214,8 +216,15 @@ export default function HomeScreen() {
           'Điểm danh thất bại',
           getCheckInFailureMessage(result.reasons),
         );
-      } catch {
-        showAlert('Điểm danh thất bại', 'Không thể thực hiện điểm danh.');
+      } catch (error) {
+        if (error instanceof LocationPermissionError) {
+          showAlert(
+            'Chưa có quyền vị trí',
+            'Vui lòng cấp quyền truy cập vị trí để điểm danh.',
+          );
+        } else {
+          showAlert('Điểm danh thất bại', 'Không thể thực hiện điểm danh.');
+        }
       } finally {
         setCheckingInId(null);
       }
@@ -341,7 +350,11 @@ export default function HomeScreen() {
                   </>
                 ) : (
                   <Text style={styles.buttonText}>
-                    {status === 'present' ? 'Đã điểm danh' : 'Điểm danh ngay'}
+                    {status === 'present' ||
+                    status === 'late' ||
+                    status === 'excused'
+                      ? 'Đã điểm danh'
+                      : 'Điểm danh ngay'}
                   </Text>
                 )}
               </TouchableOpacity>

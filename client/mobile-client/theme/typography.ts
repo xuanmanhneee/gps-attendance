@@ -16,4 +16,22 @@ export const typography = {
   caption: {
     fontSize: 12,
   },
+
+  fontSizes: {
+    xs: 11,
+    sm: 12,
+    base: 14,
+    lg: 16,
+    xl: 18,
+    '2xl': 20,
+    '3xl': 24,
+    '4xl': 32,
+  },
+
+  fontWeights: {
+    normal: '400',
+    medium: '500',
+    semibold: '600',
+    bold: '700',
+  },
 } as const;
