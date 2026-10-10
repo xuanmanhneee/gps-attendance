@@ -141,7 +141,7 @@ export const CreateSessionModal = ({
         openAt,
         closeAt,
         participantCriteria: {
-          codeFilter: { addCodes: codes },
+          codeFilter: { include: codes },
         },
       };
 
