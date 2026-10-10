@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,29 +11,36 @@ import {
   View,
 } from 'react-native';
 
-import DebugDeviceCard from '../../components/debug-device-card';
-
 import type {
   AttendanceCheckInReason,
+  AttendanceStatus,
   MyAttendanceSessionResponse,
+  SessionStatus,
 } from '@gps-attendance/shared';
 
 import { attendanceSessionsApi } from '../../api/attendance-sessions.api';
+import { useNow } from '../../hooks/use-now';
 import { checkIn } from '../../services/attendance';
 import { LocationPermissionError } from '../../services/location';
 import { colors } from '../../../theme';
 
-type StudentSessionStatus =
-  | 'pending'
-  | 'absent'
-  | 'present'
-  | 'late'
-  | 'excused'
-  | 'closed';
+// Trạng thái phiên nhìn từ phía sinh viên. Dẫn xuất từ type của shared (không
+// chép tay) để khi server thêm SessionStatus mới thì switch dưới đây hết
+// exhaustive và TS báo lỗi ngay, thay vì âm thầm rơi vào nhánh sai.
+// 'open' không nằm trong union: phiên đang mở thì trạng thái hiển thị chính là
+// `myAttendance.status`.
+type StudentSessionStatus = Exclude<SessionStatus, 'open'> | AttendanceStatus;
 
 function getStudentSessionStatus(
   session: MyAttendanceSessionResponse,
 ): StudentSessionStatus {
+  // 'cancelled' là stored state do giảng viên set, phải kiểm tra TRƯỚC khi
+  // xét theo giờ/điểm danh — nếu không sẽ bị tính đè thành 'absent' và hiện
+  // như thể sinh viên còn điểm danh được.
+  if (session.status === 'cancelled') {
+    return 'cancelled';
+  }
+
   if (session.status === 'pending') {
     return 'pending';
   }
@@ -64,6 +71,30 @@ function getStudentSessionStatusLabel(status: StudentSessionStatus): string {
 
     case 'closed':
       return 'Đã kết thúc';
+
+    case 'cancelled':
+      return 'Đã huỷ';
+  }
+}
+
+function getCheckInButtonLabel(status: StudentSessionStatus): string {
+  switch (status) {
+    case 'absent':
+      return 'Điểm danh ngay';
+
+    case 'pending':
+      return 'Chưa mở';
+
+    case 'closed':
+      return 'Đã kết thúc';
+
+    case 'cancelled':
+      return 'Đã huỷ';
+
+    case 'present':
+    case 'late':
+    case 'excused':
+      return 'Đã điểm danh';
   }
 }
 
@@ -143,6 +174,12 @@ function getStatusStyle(status: StudentSessionStatus) {
         container: styles.statusClosed,
         text: styles.statusClosedText,
       };
+
+    case 'cancelled':
+      return {
+        container: styles.statusClosed,
+        text: styles.statusClosedText,
+      };
   }
 }
 
@@ -152,20 +189,46 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [checkingInId, setCheckingInId] = useState<number | null>(null);
 
+  // Mốc thời gian của các phiên: useNow re-render đúng lúc đồng hồ đi qua
+  // openAt/closeAt (và khi app trở lại foreground).
+  const boundaries = useMemo(
+    () => sessions.flatMap((session) => [session.openAt, session.closeAt]),
+    [sessions],
+  );
+  const now = useNow(boundaries);
+  const syncedAtRef = useRef(now);
+
+  const fetchSessions = useCallback(async () => {
+    setSessions(await attendanceSessionsApi.getSessions());
+  }, []);
+
   const loadSessions = useCallback(async () => {
     try {
-      const data = await attendanceSessionsApi.getSessions();
-      setSessions(data);
+      await fetchSessions();
     } catch {
       Alert.alert('Lỗi', 'Không tải được danh sách phiên điểm danh');
     }
-  }, []);
+  }, [fetchSessions]);
 
   useEffect(() => {
     loadSessions().finally(() => {
       setLoading(false);
     });
   }, [loadSessions]);
+
+  // Trạng thái phiên (pending/open/closed) do server tính theo giờ của server,
+  // nên khi qua mốc openAt/closeAt phải hỏi lại server — không tự tính ở client
+  // để tránh lệch giờ máy và lặp lại đúng loại logic đã gây bug 'cancelled'.
+  useEffect(() => {
+    if (syncedAtRef.current === now) {
+      return;
+    }
+
+    syncedAtRef.current = now;
+
+    // Đồng bộ nền: lỗi mạng ở đây không alert vì người dùng không chủ động gọi.
+    void fetchSessions().catch(() => {});
+  }, [now, fetchSessions]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -263,16 +326,13 @@ export default function HomeScreen() {
           />
         }
         ListHeaderComponent={
-          <>
-            <View style={styles.header}>
-              <Text style={styles.headerTitle}>Điểm danh</Text>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Điểm danh</Text>
 
-              <Text style={styles.headerSubtitle}>
-                Các phiên điểm danh của bạn
-              </Text>
-            </View>
-            <DebugDeviceCard />
-          </>
+            <Text style={styles.headerSubtitle}>
+              Các phiên điểm danh của bạn
+            </Text>
+          </View>
         }
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -350,11 +410,7 @@ export default function HomeScreen() {
                   </>
                 ) : (
                   <Text style={styles.buttonText}>
-                    {status === 'present' ||
-                    status === 'late' ||
-                    status === 'excused'
-                      ? 'Đã điểm danh'
-                      : 'Điểm danh ngay'}
+                    {getCheckInButtonLabel(status)}
                   </Text>
                 )}
               </TouchableOpacity>

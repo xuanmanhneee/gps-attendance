@@ -1,5 +1,6 @@
 import type { CheckInRequest, CheckInResponse } from '@gps-attendance/shared';
 import { attendanceCheckInApi } from '@/api';
+import { isMockLocationForced } from './dev-mode';
 import { getCurrentLocation } from './location';
 import { buildDeviceInfo } from './device-info';
 import { getIntegrity } from './integrity';
@@ -11,7 +12,16 @@ export async function collectCheckInContext() {
     buildDeviceInfo(),
     getIntegrity(),
   ]);
-  return { location, device, integrity };
+
+  // Dev mode: ép cờ mock location để thử nhánh server từ chối
+  // (REJECTED / MOCK_LOCATION) mà không cần app giả lập GPS.
+  return {
+    location: isMockLocationForced()
+      ? { ...location, isMockLocation: true }
+      : location,
+    device,
+    integrity,
+  };
 }
 
 export async function buildCheckInPayload(sessionId: number): Promise<CheckInRequest> {

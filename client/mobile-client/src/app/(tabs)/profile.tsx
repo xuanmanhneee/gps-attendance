@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
@@ -12,6 +14,7 @@ import {
 import type { Role } from '@gps-attendance/shared';
 
 import { useAuth } from '../../context/auth-context';
+import { restoreDevMode, setDevMode } from '../../services/dev-mode';
 import { colors } from '../../../theme';
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -22,10 +25,22 @@ const ROLE_LABELS: Record<Role, string> = {
 
 export default function Profile() {
   const { user, logout } = useAuth();
+  const [devModeEnabled, setDevModeEnabled] = useState(false);
 
   const fullname = user?.fullname ?? 'Người dùng';
   const initial = fullname.trim().charAt(0).toUpperCase() || '?';
   const roleLabel = user ? ROLE_LABELS[user.role] : '—';
+
+  // Khôi phục cờ dev mode đã lưu (mặc định tắt).
+  useEffect(() => {
+    void restoreDevMode().then(setDevModeEnabled);
+  }, []);
+
+  const handleToggleDevMode = (enabled: boolean) => {
+    // Đổi UI trước cho mượt; nếu ghi storage lỗi thì lần mở app sau cờ về mặc định.
+    setDevModeEnabled(enabled);
+    void setDevMode(enabled).catch(() => {});
+  };
 
   const handleSignOut = () => {
     Alert.alert('Đăng xuất', 'Bạn có chắc muốn đăng xuất không?', [
@@ -68,6 +83,43 @@ export default function Profile() {
 
           <Text style={styles.meta}>Vai trò: {roleLabel}</Text>
         </View>
+      </View>
+
+      <View style={[styles.card, styles.devSection]}>
+        <View style={styles.devRow}>
+          <View style={styles.devRowInfo}>
+            <Text style={styles.devTitle}>Chế độ dev</Text>
+
+            <Text style={styles.devHint}>
+              Hiện thêm công cụ dành cho lập trình viên
+            </Text>
+          </View>
+
+          <Switch
+            value={devModeEnabled}
+            onValueChange={handleToggleDevMode}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
+
+        {devModeEnabled && (
+          <Pressable
+            onPress={() => router.push('/dev')}
+            style={({ pressed }) => [
+              styles.devButton,
+              pressed && styles.devButtonPressed,
+            ]}
+          >
+            <Ionicons
+              name="construct-outline"
+              size={20}
+              color={colors.primaryDark}
+            />
+
+            <Text style={styles.devButtonText}>Mở trang dev</Text>
+          </Pressable>
+        )}
       </View>
 
       <Pressable
@@ -172,6 +224,57 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.danger,
+  },
+
+  // Kế thừa style `card` (nền, bo góc, đổ bóng), chỉ đổi sang layout dọc.
+  devSection: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 12,
+  },
+
+  devRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  devRowInfo: {
+    flex: 1,
+    gap: 4,
+  },
+
+  devTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+
+  devHint: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+
+  devButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+
+  devButtonPressed: {
+    opacity: 0.7,
+  },
+
+  devButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.primaryDark,
   },
 });
 
