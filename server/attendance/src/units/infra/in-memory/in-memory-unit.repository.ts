@@ -67,7 +67,7 @@ export class InMemoryUnitRepository implements IUnitRepository {
       }),
       ...(data.level !== undefined && {
         level: data.level,
-      })
+      }),
     };
 
     this.units[index] = updated;
@@ -89,7 +89,7 @@ export class InMemoryUnitRepository implements IUnitRepository {
 
   private clone(unit: Unit): Unit {
     return {
-      ...unit
+      ...unit,
     };
   }
 }

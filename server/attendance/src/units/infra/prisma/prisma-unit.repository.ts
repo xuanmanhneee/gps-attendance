@@ -46,6 +46,8 @@ export class PrismaUnitRepository implements IUnitRepository {
   }
 
   delete(id: number, ctx?: ITransactionContext): Promise<void> {
-    return this.client(ctx).unit.delete({ where: { id } }).then(() => undefined);
+    return this.client(ctx)
+      .unit.delete({ where: { id } })
+      .then(() => undefined);
   }
 }

@@ -132,7 +132,9 @@ export class AttendanceRecordsService {
       sessionId,
       userId,
     );
-    return buffered ?? this.attendanceRecordRepository.getRecord(sessionId, userId);
+    return (
+      buffered ?? this.attendanceRecordRepository.getRecord(sessionId, userId)
+    );
   }
 
   async findBySessionId(sessionId: number): Promise<AttendanceRecord[]> {

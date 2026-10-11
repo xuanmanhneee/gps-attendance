@@ -12,7 +12,10 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { UserFilterCriteria, UserProfileResponse } from '@gps-attendance/shared';
+import {
+  UserFilterCriteria,
+  UserProfileResponse,
+} from '@gps-attendance/shared';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { UserFilterService } from './user-filter.service';
 import { UserFilterDto } from './dto/user-filter.dto';
@@ -52,6 +55,6 @@ export class UserController {
   }
 
   @Post('test-filter') async testFilter(@Body() criteria: UserFilterDto) {
-    return this.userFilterService.resolveUserIds(criteria as UserFilterCriteria);
+    return this.userFilterService.resolveUserIds(criteria);
   }
 }

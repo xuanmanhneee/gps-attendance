@@ -22,9 +22,7 @@ export class InMemoryAttendanceSessionRepository implements IAttendanceSessionRe
     return session;
   }
 
-  async updateStatus(id: number, status: 'cancelled'): Promise<void>{
-    
-  }
+  async updateStatus(id: number, status: 'cancelled'): Promise<void> {}
 
   async findAll(): Promise<AttendanceSession[]> {
     return [...this.sessions.values()];

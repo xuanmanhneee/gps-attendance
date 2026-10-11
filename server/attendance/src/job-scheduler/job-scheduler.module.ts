@@ -7,10 +7,7 @@ import { RedisModule } from '../redis/redis.module';
 
 @Global()
 @Module({
-  imports: [
-    ScheduleModule.forRoot(),
-    RedisModule,
-  ],
+  imports: [ScheduleModule.forRoot(), RedisModule],
   providers: [
     RedisJobSchedulerService,
     {

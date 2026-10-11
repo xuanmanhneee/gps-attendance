@@ -8,10 +8,12 @@ import {
 import {
   AttendanceSessionErrorCode,
   SessionStatus,
+  UserFilterCriteria,
 } from '@gps-attendance/shared';
 
 import { IJobScheduler } from '#job-scheduler/job-scheduler.interface';
 import { JOB_SCHEDULER } from '#job-scheduler/job-scheduler.token';
+import { RedisService } from '#redis/redis.service';
 
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
 import { ILogger } from '../common/logging/logger.interface';
@@ -24,6 +26,9 @@ import { IAttendanceSessionRepository } from './attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
 import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
 
+const criteriaKeyFor = (sessionId: number) =>
+  `attendance:session:${sessionId}:criteria`;
+
 @Injectable()
 export class AttendanceSessionsService {
   private readonly logger: ILogger;
@@ -34,6 +39,7 @@ export class AttendanceSessionsService {
     private readonly attendanceSessionRepository: IAttendanceSessionRepository,
     private readonly userFilterService: UserFilterService,
     private readonly attendanceRecordsService: AttendanceRecordsService,
+    private readonly redisService: RedisService,
 
     @Inject(JOB_SCHEDULER)
     private readonly jobScheduler: IJobScheduler,
@@ -45,13 +51,30 @@ export class AttendanceSessionsService {
   }
 
   onModuleInit() {
-    this.jobScheduler.onJob<{ sessionId: number; userIds: number[] }>(
+    this.jobScheduler.onJob<{ sessionId: number }>(
       'attendance:init-roster',
-      (payload) =>
-        this.attendanceRecordsService.initializeForSession(
+      async (payload) => {
+        const rawCriteria = await this.redisService.get(
+          criteriaKeyFor(payload.sessionId),
+        );
+
+        if (!rawCriteria) {
+          this.logger.warn(
+            `Init roster session ${payload.sessionId}: không tìm thấy criteria trong Redis`,
+          );
+          return;
+        }
+
+        const criteria: UserFilterCriteria = JSON.parse(rawCriteria);
+        const userIds = await this.userFilterService.resolveUserIds(criteria);
+
+        await this.attendanceRecordsService.initializeForSession(
           payload.sessionId,
-          payload.userIds,
-        ),
+          userIds,
+        );
+
+        await this.redisService.del(criteriaKeyFor(payload.sessionId));
+      },
     );
   }
 
@@ -60,10 +83,6 @@ export class AttendanceSessionsService {
     createdBy: number,
   ): Promise<AttendanceSession> {
     const now = new Date();
-
-    const userIds = await this.userFilterService.resolveUserIds(
-      dto.participantCriteria,
-    );
 
     const session = await this.attendanceSessionRepository.create({
       title: dto.title,
@@ -77,6 +96,11 @@ export class AttendanceSessionsService {
       updatedAt: now,
     });
 
+    await this.redisService.set(
+      criteriaKeyFor(session.id),
+      JSON.stringify(dto.participantCriteria),
+    );
+
     const initAt = new Date(
       session.openAt.getTime() -
         AttendanceSessionsService.ROSTER_INIT_BUFFER_MS,
@@ -85,7 +109,7 @@ export class AttendanceSessionsService {
     await this.jobScheduler.schedule(
       'attendance:init-roster',
       initAt,
-      { sessionId: session.id, userIds },
+      { sessionId: session.id },
       `init-roster:${session.id}`,
     );
     await this.jobScheduler.schedule(
@@ -128,6 +152,7 @@ export class AttendanceSessionsService {
 
     await this.jobScheduler.cancel(`init-roster:${sessionId}`);
     await this.jobScheduler.cancel(`flush:${sessionId}`);
+    await this.redisService.del(criteriaKeyFor(sessionId));
 
     if (wasOpen) {
       await this.attendanceRecordsService.clearSessionBuffer(sessionId);

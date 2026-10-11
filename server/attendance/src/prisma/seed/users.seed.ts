@@ -2,10 +2,7 @@ import { PrismaClient, UserRole } from '#prisma/generated/client';
 
 type UnitSeed = Awaited<ReturnType<typeof import('./units.seed').seedUnits>>;
 
-export async function seedUsers(
-  prisma: PrismaClient,
-  units: UnitSeed,
-) {
+export async function seedUsers(prisma: PrismaClient, units: UnitSeed) {
   const admin = await prisma.user.create({
     data: {
       code: 'ADM0001',

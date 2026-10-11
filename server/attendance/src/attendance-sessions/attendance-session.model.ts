@@ -1,4 +1,4 @@
-import { SessionStatus } from "@gps-attendance/shared";
+import { SessionStatus } from '@gps-attendance/shared';
 
 export interface AttendanceSession {
   id: number;
