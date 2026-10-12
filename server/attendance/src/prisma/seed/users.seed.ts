@@ -83,19 +83,19 @@ export async function seedUsers(prisma: PrismaClient, units: UnitSeed) {
         code: 'STU0008',
         role: UserRole.student,
         fullname: 'Hoàng Thùy Dương',
-        unitId: units.classes.suPhamK45A.id,
+        unitId: units.classes.cnttK46B.id,
       },
       {
         code: 'STU0009',
         role: UserRole.student,
         fullname: 'Đỗ Minh Khang',
-        unitId: units.classes.suPhamK45B.id,
+        unitId: units.classes.suPhamK45A.id,
       },
       {
         code: 'STU0010',
         role: UserRole.student,
         fullname: 'Nguyễn Phương Thảo',
-        unitId: units.classes.suPhamK46A.id,
+        unitId: units.classes.suPhamK45B.id,
       },
     ],
   });

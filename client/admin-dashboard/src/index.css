@@ -1,33 +1,98 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-body {
-  margin: 0;
-  font-family: sans-serif;
+/*
+ * Design token lấy từ prototype `gps-attendance-dashboard.html`.
+ * Khai báo trong `@theme` để Tailwind sinh utility tương ứng
+ * (bg-surface, text-ink, border-line, shadow-panel, font-display, ...).
+ */
+@theme {
+  --font-display: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+
+  --color-canvas: oklch(97.5% 0.012 235);
+  --color-surface: oklch(100% 0 0);
+  --color-surface-subtle: oklch(98.2% 0.008 235);
+  --color-ink: oklch(25% 0.028 245);
+  --color-muted: oklch(55% 0.025 245);
+  --color-muted-soft: oklch(66% 0.018 245);
+  --color-line: oklch(89% 0.018 235);
+  --color-accent: oklch(62% 0.16 215);
+  --color-accent-strong: oklch(52% 0.17 220);
+  --color-accent-soft: oklch(94% 0.045 215);
+  --color-positive: oklch(58% 0.14 155);
+  --color-positive-soft: oklch(93% 0.045 155);
+  --color-warning: oklch(66% 0.14 78);
+  --color-warning-soft: oklch(95% 0.055 85);
+  --color-danger: oklch(59% 0.16 25);
+  --color-danger-soft: oklch(94% 0.045 25);
+
+  --shadow-panel: 0 12px 30px oklch(30% 0.04 245 / 0.06);
 }
 
-main {
-  min-height: 100vh;
-  box-sizing: border-box;
+/*
+ * Dark theme ghi đè cùng bộ token. `data-theme` luôn chứa theme đã resolve
+ * (không bao giờ là "system") nên CSS không cần media query.
+ */
+[data-theme='dark'] {
+  --color-canvas: oklch(19% 0.02 245);
+  --color-surface: oklch(24% 0.022 245);
+  --color-surface-subtle: oklch(28% 0.022 245);
+  --color-ink: oklch(96% 0.008 235);
+  --color-muted: oklch(76% 0.018 245);
+  --color-muted-soft: oklch(64% 0.018 245);
+  --color-line: oklch(34% 0.022 245);
+  --color-accent: oklch(72% 0.13 215);
+  --color-accent-strong: oklch(80% 0.11 215);
+  --color-accent-soft: oklch(32% 0.05 220);
+  --color-positive: oklch(74% 0.14 155);
+  --color-positive-soft: oklch(30% 0.05 155);
+  --color-warning: oklch(80% 0.13 80);
+  --color-warning-soft: oklch(32% 0.05 80);
+  --color-danger: oklch(72% 0.15 25);
+  --color-danger-soft: oklch(32% 0.06 25);
+
+  --shadow-panel: 0 12px 30px oklch(0% 0 0 / 0.35);
 }
 
-/* Dashboard */
+@layer base {
+  html {
+    color-scheme: light;
+  }
 
-.dashboard-page {
-  min-height: 100vh;
-}
+  html[data-theme='dark'] {
+    color-scheme: dark;
+  }
 
-.dashboard-header {
-  position: relative;
-  padding: 1.5rem;
-  text-align: center;
-}
+  body {
+    margin: 0;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.5;
+  }
 
-.dashboard-header h1 {
-  margin: 0;
-}
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
 
-.logout-button {
-  position: absolute;
-  right: 1.5rem;
-  top: 1.5rem;
+  button {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 3px solid oklch(72% 0.14 215 / 0.55);
+    outline-offset: 2px;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    margin: 0;
+    letter-spacing: -0.035em;
+  }
 }

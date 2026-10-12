@@ -3,12 +3,18 @@ import { PrismaClient } from '#prisma/generated/client';
 
 type UserSeed = Awaited<ReturnType<typeof import('./users.seed').seedUsers>>;
 
-export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
+export async function seedAccounts(
+  prisma: PrismaClient,
+  users: UserSeed,
+) {
+  const updatedAt = new Date();
+
   await prisma.account.create({
     data: {
       username: 'admin01',
       passwordHash: await bcrypt.hash('admin01', 10),
       userId: users.admin.id,
+      updatedAt,
     },
   });
 
@@ -17,6 +23,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'lecturer01',
       passwordHash: await bcrypt.hash('lecturer01', 10),
       userId: users.lecturers[0].id,
+      updatedAt,
     },
   });
 
@@ -25,6 +32,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'lecturer02',
       passwordHash: await bcrypt.hash('lecturer02', 10),
       userId: users.lecturers[1].id,
+      updatedAt,
     },
   });
 
@@ -33,6 +41,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'lecturer03',
       passwordHash: await bcrypt.hash('lecturer03', 10),
       userId: users.lecturers[2].id,
+      updatedAt,
     },
   });
 
@@ -41,6 +50,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'student01',
       passwordHash: await bcrypt.hash('student01', 10),
       userId: users.students[0].id,
+      updatedAt,
     },
   });
 
@@ -49,6 +59,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'student02',
       passwordHash: await bcrypt.hash('student02', 10),
       userId: users.students[1].id,
+      updatedAt,
     },
   });
 
@@ -57,6 +68,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'student03',
       passwordHash: await bcrypt.hash('student03', 10),
       userId: users.students[2].id,
+      updatedAt,
     },
   });
 
@@ -65,6 +77,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'student04',
       passwordHash: await bcrypt.hash('student04', 10),
       userId: users.students[3].id,
+      updatedAt,
     },
   });
 
@@ -73,6 +86,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'student05',
       passwordHash: await bcrypt.hash('student05', 10),
       userId: users.students[4].id,
+      updatedAt,
     },
   });
 
@@ -81,6 +95,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'student06',
       passwordHash: await bcrypt.hash('student06', 10),
       userId: users.students[5].id,
+      updatedAt,
     },
   });
 
@@ -89,6 +104,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'student07',
       passwordHash: await bcrypt.hash('student07', 10),
       userId: users.students[6].id,
+      updatedAt,
     },
   });
 
@@ -97,6 +113,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'student08',
       passwordHash: await bcrypt.hash('student08', 10),
       userId: users.students[7].id,
+      updatedAt,
     },
   });
 
@@ -105,6 +122,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'student09',
       passwordHash: await bcrypt.hash('student09', 10),
       userId: users.students[8].id,
+      updatedAt,
     },
   });
 
@@ -113,6 +131,7 @@ export async function seedAccounts(prisma: PrismaClient, users: UserSeed) {
       username: 'student10',
       passwordHash: await bcrypt.hash('student10', 10),
       userId: users.students[9].id,
+      updatedAt,
     },
   });
 }

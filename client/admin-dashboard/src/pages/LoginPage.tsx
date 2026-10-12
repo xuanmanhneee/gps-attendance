@@ -11,6 +11,7 @@ import { toast } from 'react-toastify';
 import { ApiError, AuthErrorCode } from '@gps-attendance/shared';
 import type { LoginRequest } from '@gps-attendance/shared';
 import { useAuth } from '../hooks/useAuth';
+import { ROUTE_PATHS } from '../routes/paths';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -25,30 +26,27 @@ const LoginPage = () => {
   const { login, isLoading } = useAuth();
 
   const handleLogin = async (data: LoginRequest) => {
+    // Lấy lỗi từ backend theo error code thay vì hard-code cùng một chuỗi ở
+    // nhiều component.
+    const loginErrorMessages: Partial<Record<string, string>> = {
+      [AuthErrorCode.INVALID_CREDENTIALS]: 'Sai username hoặc password',
+      [AuthErrorCode.ACCOUNT_NOT_LINKED]: 'Tài khoản chưa được liên kết',
+      [AuthErrorCode.ROLE_NOT_ALLOWED]: 'Bạn không có quyền truy cập',
+    };
+
     try {
       await login(data);
 
       toast.success('Đăng nhập thành công!');
 
-      navigate('/dashboard', { replace: true });
+      navigate(ROUTE_PATHS.overview, { replace: true });
     } catch (error) {
-      console.error('LOGIN ERROR:', error);
-      console.error('instanceof ApiError:', error instanceof ApiError);
-
       if (error instanceof ApiError) {
-        switch (error.code) {
-          case AuthErrorCode.INVALID_CREDENTIALS:
-            toast.error('Sai username hoặc password');
-            break;
-          case AuthErrorCode.ACCOUNT_NOT_LINKED:
-            toast.error('Tài khoản chưa được liên kết');
-            break;
-          case AuthErrorCode.ROLE_NOT_ALLOWED:
-            toast.error('Bạn không có quyền truy cập');
-            break;
-          default:
-            toast.error(error.message);
-        }
+        const message = error.code
+          ? loginErrorMessages[error.code]
+          : undefined;
+
+        toast.error(message ?? error.message);
         return;
       }
 

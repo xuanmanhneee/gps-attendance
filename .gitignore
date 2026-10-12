@@ -9,6 +9,8 @@ build/
 .expo-shared/
 .vscode
 .github/*
+.clinerules/*
+.agents/*
 *.log
 *.tsbuildinfo
 *.code-workspace
