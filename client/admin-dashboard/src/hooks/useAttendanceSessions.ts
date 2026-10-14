@@ -5,7 +5,7 @@ import type { AttendanceSessionResponse } from '@gps-attendance/shared';
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
 import {
   isAttendanceSession,
-  isAttendanceSessionList,
+  parseAttendanceSessionList,
 } from '../types/attendance-session';
 import type { CreateSessionFormData } from '../types/attendance-session';
 import { createLoadTracker } from '../utils/attendance-sessions/session-filter';
@@ -28,7 +28,8 @@ interface UseAttendanceSessionsOptions {
   /** Bắt buộc khi `scope` là `created-by`: id của lecturer cần lọc. */
   createdByUserId?: number;
   /**
-   * `false` khi bộ lọc chưa hợp lệ: hook không gọi API nào và tắt loading.
+   * `false` khi bộ lọc chưa hợp lệ: hook không gọi API nào và trả `isLoading`
+   * bằng `false` (giá trị suy ra từ `enabled`, không setState trong effect).
    * Mặc định `true` để giữ nguyên behavior cũ cho các nơi dùng hiện tại.
    */
   enabled?: boolean;
@@ -60,11 +61,13 @@ export const useAttendanceSessions = (
       const data: unknown = await attendanceSessionsApi.getCreatedByMe();
 
       // Kiểm tra shape trước khi ghi state: không biến payload lạ thành thành công.
-      if (!isAttendanceSessionList(data)) {
+      const list = parseAttendanceSessionList(data);
+
+      if (list === null) {
         throw new Error('Unexpected attendance session list response');
       }
 
-      return [...data];
+      return list;
     }
 
     if (scope === 'created-by') {
@@ -80,21 +83,25 @@ export const useAttendanceSessions = (
         await attendanceSessionsApi.getCreatedBy(createdByUserId);
 
       // Kiểm tra shape trước khi ghi state: không biến payload lạ thành thành công.
-      if (!isAttendanceSessionList(data)) {
+      const list = parseAttendanceSessionList(data);
+
+      if (list === null) {
         throw new Error('Unexpected attendance session list response');
       }
 
-      return [...data];
+      return list;
     }
 
     const data: unknown = await attendanceSessionsApi.getAll();
 
     // Kiểm tra shape trước khi ghi state: không biến payload lạ thành thành công.
-    if (!isAttendanceSessionList(data)) {
+    const list = parseAttendanceSessionList(data);
+
+    if (list === null) {
       throw new Error('Unexpected attendance session list response');
     }
 
-    return [...data];
+    return list;
   }, [scope, createdByUserId]);
 
   const reload = useCallback(async () => {
@@ -138,15 +145,13 @@ export const useAttendanceSessions = (
   }, [loadSessions, scope, createdByUserId]);
 
   useEffect(() => {
-    // Bộ lọc chưa hợp lệ: không gọi API nào (yêu cầu task), tắt loading.
-    if (!enabled) {
-      setIsLoading(false);
+    // Bộ lọc chưa hợp lệ: không gọi API nào. Loading được suy ra từ `enabled`
+    // ở giá trị trả về nên không cần setState ở đây (tránh cascading render).
+    if (!enabled) return;
 
-      return;
-    }
-
-    // Fetch khi mount/đổi scope; setState trong reload nằm trong async nên
-    // không gây cascading render như rule suy đoán.
+    // Fetch khi mount/đổi scope: `reload()` bật loading ngay (đồng bộ) rồi mới
+    // `await`, nên rule báo cascading render — đây là chủ ý, giống các hook khác
+    // trong repo, nên tắt rule cho đúng dòng gọi này.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void reload();
   }, [reload, enabled]);
@@ -188,7 +193,9 @@ export const useAttendanceSessions = (
 
   return {
     sessions,
-    isLoading,
+    // Bộ lọc chưa hợp lệ thì coi như không loading: suy ra từ `enabled` thay vì
+    // setState trong effect.
+    isLoading: enabled ? isLoading : false,
     error,
     isCreating,
     createSession,

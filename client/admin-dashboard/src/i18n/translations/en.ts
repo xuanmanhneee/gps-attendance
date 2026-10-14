@@ -141,6 +141,7 @@ export const en: Record<TranslationKey, string> = {
   'sessions.status.open': 'Open',
   'sessions.status.pending': 'Upcoming',
   'sessions.status.closed': 'Closed',
+  'sessions.status.cancelled': 'Cancelled',
   'sessions.reloading': 'Reloading the session list...',
   'sessions.staleDataWarning':
     'The session list may be outdated because a load failed.',
@@ -220,6 +221,8 @@ export const en: Record<TranslationKey, string> = {
   'sessionDetail.studentCode': 'Student code',
   'sessionDetail.present': 'Checked in',
   'sessionDetail.absent': 'Not checked in',
+  'sessionDetail.late': 'Late',
+  'sessionDetail.excused': 'Excused',
   // ---- Units ----
   'units.title': 'Units',
   'units.description': 'Manage the unit tree: browse list and tree, create and update units.',

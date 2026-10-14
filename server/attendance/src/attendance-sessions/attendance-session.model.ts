@@ -22,6 +22,18 @@ export interface CreateAttendanceSessionRecord {
   openAt: Date;
   closeAt: Date;
   createdBy: number;
-  createdAt: Date;
-  updatedAt: Date;
+
 }
+
+export type UpdateAttendanceSessionRecord = Partial<
+  Pick<
+    AttendanceSession,
+    | 'title'
+    | 'latitude'
+    | 'longitude'
+    | 'radius'
+    | 'openAt'
+    | 'closeAt'
+    | 'status'
+  >
+>;

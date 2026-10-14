@@ -11,6 +11,7 @@ const statusBarClass: Record<SessionStatus, string> = {
   open: 'bg-positive',
   pending: 'bg-warning',
   closed: 'bg-muted-soft',
+  cancelled: 'bg-danger',
 };
 
 type StatusDistributionProps = {

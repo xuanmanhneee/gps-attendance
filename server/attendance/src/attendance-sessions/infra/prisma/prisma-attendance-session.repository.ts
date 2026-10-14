@@ -5,9 +5,10 @@ import { AttendanceSession as PrismaAttendanceSession } from '#prisma/generated/
 import {
   AttendanceSession,
   CreateAttendanceSessionRecord,
+  UpdateAttendanceSessionRecord,
 } from '../../attendance-session.model';
 import { IAttendanceSessionRepository } from '../../attendance-session.repository';
-import { PrismaService } from '#prisma/prisma.service'; // chỉnh path đúng theo project
+import { PrismaService } from '#prisma/prisma.service';
 
 @Injectable()
 export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepository {
@@ -25,22 +26,22 @@ export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepo
         openAt: input.openAt,
         closeAt: input.closeAt,
         createdBy: input.createdBy,
-        createdAt: input.createdAt,
-        updatedAt: input.updatedAt,
-        // status không ảnh hưởng business logic hiện tại (luôn bị tính lại
-        // qua withComputedStatus ở tầng service dựa theo openAt/closeAt),
-        // giữ mặc định 'draft' của Prisma.
       },
     });
 
     return this.toDomain(record);
   }
 
-  async updateStatus(id: number, status: 'cancelled'): Promise<void> {
-    await this.prisma.attendanceSession.update({
+  async update(
+    id: number,
+    data: UpdateAttendanceSessionRecord,
+  ): Promise<AttendanceSession> {
+    const record = await this.prisma.attendanceSession.update({
       where: { id },
-      data: { status, updatedAt: new Date() },
+      data: { ...data, updatedAt: new Date() },
     });
+
+    return this.toDomain(record);
   }
 
   async findAll(): Promise<AttendanceSession[]> {

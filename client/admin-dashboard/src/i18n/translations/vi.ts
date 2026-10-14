@@ -137,6 +137,7 @@ export const vi = {
   'sessions.status.open': 'Đang mở',
   'sessions.status.pending': 'Sắp diễn ra',
   'sessions.status.closed': 'Đã kết thúc',
+  'sessions.status.cancelled': 'Đã huỷ',
   'sessions.reloading': 'Đang tải lại danh sách phiên...',
   'sessions.staleDataWarning':
     'Danh sách phiên có thể chưa được cập nhật do lỗi tải.',
@@ -216,6 +217,8 @@ export const vi = {
   'sessionDetail.studentCode': 'Mã sinh viên',
   'sessionDetail.present': 'Đã điểm danh',
   'sessionDetail.absent': 'Chưa điểm danh',
+  'sessionDetail.late': 'Đi muộn',
+  'sessionDetail.excused': 'Có phép',
   // ---- Units (vi) ----
   'units.title': 'Đơn vị',
   'units.description': 'Quản lý cây đơn vị: xem danh sách, cây, tạo và cập nhật đơn vị.',
