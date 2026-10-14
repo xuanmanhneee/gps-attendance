@@ -41,7 +41,7 @@ export default function LoginScreen() {
     }
 
     try {
-      await login(username.trim(), password, isLecturer);
+      await login(username.trim(), password, isLecturer, rememberMe);
       router.replace('/(tabs)');
     } catch (error) {
       const message = error instanceof Error

@@ -183,8 +183,9 @@ Mọi request gắn Bearer nếu có token. Unwrap `ApiResponse` phía shared cl
 
 - Liệt kê teaching sections và roster.
 - Admin tạo lớp học phần; backend tạo hoặc dùng lại môn theo course code và học kỳ theo năm học + semester.
+- Admin quản lý thời khóa biểu từng lớp: thêm/sửa/xóa lịch lặp theo Thứ hoặc một buổi theo ngày cụ thể, giờ và phòng; ngày cụ thể phải nằm trong học kỳ, ca trùng giờ không được lưu và ca đã gắn với session không thể xóa.
 - Nhập danh mục bằng CSV/XLSX: `ma_hoc_phan` bắt buộc; `ten_hoc_phan`, `tin_chi` tùy chọn; tối đa 1.000 dòng/5 MB. Thiếu tên thì dùng mã làm tên tạm.
-- Nhập sinh viên bằng CSV/XLSX có cột `ma_sinh_vien`; chỉ ghi danh user student đã tồn tại, tối đa 2.000 mã. Kết quả báo imported, already enrolled, unknown, duplicate và vượt sức chứa.
+- Nhập sinh viên bằng CSV/XLSX (tối đa 2.000 dòng/5 MB) hỗ trợ các cột mã số SV, User (tùy chọn), họ lót, tên, ngày sinh, giới tính và lớp. Khi ghi danh, hồ sơ sinh viên được cập nhật gồm họ tên, ngày sinh, giới tính, lớp và email theo dạng `<mã_sinh_viên>@dlu.edu.vn`. Mỗi lớp nhận tối đa 300 sinh viên; admin có thể nâng sức chứa lớp đang chọn lên 300 trước khi ghi danh lại các dòng vượt giới hạn. Tài khoản mới dùng MSSV làm tên đăng nhập nếu file không có User; mật khẩu tài khoản mới và tài khoản đã có trong danh sách chi tiết được đồng bộ về MSSV. Mật khẩu được hash, không hiển thị hoặc trả về. Báo cáo dòng thiếu dữ liệu, User trùng, mã không phải student, mã trùng file và vượt sức chứa.
 
 ### `location-registry.api.ts`
 

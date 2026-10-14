@@ -16,6 +16,20 @@ export interface LocationRegistryBuilding {
   roomCount: number;
 }
 
+export interface LocationRegistryCampus {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export interface CreateLocationRegistryBuilding {
+  campusId: number;
+  code: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface UpdateLocationRegistryBuilding {
   latitude?: number;
   longitude?: number;
@@ -42,9 +56,20 @@ export interface LocationRegistryRoom {
 }
 
 export const locationRegistryApi = {
+  listCampuses() {
+    return httpClient.get<LocationRegistryCampus[]>('/v0/location-registry/campuses');
+  },
+
   listBuildings(includeInactive = true) {
     return httpClient.get<LocationRegistryBuilding[]>(
       `/v0/location-registry/buildings?includeInactive=${includeInactive}`,
+    );
+  },
+
+  createBuilding(input: CreateLocationRegistryBuilding) {
+    return httpClient.post<LocationRegistryBuilding>(
+      '/v0/location-registry/buildings',
+      input,
     );
   },
 

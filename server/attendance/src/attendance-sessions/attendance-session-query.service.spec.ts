@@ -1,4 +1,5 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { AttendanceSessionQueryService } from './attendance-session-query.service';
 
 describe('AttendanceSessionQueryService', () => {
@@ -38,6 +39,9 @@ describe('AttendanceSessionQueryService', () => {
       code: 'SV001',
       fullname: 'Nguyễn An',
       email: null,
+      dateOfBirth: null,
+      gender: null,
+      cohort: null,
       enrolledAt: '2026-09-01T00:00:00.000Z',
     }]);
     expect(prisma.classEnrollment.findMany).toHaveBeenCalledWith(
@@ -58,6 +62,57 @@ describe('AttendanceSessionQueryService', () => {
       service.getSectionRoster(4, { userId: 9, role: 'lecturer' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.classEnrollment.findMany).not.toHaveBeenCalled();
+  });
+
+  it('expands an existing section capacity to 300', async () => {
+    const prisma = {
+      courseSection: {
+        findUnique: jest.fn().mockResolvedValue({ id: 4, capacity: 40 }),
+        update: jest.fn().mockResolvedValue({ id: 4, capacity: 300 }),
+      },
+    };
+    const service = makeService(prisma);
+
+    await expect(service.expandCourseSectionCapacity(4)).resolves.toEqual({
+      id: 4,
+      capacity: 300,
+    });
+    expect(prisma.courseSection.update).toHaveBeenCalledWith({
+      where: { id: 4 },
+      data: { capacity: 300 },
+      select: { id: true, capacity: true },
+    });
+  });
+
+  it('does not update a section that already has capacity 300', async () => {
+    const prisma = {
+      courseSection: {
+        findUnique: jest.fn().mockResolvedValue({ id: 4, capacity: 300 }),
+        update: jest.fn(),
+      },
+    };
+    const service = makeService(prisma);
+
+    await expect(service.expandCourseSectionCapacity(4)).resolves.toEqual({
+      id: 4,
+      capacity: 300,
+    });
+    expect(prisma.courseSection.update).not.toHaveBeenCalled();
+  });
+
+  it('reports a missing section when expanding capacity', async () => {
+    const prisma = {
+      courseSection: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
+      },
+    };
+    const service = makeService(prisma);
+
+    await expect(service.expandCourseSectionCapacity(404)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(prisma.courseSection.update).not.toHaveBeenCalled();
   });
 
   it('summarizes only scoped sessions and ranks absent students', async () => {
@@ -121,15 +176,17 @@ describe('AttendanceSessionQueryService', () => {
         count: jest.fn().mockResolvedValue(1),
         upsert: jest.fn().mockResolvedValue({}),
       },
+      user: { update: jest.fn().mockResolvedValue({ id: 11, code: 'S002' }) },
     };
     const prisma = {
       courseSection: { findUnique: jest.fn().mockResolvedValue({ id: 4, capacity: 5 }) },
       user: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 10, code: 'S001' },
-          { id: 11, code: 'S002' },
+          { id: 10, code: 'S001', role: 'student', fullname: 'Student One', account: { username: 'S001' } },
+          { id: 11, code: 'S002', role: 'student', fullname: 'Student Two', account: { username: 'S002' } },
         ]),
       },
+      account: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
         callback(tx),
       ),
@@ -149,6 +206,10 @@ describe('AttendanceSessionQueryService', () => {
       unknownCodes: ['UNKNOWN'],
       duplicateCodes: ['S002'],
       capacityExceededCodes: [],
+      createdAccountCodes: [],
+      usernameConflictCodes: [],
+      missingAccountDataCodes: ['UNKNOWN'],
+      conflictingCodes: [],
     });
     expect(tx.classEnrollment.upsert).toHaveBeenCalledWith({
       where: { courseSectionId_userId: { courseSectionId: 4, userId: 11 } },
@@ -164,10 +225,16 @@ describe('AttendanceSessionQueryService', () => {
         count: jest.fn().mockResolvedValue(1),
         upsert: jest.fn().mockResolvedValue({}),
       },
+      user: { update: jest.fn().mockResolvedValue({ id: 11, code: 'S002' }) },
     };
     const prisma = {
       courseSection: { findUnique: jest.fn().mockResolvedValue({ id: 4, capacity: 1 }) },
-      user: { findMany: jest.fn().mockResolvedValue([{ id: 11, code: 'S002' }]) },
+      user: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 11, code: 'S002', role: 'student', fullname: 'Student Two', account: { username: 'S002' } },
+        ]),
+      },
+      account: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
         callback(tx),
       ),
@@ -178,7 +245,196 @@ describe('AttendanceSessionQueryService', () => {
 
     expect(result.importedCodes).toEqual([]);
     expect(result.capacityExceededCodes).toEqual(['S002']);
+    expect(result.createdAccountCodes).toEqual([]);
+    expect(result.usernameConflictCodes).toEqual([]);
+    expect(result.missingAccountDataCodes).toEqual([]);
+    expect(result.conflictingCodes).toEqual([]);
     expect(tx.classEnrollment.upsert).not.toHaveBeenCalled();
+  });
+
+  it('caps sections without an explicit capacity at 300 students', async () => {
+    const students = Array.from({ length: 301 }, (_, index) => ({
+      id: index + 1,
+      code: `S${String(index + 1).padStart(3, '0')}`,
+      role: 'student',
+      fullname: `Student ${index + 1}`,
+      account: { username: `S${String(index + 1).padStart(3, '0')}` },
+    }));
+    const tx = {
+      classEnrollment: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      user: {
+        update: jest.fn((args: { where: { id: number } }) =>
+          Promise.resolve({
+            id: args.where.id,
+            code: `S${String(args.where.id).padStart(3, '0')}`,
+          }),
+        ),
+      },
+    };
+    const prisma = {
+      courseSection: { findUnique: jest.fn().mockResolvedValue({ id: 4, capacity: null }) },
+      user: { findMany: jest.fn().mockResolvedValue(students) },
+      account: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = makeService(prisma);
+
+    const result = await service.importSectionRoster(
+      4,
+      students.map(({ code }) => code),
+    );
+
+    expect(result.importedCodes).toHaveLength(300);
+    expect(result.capacityExceededCodes).toEqual(['S301']);
+    expect(tx.classEnrollment.upsert).toHaveBeenCalledTimes(300);
+  });
+
+  it('creates a student account with a hashed student-code initial password', async () => {
+    const tx = {
+      classEnrollment: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      user: {
+        create: jest.fn().mockResolvedValue({ id: 25, code: 'SV025' }),
+      },
+    };
+    const prisma = {
+      courseSection: { findUnique: jest.fn().mockResolvedValue({ id: 4, capacity: 5 }) },
+      user: { findMany: jest.fn().mockResolvedValue([]) },
+      account: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = makeService(prisma);
+
+    const result = await service.importSectionRoster(4, [{
+      studentCode: 'SV025',
+      username: 'sv025',
+      middleName: 'Nguyễn Văn',
+      firstName: 'An',
+      dateOfBirth: '2005-01-31',
+      gender: 'Nam',
+      cohort: 'CTK47B',
+    }]);
+
+    expect(result.createdAccountCodes).toEqual(['SV025']);
+    expect(result.importedCodes).toEqual(['SV025']);
+    const createCall = tx.user.create.mock.calls[0][0];
+    expect(createCall.data).toMatchObject({
+      code: 'SV025',
+      role: 'student',
+      fullname: 'Nguyễn Văn An',
+      email: 'SV025@dlu.edu.vn',
+      dateOfBirth: '2005-01-31',
+      gender: 'Nam',
+      cohort: 'CTK47B',
+      account: { create: { username: 'sv025' } },
+    });
+    await expect(
+      bcrypt.compare('SV025', createCall.data.account.create.passwordHash),
+    ).resolves.toBe(true);
+    expect(prisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { timeout: 30_000 },
+    );
+  });
+
+  it('uses the student code as username when a new roster row has no username', async () => {
+    const tx = {
+      classEnrollment: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      user: {
+        create: jest.fn().mockResolvedValue({ id: 26, code: 'SV026' }),
+      },
+    };
+    const prisma = {
+      courseSection: { findUnique: jest.fn().mockResolvedValue({ id: 4, capacity: 5 }) },
+      user: { findMany: jest.fn().mockResolvedValue([]) },
+      account: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = makeService(prisma);
+
+    await service.importSectionRoster(4, [{
+      studentCode: 'SV026',
+      fullname: 'Trần Văn Bình',
+    }]);
+
+    expect(tx.user.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        account: { create: expect.objectContaining({ username: 'SV026' }) },
+      }),
+    }));
+  });
+
+  it('updates an existing student profile and resets its password to the student code', async () => {
+    const tx = {
+      classEnrollment: {
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
+      user: { update: jest.fn().mockResolvedValue({ id: 26, code: 'SV026' }) },
+    };
+    const prisma = {
+      courseSection: { findUnique: jest.fn().mockResolvedValue({ id: 4, capacity: 5 }) },
+      user: {
+        findMany: jest.fn().mockResolvedValue([{
+          id: 26,
+          code: 'SV026',
+          role: 'student',
+          fullname: 'Tên cũ',
+          email: 'old@example.com',
+          account: { username: 'sv026' },
+        }]),
+      },
+      account: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn((callback: (transaction: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const service = makeService(prisma);
+
+    const result = await service.importSectionRoster(4, [{
+      studentCode: 'SV026',
+      username: 'sv026',
+      middleName: 'Trần Văn',
+      firstName: 'Bình',
+      dateOfBirth: '2004-07-31',
+      gender: 'Nam',
+      cohort: 'CTK47B',
+    }]);
+
+    expect(result.importedCodes).toEqual(['SV026']);
+    const updateCall = tx.user.update.mock.calls[0][0];
+    expect(updateCall).toEqual(expect.objectContaining({
+      where: { id: 26 },
+      data: expect.objectContaining({
+        fullname: 'Trần Văn Bình',
+        email: 'SV026@dlu.edu.vn',
+        dateOfBirth: '2004-07-31',
+        gender: 'Nam',
+        cohort: 'CTK47B',
+        account: { update: { passwordHash: expect.any(String) } },
+      }),
+    }));
+    await expect(
+      bcrypt.compare('SV026', updateCall.data.account.update.passwordHash),
+    ).resolves.toBe(true);
   });
 
   it('creates a course section with reusable course and academic term records', async () => {
@@ -384,5 +640,172 @@ describe('AttendanceSessionQueryService', () => {
       service.reviewAttempt(12, 8, 7, 'lecturer', 'REJECTED', 'Đã xác minh'),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('creates a timetable slot for an existing section', async () => {
+    const createdSlot = { id: 16, dayOfWeek: 1, startMinute: 480, endMinute: 540 };
+    const prisma = {
+      courseSection: { findUnique: jest.fn().mockResolvedValue({ id: 4 }) },
+      room: { findUnique: jest.fn() },
+      timetableSlot: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue(createdSlot),
+      },
+    };
+    const service = makeService(prisma);
+
+    const result = await service.createTimetableSlot(4, {
+      dayOfWeek: 1,
+      startMinute: 480,
+      endMinute: 540,
+    });
+
+    expect(result).toBe(createdSlot);
+    expect(prisma.timetableSlot.create).toHaveBeenCalledWith({
+      data: {
+        courseSectionId: 4,
+        dayOfWeek: 1,
+        scheduledDate: null,
+        startMinute: 480,
+        endMinute: 540,
+      },
+      include: { room: { select: { id: true, code: true, name: true } } },
+    });
+  });
+
+  it('creates a one-time timetable slot on the selected calendar date', async () => {
+    const scheduledDate = new Date('2026-10-14T00:00:00.000Z');
+    const createdSlot = {
+      id: 17,
+      dayOfWeek: 3,
+      scheduledDate,
+      startMinute: 600,
+      endMinute: 660,
+    };
+    const prisma = {
+      courseSection: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 4,
+          roomId: null,
+          term: {
+            startDate: new Date('2026-09-01T00:00:00.000Z'),
+            endDate: new Date('2027-01-15T00:00:00.000Z'),
+          },
+        }),
+      },
+      room: { findUnique: jest.fn() },
+      timetableSlot: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockResolvedValue(createdSlot),
+      },
+    };
+    const service = makeService(prisma);
+
+    const result = await service.createTimetableSlot(4, {
+      scheduledDate: '2026-10-14',
+      startMinute: 600,
+      endMinute: 660,
+    });
+
+    expect(result).toBe(createdSlot);
+    expect(prisma.timetableSlot.create).toHaveBeenCalledWith({
+      data: {
+        courseSectionId: 4,
+        dayOfWeek: 3,
+        scheduledDate,
+        startMinute: 600,
+        endMinute: 660,
+      },
+      include: { room: { select: { id: true, code: true, name: true } } },
+    });
+  });
+
+  it('allows same-time one-time slots on different calendar dates', async () => {
+    const scheduledDate = new Date('2026-10-14T00:00:00.000Z');
+    const prisma = {
+      courseSection: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 4,
+          roomId: null,
+          term: {
+            startDate: new Date('2026-09-01T00:00:00.000Z'),
+            endDate: new Date('2027-01-15T00:00:00.000Z'),
+          },
+        }),
+      },
+      room: { findUnique: jest.fn() },
+      timetableSlot: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 18,
+            courseSectionId: 4,
+            roomId: null,
+            scheduledDate: new Date('2026-10-15T00:00:00.000Z'),
+            courseSection: { roomId: null },
+          },
+        ]),
+        create: jest.fn().mockResolvedValue({ id: 19 }),
+      },
+    };
+    const service = makeService(prisma);
+
+    await expect(
+      service.createTimetableSlot(4, {
+        scheduledDate: '2026-10-14',
+        startMinute: 600,
+        endMinute: 660,
+      }),
+    ).resolves.toEqual({ id: 19 });
+    expect(prisma.timetableSlot.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ scheduledDate }),
+      }),
+    );
+  });
+
+  it('rejects overlapping timetable slots in the same section and day', async () => {
+    const prisma = {
+      courseSection: { findUnique: jest.fn().mockResolvedValue({ id: 4 }) },
+      room: { findUnique: jest.fn() },
+      timetableSlot: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 15,
+            courseSectionId: 4,
+            roomId: null,
+            courseSection: { roomId: null },
+          },
+        ]),
+        create: jest.fn(),
+      },
+    };
+    const service = makeService(prisma);
+
+    await expect(
+      service.createTimetableSlot(4, {
+        dayOfWeek: 1,
+        startMinute: 510,
+        endMinute: 570,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.timetableSlot.create).not.toHaveBeenCalled();
+  });
+
+  it('prevents deleting timetable slots already referenced by attendance sessions', async () => {
+    const prisma = {
+      timetableSlot: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 16,
+          _count: { attendanceSessions: 1 },
+        }),
+        delete: jest.fn(),
+      },
+    };
+    const service = makeService(prisma);
+
+    await expect(service.deleteTimetableSlot(4, 16)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(prisma.timetableSlot.delete).not.toHaveBeenCalled();
   });
 });

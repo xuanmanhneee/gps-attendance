@@ -10,6 +10,7 @@ import { AuthErrorCode, LoginResponse } from '@gps-attendance/shared';
 import { ConfigService } from '@nestjs/config';
 import type { SignOptions } from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
+import { AuditLogService } from '../common/audit/audit-log.service';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +20,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
+    private readonly auditLogService?: AuditLogService,
   ) {}
 
   /**
@@ -35,6 +37,13 @@ export class AuthService {
       throw new UnauthorizedException({
         code: AuthErrorCode.INVALID_CREDENTIALS,
         message: 'Invalid credentials',
+      });
+    }
+
+    if (account.status !== 'active') {
+      throw new UnauthorizedException({
+        code: AuthErrorCode.INVALID_CREDENTIALS,
+        message: 'Account is disabled or locked',
       });
     }
 
@@ -73,8 +82,6 @@ export class AuthService {
       sub: user.userId,
       username: user.username,
       role: user.role,
-      iss: issuer,
-      aud: audience,
       jti: randomUUID(),
       iat: Math.floor(Date.now() / 1000),
     };
@@ -98,10 +105,23 @@ export class AuthService {
       audience,
     } as SignOptions & { secret: string };
 
-    return {
+    const response = {
       accessToken: this.jwtService.sign(accessTokenPayload, accessTokenOptions),
       refreshToken: this.jwtService.sign(refreshTokenPayload, refreshTokenOptions),
     };
+
+    void this.auditLogService?.record({
+      actorUserId: user.userId,
+      action: 'USER_LOGIN',
+      entityType: 'auth',
+      entityId: String(user.userId),
+      metadata: {
+        username: user.username,
+        role: user.role,
+      },
+    });
+
+    return response;
   }
 
   async refresh(refreshToken: string): Promise<LoginResponse> {
@@ -133,11 +153,24 @@ export class AuthService {
         await this.redisService.setBlacklistToken(payload.jti, 1209600, 'jti');
       }
 
-      return this.login({
+      const refreshed = this.login({
         userId: payload.sub,
         username: payload.username,
         role: payload.role,
       });
+
+      await this.auditLogService?.record({
+        actorUserId: payload.sub,
+        action: 'USER_REFRESH_TOKEN',
+        entityType: 'auth',
+        entityId: String(payload.sub),
+        metadata: {
+          username: payload.username,
+          role: payload.role,
+        },
+      });
+
+      return refreshed;
     } catch (err) {
       if (err instanceof UnauthorizedException) {
         throw err;
@@ -158,6 +191,17 @@ export class AuthService {
     }
     if (refreshToken) {
       await this.redisService.setBlacklistToken(refreshToken, 1209600);
+    }
+
+    if (accessToken || refreshToken) {
+      await this.auditLogService?.record({
+        action: 'USER_LOGOUT',
+        entityType: 'auth',
+        metadata: {
+          hasAccessToken: Boolean(accessToken),
+          hasRefreshToken: Boolean(refreshToken),
+        },
+      });
     }
   }
 

@@ -20,39 +20,50 @@ import { DluLogo } from '../../components/dlu-logo';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../context/auth-context';
 
+const CAMPUS_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
 function startOfWeek(date: Date): Date {
-  const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const dayFromMonday = (result.getDay() + 6) % 7;
-  result.setDate(result.getDate() - dayFromMonday);
-  result.setHours(0, 0, 0, 0);
+  const result = new Date(`${dateKey(date)}T00:00:00Z`);
+  const dayFromMonday = (result.getUTCDay() + 6) % 7;
+  result.setUTCDate(result.getUTCDate() - dayFromMonday);
   return result;
 }
 
 function addDays(date: Date, days: number): Date {
   const result = new Date(date);
-  result.setDate(result.getDate() + days);
+  result.setUTCDate(result.getUTCDate() + days);
   return result;
 }
 
 function dateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: CAMPUS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
 function formatDay(date: Date): string {
-  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`;
+  return `${String(date.getUTCDate()).padStart(2, '0')}/${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 function formatClock(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--:--';
-  return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return date.toLocaleTimeString('vi-VN', {
+    timeZone: CAMPUS_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 }
 
 function getIsoWeek(date: Date): number {
-  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const utcDate = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const day = utcDate.getUTCDay() || 7;
   utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
@@ -60,11 +71,12 @@ function getIsoWeek(date: Date): number {
 }
 
 function weekLabel(weekStart: Date): string {
-  return `Tuần ${getIsoWeek(weekStart)} (${formatDay(weekStart)} – ${formatDay(addDays(weekStart, 6))}/${addDays(weekStart, 6).getFullYear()})`;
+  const weekEnd = addDays(weekStart, 6);
+  return `Tuần ${getIsoWeek(weekStart)} (${formatDay(weekStart)} – ${formatDay(weekEnd)}/${weekEnd.getUTCFullYear()})`;
 }
 
 function getDayLabel(date: Date): string {
-  const day = date.getDay();
+  const day = date.getUTCDay();
   return day === 0 ? 'CN' : `T${day + 1}`;
 }
 
@@ -296,8 +308,13 @@ export default function ScheduleScreen() {
 }
 
 function formatDayLabel(value: string): string {
-  const date = new Date(`${value}T00:00:00`);
-  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const date = new Date(`${value}T00:00:00Z`);
+  return date.toLocaleDateString('vi-VN', {
+    timeZone: CAMPUS_TIME_ZONE,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 }
 
 const styles = StyleSheet.create({

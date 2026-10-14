@@ -307,14 +307,14 @@ Enum Prisma:
 - `AttendanceStatus`: absent, present, late, excused
 - `AttendanceAttemptResult`: APPROVED, REVIEW, REJECTED
 
-Seed local: biến `SEED_*_PASSWORD` trong `.env` backend.
+Seed local: mật khẩu admin/giảng viên cấu hình bằng biến `SEED_ADMIN_PASSWORD` và `SEED_LECTURER_PASSWORD`; tài khoản sinh viên mẫu luôn dùng MSSV làm mật khẩu.
 
 Biến môi trường backend (xem `server/attendance/.env.example`):
 
 ```text
 PORT, DATABASE_URL, JWT_SECRET, EXPIRES_IN,
 REFRESH_TOKEN_SECRET, REFRESH_TOKEN_EXPIRES_IN, MOBILE_DEV_IP,
-SEED_ADMIN_PASSWORD, SEED_LECTURER_PASSWORD, SEED_STUDENT_*_PASSWORD
+SEED_ADMIN_PASSWORD, SEED_LECTURER_PASSWORD
 ```
 
 ---

@@ -22,6 +22,7 @@ import { LocalAuthGuard } from '../guards/local-auth.guard';
 import type { AuthenticatedUser } from '../types/authenticated-user.type';
 import { LoginDto } from '../dto/login.dto';
 import { Throttle } from '@nestjs/throttler';
+import { DeviceRateLimitGuard } from '../../common/guards/device-rate-limit.guard';
 
 @ApiTags('admin-auth')
 @Controller('v0/admin/auth')
@@ -33,7 +34,7 @@ export class AdminAuthController {
   })
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @UseGuards(LocalAuthGuard)
+  @UseGuards(DeviceRateLimitGuard, LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: LoginDto })
   async login(
@@ -48,7 +49,7 @@ export class AdminAuthController {
 
     return {
       success: true,
-      data: this.authService.login(user),
+      data: await this.authService.login(user),
     };
   }
 

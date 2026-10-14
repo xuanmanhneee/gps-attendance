@@ -116,7 +116,7 @@ describe('AuthService', () => {
       expect(jwtService.sign).toHaveBeenCalled();
     });
 
-    it('nên gắn issuer, audience và jti vào payload để tăng an toàn JWT', () => {
+    it('nên cấu hình issuer và audience khi ký JWT và gắn jti vào payload', () => {
       authService.login(mockUser);
 
       expect(jwtService.sign).toHaveBeenCalledWith(
@@ -124,11 +124,12 @@ describe('AuthService', () => {
           sub: mockUser.userId,
           username: mockUser.username,
           role: mockUser.role,
-          iss: 'gps-attendance',
-          aud: 'gps-attendance-app',
           jti: expect.any(String),
         }),
-        expect.anything(),
+        expect.objectContaining({
+          issuer: 'gps-attendance',
+          audience: 'gps-attendance-app',
+        }),
       );
     });
   });

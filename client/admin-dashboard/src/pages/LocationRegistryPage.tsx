@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import DashboardSidebar from '../components/DashboardSidebar';
 import { locationRegistryApi } from '../api/location-registry.api';
 import type {
+  LocationRegistryCampus,
   LocationRegistryBuilding,
   LocationRegistryRoom,
 } from '../api/location-registry.api';
@@ -34,9 +35,16 @@ const LocationRegistryPage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const [campuses, setCampuses] = useState<LocationRegistryCampus[]>([]);
   const [buildings, setBuildings] = useState<LocationRegistryBuilding[]>([]);
   const [rooms, setRooms] = useState<LocationRegistryRoom[]>([]);
   const [drafts, setDrafts] = useState<Record<number, BuildingDraft>>({});
+  const [newBuildingCampusId, setNewBuildingCampusId] = useState('');
+  const [newBuildingCode, setNewBuildingCode] = useState('');
+  const [newBuildingName, setNewBuildingName] = useState('');
+  const [newBuildingLatitude, setNewBuildingLatitude] = useState('');
+  const [newBuildingLongitude, setNewBuildingLongitude] = useState('');
+  const [isCreatingBuilding, setIsCreatingBuilding] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [roomName, setRoomName] = useState('');
   const [roomFloor, setRoomFloor] = useState('');
@@ -49,12 +57,17 @@ const LocationRegistryPage = () => {
   const loadBuildings = async () => {
     try {
       setError(null);
-      const [data, roomData] = await Promise.all([
+      const [campusData, data, roomData] = await Promise.all([
+        locationRegistryApi.listCampuses(),
         locationRegistryApi.listBuildings(true),
         locationRegistryApi.listRooms(true),
       ]);
+      setCampuses(campusData);
       setBuildings(data);
       setRooms(roomData);
+      setNewBuildingCampusId((current) =>
+        current || (campusData.length === 1 ? String(campusData[0].id) : ''),
+      );
       setDrafts(Object.fromEntries(data.map((item) => [item.id, toDraft(item)])));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Không tải được Location Registry.');
@@ -66,6 +79,49 @@ const LocationRegistryPage = () => {
   useEffect(() => {
     void loadBuildings();
   }, []);
+
+  const createBuilding = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!isAdmin) return;
+
+    const campusId = Number(newBuildingCampusId);
+    const latitude = Number(newBuildingLatitude);
+    const longitude = Number(newBuildingLongitude);
+    if (
+      !Number.isInteger(campusId) ||
+      campusId <= 0 ||
+      !Number.isFinite(latitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      !Number.isFinite(longitude) ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      toast.error('Chọn khuôn viên và nhập tọa độ latitude/longitude hợp lệ.');
+      return;
+    }
+
+    try {
+      setIsCreatingBuilding(true);
+      await locationRegistryApi.createBuilding({
+        campusId,
+        code: newBuildingCode.trim(),
+        name: newBuildingName.trim(),
+        latitude,
+        longitude,
+      });
+      setNewBuildingCode('');
+      setNewBuildingName('');
+      setNewBuildingLatitude('');
+      setNewBuildingLongitude('');
+      await loadBuildings();
+      toast.success('Đã đăng ký tòa nhà với tọa độ master data; cần field test trước khi cấu hình radius/accuracy.');
+    } catch (createError) {
+      toast.error(createError instanceof Error ? createError.message : 'Không đăng ký được tòa nhà.');
+    } finally {
+      setIsCreatingBuilding(false);
+    }
+  };
 
   const updateDraft = <K extends keyof BuildingDraft>(
     id: number,
@@ -203,6 +259,91 @@ const LocationRegistryPage = () => {
           </p>
         )}
         {error && <p role="alert" className="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
+
+        {isAdmin && (
+          <section className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold">Đăng ký tòa nhà</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Nhập mã, tên, khuôn viên và tọa độ thực địa. Tòa nhà mới chưa được xác minh; radius và ngưỡng accuracy để trống đến sau field test.
+              </p>
+            </div>
+            <form onSubmit={(event) => void createBuilding(event)} className="grid gap-3 md:grid-cols-3">
+              <select
+                required
+                aria-label="Khuôn viên trường"
+                value={newBuildingCampusId}
+                onChange={(event) => setNewBuildingCampusId(event.target.value)}
+                className="rounded border bg-white px-3 py-2 text-sm"
+              >
+                <option value="">Chọn khuôn viên</option>
+                {campuses.map((campus) => (
+                  <option key={campus.id} value={campus.id}>
+                    {campus.code} — {campus.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                required
+                maxLength={50}
+                value={newBuildingCode}
+                onChange={(event) => setNewBuildingCode(event.target.value)}
+                placeholder="Mã tòa nhà (ví dụ A33)"
+                aria-label="Mã tòa nhà"
+                className="rounded border px-3 py-2 text-sm"
+              />
+              <input
+                required
+                maxLength={150}
+                value={newBuildingName}
+                onChange={(event) => setNewBuildingName(event.target.value)}
+                placeholder="Tên tòa nhà"
+                aria-label="Tên tòa nhà"
+                className="rounded border px-3 py-2 text-sm"
+              />
+              <label className="text-xs text-slate-600">
+                Latitude
+                <input
+                  required
+                  type="number"
+                  min="-90"
+                  max="90"
+                  step="any"
+                  value={newBuildingLatitude}
+                  onChange={(event) => setNewBuildingLatitude(event.target.value)}
+                  aria-label="Latitude tòa nhà"
+                  className="mt-1 w-full rounded border px-3 py-2 text-sm text-slate-900"
+                />
+              </label>
+              <label className="text-xs text-slate-600">
+                Longitude
+                <input
+                  required
+                  type="number"
+                  min="-180"
+                  max="180"
+                  step="any"
+                  value={newBuildingLongitude}
+                  onChange={(event) => setNewBuildingLongitude(event.target.value)}
+                  aria-label="Longitude tòa nhà"
+                  className="mt-1 w-full rounded border px-3 py-2 text-sm text-slate-900"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={isCreatingBuilding || campuses.length === 0}
+                className="self-end rounded bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isCreatingBuilding ? 'Đang đăng ký…' : 'Đăng ký tọa độ'}
+              </button>
+              {campuses.length === 0 && (
+                <p className="text-sm text-amber-800 md:col-span-3">
+                  Chưa có khuôn viên nào để chọn; cần tạo dữ liệu khuôn viên trước.
+                </p>
+              )}
+            </form>
+          </section>
+        )}
 
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
           <table className="min-w-[1180px] w-full text-left text-sm">

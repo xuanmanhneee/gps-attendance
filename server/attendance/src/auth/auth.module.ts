@@ -9,6 +9,9 @@ import { UsersModule } from '../users/users.module';
 import { AccountModule } from '../account/account.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
+import { AuditLogService } from '../common/audit/audit-log.service';
+import { DeviceRateLimitGuard } from '../common/guards/device-rate-limit.guard';
+import { RateLimitService } from '../common/rate-limit/rate-limit.service';
 
 @Module({
   imports: [
@@ -28,7 +31,14 @@ import { LocalStrategy } from './strategies/local.strategy';
   ],
 
   controllers: [AdminAuthController, UserAuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    LocalStrategy,
+    AuditLogService,
+    DeviceRateLimitGuard,
+    RateLimitService,
+  ],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

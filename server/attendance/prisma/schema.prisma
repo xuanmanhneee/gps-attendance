@@ -301,7 +301,9 @@ model AttendanceRecord {
   updater        User?             @relation("RecordUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
 
   @@unique([sessionId, userId])
-  @@index([sessionId, deviceId])  @@index([sessionId, status, checkedInAt])  @@index([userId, updatedAt])
+  @@index([sessionId, deviceId])
+  @@index([sessionId, status, checkedInAt])
+  @@index([userId, updatedAt])
   @@map("attendance_records")
 }
 
@@ -484,7 +486,8 @@ model TimetableSlot {
   id              Int           @id @default(autoincrement())
   courseSectionId Int           @map("course_section_id")
   dayOfWeek       Int           @map("day_of_week")
-  startMinute     Int           @map("start_minute")
+  scheduledDate   DateTime?       @map("scheduled_date") @db.Date
+  startMinute     Int             @map("start_minute")
   endMinute       Int           @map("end_minute")
   roomId          Int?          @map("room_id")
   createdAt       DateTime      @default(now()) @map("created_at")

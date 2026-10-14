@@ -6,6 +6,9 @@ export interface CourseSectionStudent {
   code: string;
   fullname: string;
   email: string | null;
+  dateOfBirth: string | null;
+  gender: string | null;
+  cohort: string | null;
   enrolledAt: string;
 }
 
@@ -26,12 +29,44 @@ export interface RosterImportResult {
   unknownCodes: string[];
   duplicateCodes: string[];
   capacityExceededCodes: string[];
+  createdAccountCodes: string[];
+  usernameConflictCodes: string[];
+  missingAccountDataCodes: string[];
+  conflictingCodes: string[];
+}
+
+export interface ImportSectionStudent {
+  studentCode: string;
+  username?: string;
+  password?: string;
+  fullname?: string;
+  middleName?: string;
+  firstName?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  cohort?: string;
 }
 
 export interface CourseSectionCreationOptions {
   lecturers: Array<{ id: number; code: string; fullname: string }>;
   rooms: Array<{ id: number; code: string; name: string }>;
   courses: Array<{ id: number; code: string; name: string; credits: number | null }>;
+}
+
+export interface TimetableSlotInput {
+  dayOfWeek?: number;
+  scheduledDate?: string;
+  startMinute: number;
+  endMinute: number;
+  roomId?: number;
+}
+
+export interface UpdateTimetableSlotInput {
+  scheduledDate?: string | null;
+  dayOfWeek?: number;
+  startMinute?: number;
+  endMinute?: number;
+  roomId?: number | null;
 }
 
 export interface ImportCourseItem {
@@ -81,10 +116,16 @@ export const courseSectionsApi = {
     );
   },
 
-  importRoster(sectionId: number, studentCodes: string[]) {
+  importRoster(sectionId: number, students: ImportSectionStudent[]) {
     return httpClient.post<RosterImportResult>(
       `/v0/attendance-sessions/sections/${sectionId}/roster/import`,
-      { studentCodes },
+      { students },
+    );
+  },
+
+  expandCapacity(sectionId: number) {
+    return httpClient.patch<{ id: number; capacity: number }>(
+      `/v0/attendance-sessions/sections/${sectionId}/capacity`,
     );
   },
 
@@ -105,6 +146,30 @@ export const courseSectionsApi = {
     return httpClient.post<CreatedCourseSection>(
       '/v0/attendance-sessions/sections',
       input,
+    );
+  },
+
+  createTimetableSlot(sectionId: number, input: TimetableSlotInput) {
+    return httpClient.post(
+      `/v0/attendance-sessions/sections/${sectionId}/timetable`,
+      input,
+    );
+  },
+
+  updateTimetableSlot(
+    sectionId: number,
+    slotId: number,
+    input: UpdateTimetableSlotInput,
+  ) {
+    return httpClient.patch(
+      `/v0/attendance-sessions/sections/${sectionId}/timetable/${slotId}`,
+      input,
+    );
+  },
+
+  deleteTimetableSlot(sectionId: number, slotId: number) {
+    return httpClient.delete(
+      `/v0/attendance-sessions/sections/${sectionId}/timetable/${slotId}`,
     );
   },
 };

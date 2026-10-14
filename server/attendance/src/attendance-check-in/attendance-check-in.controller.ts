@@ -9,6 +9,7 @@ import { ApiResponse, AttendanceCheckInResult } from '@gps-attendance/shared';
 import { Throttle } from '@nestjs/throttler';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { DeviceRateLimitGuard } from '../common/guards/device-rate-limit.guard';
 
 @ApiTags('attendance-check-in')
 @ApiBearerAuth()
@@ -19,7 +20,7 @@ export class AttendanceCheckInController {
   ) {}
 
   @ApiOperation({ summary: 'Sinh viên thực hiện điểm danh (Check-in GPS)' })
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, DeviceRateLimitGuard, RolesGuard)
   @Roles('student')
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)

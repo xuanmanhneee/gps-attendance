@@ -23,6 +23,9 @@ import { ATTENDANCE_CHECK_IN_DEVICE_USAGE_REPOSITORY } from './attendance-check-
 import { IAttendanceCheckInDeviceUsageRepository } from './repositories/attendance-check-in-device-usage.repository';
 import { ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY } from './attendance-check-in.token';
 import type { IAttendanceCheckInAttemptRepository } from './repositories/attendance-check-in-attempt.repository';
+import { AuditLogService } from '../common/audit/audit-log.service';
+import { DeviceAttestationService } from '../common/device-attestation/device-attestation.service';
+import { MonitoringService } from '../health/monitoring.service';
 
 @Injectable()
 export class AttendanceCheckInService {
@@ -37,6 +40,9 @@ export class AttendanceCheckInService {
     @Inject(ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY)
     private readonly attemptRepository: IAttendanceCheckInAttemptRepository,
     private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+    private readonly deviceAttestationService: DeviceAttestationService,
+    private readonly monitoringService: MonitoringService,
   ) {}
 
   async checkIn(
@@ -50,6 +56,19 @@ export class AttendanceCheckInService {
     const session = await this.attendanceSessionsService.findById(
       dto.sessionId,
     );
+
+    await this.auditLogService.record({
+      actorUserId: userId,
+      action: 'CHECK_IN_REQUESTED',
+      entityType: 'attendance_session',
+      entityId: String(dto.sessionId),
+      metadata: {
+        latitude: dto.location.latitude,
+        longitude: dto.location.longitude,
+        accuracy: dto.location.accuracy,
+        deviceId: dto.device.deviceId,
+      },
+    });
 
     if (!session) {
       throw new NotFoundException({
@@ -145,18 +164,34 @@ export class AttendanceCheckInService {
       select: { id: true, trustStatus: true },
     });
 
+    const attestation = this.deviceAttestationService.verify(
+      dto.device.platform,
+      dto.integrity?.integrityToken,
+    );
+
     await this.prisma.deviceIntegrityCheck.create({
       data: {
         userId,
         registeredDeviceId: registeredDevice.id,
         sessionId: dto.sessionId,
         provider: dto.device.platform === 'ios' ? 'APP_ATTEST' : 'PLAY_INTEGRITY',
-        verdict: dto.integrity.integrityToken
-          ? 'TOKEN_PRESENT_UNVERIFIED'
-          : 'TOKEN_MISSING',
-        reasons: ['PLATFORM_ATTESTATION_VALIDATOR_NOT_CONFIGURED'],
+        verdict: attestation.verdict,
+        reasons: attestation.reasons.length > 0 ? attestation.reasons : ['ATTESTATION_OK'],
       },
     });
+
+    if (!attestation.isValid) {
+      await this.auditLogService.record({
+        actorUserId: userId,
+        action: 'CHECK_IN_REVIEWED',
+        entityType: 'attendance_check_in',
+        entityId: String(dto.sessionId),
+        metadata: {
+          reason: 'DEVICE_ATTESTATION_FAILED',
+          details: attestation.reasons,
+        },
+      });
+    }
 
     if (registeredDevice.trustStatus === 'BLOCKED') {
       await this.attemptRepository.completeAttempt(
@@ -217,6 +252,18 @@ export class AttendanceCheckInService {
         'REJECTED',
         reasons,
       );
+      this.monitoringService.recordCheckInOutcome('REJECTED');
+      await this.auditLogService.record({
+        actorUserId: userId,
+        action: 'CHECK_IN_REJECTED',
+        entityType: 'attendance_check_in',
+        entityId: String(dto.sessionId),
+        metadata: {
+          status: 'REJECTED',
+          reasons,
+          distanceMeters: validation.distance,
+        },
+      });
       return {
         status: 'REJECTED',
         reasons: reasons as [
@@ -250,6 +297,21 @@ export class AttendanceCheckInService {
       finalStatus === 'VALID' ? 'APPROVED' : 'REVIEW',
       reasons,
     );
+
+    this.monitoringService.recordCheckInOutcome(
+      finalStatus === 'VALID' ? 'VALID' : 'REVIEW',
+    );
+    await this.auditLogService.record({
+      actorUserId: userId,
+      action: 'CHECK_IN_RESULT',
+      entityType: 'attendance_check_in',
+      entityId: String(dto.sessionId),
+      metadata: {
+        status: finalStatus,
+        reasons,
+        distanceMeters: validation.distance,
+      },
+    });
 
     if (finalStatus === 'VALID') {
       return {

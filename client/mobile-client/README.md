@@ -180,6 +180,8 @@ EXPO_PUBLIC_API_URL=
 
 Khi để trống, app lấy host từ Expo Metro và gọi backend ở cổng `3000`, dùng được khi điện thoại và máy chạy backend cùng Wi-Fi. Khi dùng điện thoại ở mạng khác, đặt `EXPO_PUBLIC_API_URL` thành URL HTTPS của ngrok; dùng static domain để URL không đổi giữa các lần chạy. Khởi động lại Expo sau khi đổi biến môi trường.
 
+Trên màn hình đăng nhập, chọn **Ghi nhớ đăng nhập** để phiên đăng nhập được giữ an toàn trong SecureStore và tự khôi phục khi mở lại ứng dụng. Nếu bỏ chọn, token chỉ giữ trong bộ nhớ và ứng dụng yêu cầu đăng nhập lại sau khi đóng. Mật khẩu không được lưu.
+
 Từ root:
 
 ```bash

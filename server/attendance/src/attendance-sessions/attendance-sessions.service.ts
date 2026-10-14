@@ -99,7 +99,17 @@ export class AttendanceSessionsService {
         throw new ForbiddenException('Bạn không được phân công giảng dạy lớp học phần này');
       }
 
-      if (section.timetable.length > 0 && dto.timetableSlotId === undefined) {
+      if (section.enrollments.length === 0) {
+        throw new BadRequestException(
+          'Lớp học phần chưa có sinh viên ghi danh active; hãy nhập roster trước khi tạo phiên.',
+        );
+      }
+      if (section.timetable.length === 0) {
+        throw new BadRequestException(
+          'Lớp học phần chưa có thời khóa biểu; hãy khai báo ca học trước khi tạo phiên.',
+        );
+      }
+      if (dto.timetableSlotId === undefined) {
         throw new BadRequestException('Lớp có thời khóa biểu; cần chọn ca học cụ thể');
       }
 
@@ -110,21 +120,38 @@ export class AttendanceSessionsService {
         throw new BadRequestException('Thời khóa biểu không thuộc lớp học phần đã chọn');
       }
       if (slot) {
-        const localWeekday = new Intl.DateTimeFormat('en-US', {
-          weekday: 'short',
+        const openAt = new Date(dto.openAt);
+        const localDateParts = new Intl.DateTimeFormat('en-US', {
           timeZone: 'Asia/Ho_Chi_Minh',
-        }).format(new Date(dto.openAt));
-        const weekdayToNumber: Record<string, number> = {
-          Mon: 1,
-          Tue: 2,
-          Wed: 3,
-          Thu: 4,
-          Fri: 5,
-          Sat: 6,
-          Sun: 7,
-        };
-        if (weekdayToNumber[localWeekday] !== slot.dayOfWeek) {
-          throw new BadRequestException('Ngày mở session không khớp ngày của ca học đã chọn');
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).formatToParts(openAt);
+        const localDatePart = (type: 'year' | 'month' | 'day') =>
+          localDateParts.find((part) => part.type === type)?.value ?? '';
+        const selectedLocalDate =
+          `${localDatePart('year')}-${localDatePart('month')}-${localDatePart('day')}`;
+        if (slot.scheduledDate) {
+          if (selectedLocalDate !== slot.scheduledDate.toISOString().slice(0, 10)) {
+            throw new BadRequestException('Ngày mở session không khớp ngày cụ thể của ca học đã chọn');
+          }
+        } else {
+          const localWeekday = new Intl.DateTimeFormat('en-US', {
+            weekday: 'short',
+            timeZone: 'Asia/Ho_Chi_Minh',
+          }).format(openAt);
+          const weekdayToNumber: Record<string, number> = {
+            Mon: 1,
+            Tue: 2,
+            Wed: 3,
+            Thu: 4,
+            Fri: 5,
+            Sat: 6,
+            Sun: 7,
+          };
+          if (weekdayToNumber[localWeekday] !== slot.dayOfWeek) {
+            throw new BadRequestException('Ngày mở session không khớp ngày của ca học đã chọn');
+          }
         }
       }
 

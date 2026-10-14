@@ -5,6 +5,7 @@ const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
 const USER_KEY = 'user';
 const LAST_LOGIN_KEY = 'lastLoginAt';
+const REMEMBER_LOGIN_KEY = 'rememberLogin';
 
 // Helper bọc SecureStore để tương thích cả Web và Mobile Native
 const storage = {
@@ -59,6 +60,7 @@ export async function removeToken() {
     storage.deleteItem(REFRESH_TOKEN_KEY),
     storage.deleteItem(USER_KEY),
     storage.deleteItem(LAST_LOGIN_KEY),
+    storage.deleteItem(REMEMBER_LOGIN_KEY),
   ]);
 }
 
@@ -67,21 +69,29 @@ export async function saveSession(
   refreshToken: string,
   user: unknown,
   lastLoginAt: string,
+  rememberLogin: boolean,
 ) {
+  if (!rememberLogin) {
+    await removeToken();
+    return;
+  }
+
   await Promise.all([
     storage.setItem(ACCESS_TOKEN_KEY, accessToken),
     storage.setItem(REFRESH_TOKEN_KEY, refreshToken),
     storage.setItem(USER_KEY, JSON.stringify(user)),
     storage.setItem(LAST_LOGIN_KEY, lastLoginAt),
+    storage.setItem(REMEMBER_LOGIN_KEY, 'true'),
   ]);
 }
 
 export async function getSession() {
-  const [accessToken, refreshToken, savedUser, lastLoginAt] = await Promise.all([
+  const [accessToken, refreshToken, savedUser, lastLoginAt, rememberLogin] = await Promise.all([
     storage.getItem(ACCESS_TOKEN_KEY),
     storage.getItem(REFRESH_TOKEN_KEY),
     storage.getItem(USER_KEY),
     storage.getItem(LAST_LOGIN_KEY),
+    storage.getItem(REMEMBER_LOGIN_KEY),
   ]);
 
   let parsedUser = null;
@@ -98,5 +108,6 @@ export async function getSession() {
     refreshToken,
     user: parsedUser,
     lastLoginAt,
+    rememberLogin: rememberLogin !== 'false',
   };
 }

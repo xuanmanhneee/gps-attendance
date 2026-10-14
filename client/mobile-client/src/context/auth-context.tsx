@@ -55,7 +55,12 @@ interface AuthContextType {
   lastLoginAt: string | null;
   isLoading: boolean;
   isSignedIn: boolean;
-  login: (username: string, password: string, isLecturer?: boolean) => Promise<void>;
+  login: (
+    username: string,
+    password: string,
+    isLecturer?: boolean,
+    rememberLogin?: boolean,
+  ) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
 }
@@ -80,7 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const savedUser = session.user as User | null;
       const savedLastLoginAt = session.lastLoginAt;
 
-      if (savedToken && savedUser && !isTokenExpired(savedToken)) {
+      if (session.rememberLogin && savedToken && savedUser && !isTokenExpired(savedToken)) {
         setToken(savedToken);
         setUser(savedUser);
         await saveInMemoryToken(savedToken);
@@ -102,6 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     username: string,
     password: string,
     isLecturer = false,
+    rememberLogin = false,
   ) => {
     try {
       setIsLoading(true);
@@ -125,7 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // Save to persistent storage and in-memory token
         await saveInMemoryToken(accessToken);
-        await saveSession(accessToken, refreshToken, userData, loginAt);
+        await saveSession(accessToken, refreshToken, userData, loginAt, rememberLogin);
       } else {
         throw new Error((!response.success && response.message) || 'Login failed');
       }

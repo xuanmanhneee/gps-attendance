@@ -17,6 +17,7 @@ import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { LocationRegistryService } from './location-registry.service';
+import { CreateBuildingRegistryDto } from './dto/create-building-registry.dto';
 import { UpdateBuildingRegistryDto } from './dto/update-building-registry.dto';
 import { CreateRegistryRoomDto } from './dto/create-registry-room.dto';
 import { UpdateRegistryRoomDto } from './dto/update-registry-room.dto';
@@ -28,6 +29,16 @@ import { UpdateRegistryRoomDto } from './dto/update-registry-room.dto';
 export class LocationRegistryController {
   constructor(private readonly locationRegistryService: LocationRegistryService) {}
 
+  @ApiOperation({ summary: 'Danh sách khuôn viên trường' })
+  @Roles('admin', 'lecturer')
+  @Get('campuses')
+  async listCampuses(): Promise<
+    ApiResponse<Awaited<ReturnType<LocationRegistryService['listCampuses']>>>
+  > {
+    const data = await this.locationRegistryService.listCampuses();
+    return { success: true, data };
+  }
+
   @ApiOperation({ summary: 'Danh sách địa điểm trong Location Registry' })
   @Roles('admin', 'lecturer')
   @Get('buildings')
@@ -36,6 +47,22 @@ export class LocationRegistryController {
   ): Promise<ApiResponse<Awaited<ReturnType<LocationRegistryService['listBuildings']>>>> {
     const data = await this.locationRegistryService.listBuildings(
       includeInactive === 'true',
+    );
+    return { success: true, data };
+  }
+
+  @ApiOperation({ summary: 'Đăng ký tọa độ tòa nhà trong khuôn viên (admin)' })
+  @Roles('admin')
+  @Post('buildings')
+  async createBuilding(
+    @Body() dto: CreateBuildingRegistryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<
+    ApiResponse<Awaited<ReturnType<LocationRegistryService['createBuilding']>>>
+  > {
+    const data = await this.locationRegistryService.createBuilding(
+      dto,
+      user.userId,
     );
     return { success: true, data };
   }

@@ -20,6 +20,7 @@
     "build:shared": "pnpm --filter @gps-attendance/shared build",
     "build:attendance": "pnpm build:shared && pnpm --filter @gps-attendance/attendance build",
     "build:admin": "pnpm build:shared && pnpm --filter @gps-attendance/admin-dashboard build",
+    "seed:attendance": "pnpm --filter @gps-attendance/attendance exec prisma db seed",
     "build": "pnpm build:shared && pnpm --filter @gps-attendance/attendance build && pnpm --filter @gps-attendance/admin-dashboard build",
     "clean:shared": "pnpm --filter @gps-attendance/shared clean",
     "clean:attendance": "pnpm --filter @gps-attendance/attendance clean",

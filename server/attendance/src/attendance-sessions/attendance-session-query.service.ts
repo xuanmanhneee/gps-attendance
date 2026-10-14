@@ -5,6 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
+import type { ImportSectionStudentDto } from './dto/import-section-roster.dto';
 import { AttendanceSessionsService } from './attendance-sessions.service';
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
 import { UsersService } from '../users/users.service';
@@ -39,7 +41,15 @@ export class AttendanceSessionQueryService {
       },
       include: {
         course: { select: { code: true, name: true } },
-        term: { select: { name: true, academicYear: true, semester: true } },
+        term: {
+          select: {
+            name: true,
+            academicYear: true,
+            semester: true,
+            startDate: true,
+            endDate: true,
+          },
+        },
         room: { include: { registryBuilding: true } },
         timetable: {
           orderBy: [{ dayOfWeek: 'asc' }, { startMinute: 'asc' }],
@@ -67,6 +77,7 @@ export class AttendanceSessionQueryService {
                   code: room.registryBuilding.code,
                   name: room.registryBuilding.name,
                   type: room.registryBuilding.type,
+                  status: room.registryBuilding.status,
                   verified: room.registryBuilding.verified,
                   latitude: Number(room.registryBuilding.latitude),
                   longitude: Number(room.registryBuilding.longitude),
@@ -93,6 +104,7 @@ export class AttendanceSessionQueryService {
       timetable: section.timetable.map((slot) => ({
         id: slot.id,
         dayOfWeek: slot.dayOfWeek,
+        scheduledDate: slot.scheduledDate?.toISOString().slice(0, 10) ?? null,
         startMinute: slot.startMinute,
         endMinute: slot.endMinute,
         room: toRoom(slot.room),
@@ -312,7 +324,17 @@ export class AttendanceSessionQueryService {
     const enrollments = await this.prisma.classEnrollment.findMany({
       where: { courseSectionId: sectionId, status: 'active' },
       include: {
-        user: { select: { id: true, code: true, fullname: true, email: true } },
+        user: {
+          select: {
+            id: true,
+            code: true,
+            fullname: true,
+            email: true,
+            dateOfBirth: true,
+            gender: true,
+            cohort: true,
+          },
+        },
       },
       orderBy: { user: { code: 'asc' } },
     });
@@ -324,12 +346,36 @@ export class AttendanceSessionQueryService {
         code: user.code,
         fullname: user.fullname,
         email: user.email,
+        dateOfBirth: user.dateOfBirth ?? null,
+        gender: user.gender ?? null,
+        cohort: user.cohort ?? null,
         enrolledAt: enrolledAt.toISOString(),
       })),
     };
   }
 
-  async importSectionRoster(sectionId: number, rawCodes: string[]) {
+  async expandCourseSectionCapacity(sectionId: number) {
+    const section = await this.prisma.courseSection.findUnique({
+      where: { id: sectionId },
+      select: { id: true, capacity: true },
+    });
+    if (!section) {
+      throw new NotFoundException('Không tìm thấy lớp học phần.');
+    }
+    if (section.capacity === null || section.capacity >= 300) {
+      return section;
+    }
+    return this.prisma.courseSection.update({
+      where: { id: sectionId },
+      data: { capacity: 300 },
+      select: { id: true, capacity: true },
+    });
+  }
+
+  async importSectionRoster(
+    sectionId: number,
+    rawStudents: Array<string | ImportSectionStudentDto>,
+  ) {
     const section = await this.prisma.courseSection.findUnique({
       where: { id: sectionId },
       select: { id: true, capacity: true },
@@ -339,37 +385,116 @@ export class AttendanceSessionQueryService {
     }
 
     const seen = new Set<string>();
-    const requestedCodes: string[] = [];
+    const resetPasswordCodes = new Set<string>();
+    const requestedStudents: ImportSectionStudentDto[] = [];
     const duplicateCodes: string[] = [];
-    for (const rawCode of rawCodes) {
-      const code = rawCode.trim();
+    for (const rawStudent of rawStudents) {
+      const student = typeof rawStudent === 'string'
+        ? { studentCode: rawStudent }
+        : rawStudent;
+      const code = student.studentCode.trim();
       if (!code) continue;
       if (seen.has(code)) {
         duplicateCodes.push(code);
       } else {
         seen.add(code);
-        requestedCodes.push(code);
+        requestedStudents.push({ ...student, studentCode: code });
+        if (typeof rawStudent !== 'string') {
+          resetPasswordCodes.add(code);
+        }
       }
     }
-    if (requestedCodes.length === 0) {
+    if (requestedStudents.length === 0) {
       throw new BadRequestException('File không có mã sinh viên hợp lệ.');
     }
 
     const users = await this.prisma.user.findMany({
-      where: { code: { in: requestedCodes }, role: 'student' },
-      select: { id: true, code: true },
+      where: { code: { in: requestedStudents.map(({ studentCode }) => studentCode) } },
+      select: {
+        id: true,
+        code: true,
+        role: true,
+        fullname: true,
+        dateOfBirth: true,
+        gender: true,
+        cohort: true,
+        account: { select: { username: true } },
+      },
     });
     const usersByCode = new Map(users.map((user) => [user.code, user]));
-    const unknownCodes = requestedCodes.filter((code) => !usersByCode.has(code));
-    const importableUsers = requestedCodes
-      .map((code) => usersByCode.get(code))
-      .filter((user): user is (typeof users)[number] => user !== undefined);
+    const requestedUsernames = requestedStudents
+      .filter(({ studentCode }) => {
+        const user = usersByCode.get(studentCode);
+        return !user || !user.account;
+      })
+      .map(({ username, studentCode }) => username?.trim() || studentCode);
+    const accounts = requestedUsernames.length > 0
+      ? await this.prisma.account.findMany({
+          where: { username: { in: requestedUsernames } },
+          select: { username: true, userId: true },
+        })
+      : [];
+    const accountsByUsername = new Map(accounts.map((account) => [account.username, account]));
+    const usernameCodes = new Map<string, string>();
+    const usernameConflictCodes: string[] = [];
+    const missingAccountDataCodes: string[] = [];
+    const unknownCodes: string[] = [];
+    const conflictingCodes: string[] = [];
+    const importableRows: Array<{
+      student: ImportSectionStudentDto;
+      existingUser: (typeof users)[number] | null;
+      fullname: string;
+    }> = [];
+
+    for (const student of requestedStudents) {
+      const existingUser = usersByCode.get(student.studentCode);
+      if (existingUser && existingUser.role !== 'student') {
+        conflictingCodes.push(student.studentCode);
+        continue;
+      }
+      const fullname = student.fullname?.trim() ||
+        [student.middleName?.trim(), student.firstName?.trim()].filter(Boolean).join(' ');
+      if (!existingUser && !fullname) {
+        missingAccountDataCodes.push(student.studentCode);
+        unknownCodes.push(student.studentCode);
+        continue;
+      }
+      if (!existingUser || !existingUser.account) {
+        const username = student.username?.trim() || student.studentCode;
+        const previousCode = usernameCodes.get(username);
+        const account = accountsByUsername.get(username);
+        if (previousCode || account) {
+          usernameConflictCodes.push(student.studentCode);
+          continue;
+        }
+        usernameCodes.set(username, student.studentCode);
+      }
+      importableRows.push({ student, existingUser: existingUser ?? null, fullname });
+    }
+
+    const passwordHashes = new Map<string, string>();
+    const rowsNeedingPasswordHash = [
+      ...importableRows.filter(({ student, existingUser }) =>
+        existingUser && resetPasswordCodes.has(student.studentCode),
+      ),
+      ...importableRows.filter(({ existingUser }) => !existingUser).slice(0, 300),
+    ];
+    for (let index = 0; index < rowsNeedingPasswordHash.length; index += 50) {
+      await Promise.all(rowsNeedingPasswordHash.slice(index, index + 50).map(async ({ student }) => {
+          passwordHashes.set(
+            student.studentCode,
+            await bcrypt.hash(student.studentCode, 10),
+          );
+      }));
+    }
 
     return this.prisma.$transaction(async (transaction) => {
+      const importableUserIds = importableRows
+        .flatMap(({ existingUser }) => existingUser ? [existingUser.id] : []);
       const existing = await transaction.classEnrollment.findMany({
         where: {
           courseSectionId: sectionId,
-          userId: { in: importableUsers.map((user) => user.id) },
+          userId: { in: importableUserIds },
         },
         select: { userId: true, status: true },
       });
@@ -379,15 +504,87 @@ export class AttendanceSessionQueryService {
       const activeEnrollmentCount = await transaction.classEnrollment.count({
         where: { courseSectionId: sectionId, status: 'active' },
       });
-      const candidates = importableUsers.filter((user) => !activeUserIds.has(user.id));
+      await Promise.all(importableRows.map(({ student, existingUser, fullname }) => {
+        if (!existingUser) return null;
+        const shouldResetPassword = resetPasswordCodes.has(student.studentCode);
+        const passwordHash = shouldResetPassword
+          ? passwordHashes.get(student.studentCode)
+          : undefined;
+        if (shouldResetPassword && !passwordHash) {
+          throw new BadRequestException(
+            `Không tạo được thông tin xác thực cho sinh viên ${student.studentCode}.`,
+          );
+        }
+        return transaction.user.update({
+          where: { id: existingUser.id },
+          data: {
+            ...(fullname ? { fullname } : {}),
+            email: `${student.studentCode}@dlu.edu.vn`,
+            ...(student.dateOfBirth ? { dateOfBirth: student.dateOfBirth } : {}),
+            ...(student.gender ? { gender: student.gender.trim() } : {}),
+            ...(student.cohort ? { cohort: student.cohort.trim() } : {}),
+            ...(passwordHash
+              ? {
+                  account: existingUser.account
+                    ? { update: { passwordHash } }
+                    : {
+                        create: {
+                          username: student.username?.trim() || student.studentCode,
+                          passwordHash,
+                        },
+                      },
+                }
+              : {}),
+          },
+        });
+      }));
+      const alreadyEnrolledRows = importableRows.filter(
+        ({ existingUser }) => existingUser && activeUserIds.has(existingUser.id),
+      );
+      const candidates = importableRows.filter(
+        ({ existingUser }) => !existingUser || !activeUserIds.has(existingUser.id),
+      );
       const availableSlots =
-        section.capacity === null
-          ? candidates.length
-          : Math.max(0, section.capacity - activeEnrollmentCount);
-      const acceptedUsers = candidates.slice(0, availableSlots);
+        Math.max(0, Math.min(section.capacity ?? 300, 300) - activeEnrollmentCount);
+      const acceptedRows = candidates.slice(0, availableSlots);
       const capacityExceededCodes = candidates
         .slice(availableSlots)
-        .map((user) => user.code);
+        .map(({ student }) => student.studentCode);
+
+      const acceptedUsers = await Promise.all(acceptedRows.map(async (row) => {
+        const { student, existingUser, fullname } = row;
+        const profile = {
+          fullname: fullname || existingUser?.fullname || student.studentCode,
+          email: `${student.studentCode}@dlu.edu.vn`,
+          ...(student.dateOfBirth ? { dateOfBirth: student.dateOfBirth } : {}),
+          ...(student.gender ? { gender: student.gender.trim() } : {}),
+          ...(student.cohort ? { cohort: student.cohort.trim() } : {}),
+        };
+        if (existingUser) {
+          return { id: existingUser.id, code: existingUser.code };
+        }
+
+        const passwordHash = passwordHashes.get(student.studentCode);
+        if (!passwordHash) {
+          throw new BadRequestException(
+            `Không tạo được thông tin xác thực cho sinh viên ${student.studentCode}.`,
+          );
+        }
+        return transaction.user.create({
+          data: {
+            code: student.studentCode,
+            role: 'student',
+            ...profile,
+            account: {
+              create: {
+                username: student.username?.trim() || student.studentCode,
+                passwordHash,
+              },
+            },
+          },
+          select: { id: true, code: true },
+        });
+      }));
 
       await Promise.all(
         acceptedUsers.map((user) =>
@@ -403,14 +600,199 @@ export class AttendanceSessionQueryService {
 
       return {
         importedCodes: acceptedUsers.map((user) => user.code),
-        alreadyEnrolledCodes: importableUsers
-          .filter((user) => activeUserIds.has(user.id))
-          .map((user) => user.code),
+        alreadyEnrolledCodes: alreadyEnrolledRows.map(({ student }) => student.studentCode),
         unknownCodes,
         duplicateCodes,
         capacityExceededCodes,
+        createdAccountCodes: acceptedUsers
+          .filter((user) => !usersByCode.has(user.code))
+          .map((user) => user.code),
+        usernameConflictCodes,
+        missingAccountDataCodes,
+        conflictingCodes,
       };
+    }, { timeout: 30_000 });
+  }
+
+  async createTimetableSlot(
+    sectionId: number,
+    input: {
+      dayOfWeek?: number;
+      scheduledDate?: string;
+      startMinute: number;
+      endMinute: number;
+      roomId?: number;
+    },
+  ) {
+    const scheduledDate = input.scheduledDate
+      ? new Date(`${input.scheduledDate}T00:00:00.000Z`)
+      : null;
+    const dayOfWeek = scheduledDate
+      ? scheduledDate.getUTCDay() || 7
+      : input.dayOfWeek;
+    if (dayOfWeek === undefined) {
+      throw new BadRequestException('Vui lòng chọn Thứ hoặc ngày học cụ thể.');
+    }
+    const normalizedInput = { ...input, dayOfWeek, scheduledDate };
+    await this.assertTimetableSlotInput(sectionId, normalizedInput);
+    return this.prisma.timetableSlot.create({
+      data: {
+        courseSectionId: sectionId,
+        dayOfWeek,
+        startMinute: input.startMinute,
+        endMinute: input.endMinute,
+        ...(input.roomId !== undefined ? { roomId: input.roomId } : {}),
+        scheduledDate,
+      },
+      include: { room: { select: { id: true, code: true, name: true } } },
     });
+  }
+
+  async updateTimetableSlot(
+    sectionId: number,
+    slotId: number,
+    input: {
+      dayOfWeek?: number;
+      scheduledDate?: string | null;
+      startMinute?: number;
+      endMinute?: number;
+      roomId?: number | null;
+    },
+  ) {
+    const existing = await this.prisma.timetableSlot.findFirst({
+      where: { id: slotId, courseSectionId: sectionId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Không tìm thấy ca học trong lớp học phần.');
+    }
+
+    const scheduledDate = input.scheduledDate === undefined
+      ? existing.scheduledDate
+      : input.scheduledDate === null
+        ? null
+        : new Date(`${input.scheduledDate}T00:00:00.000Z`);
+    const dayOfWeek = input.scheduledDate
+      ? scheduledDate!.getUTCDay() || 7
+      : input.dayOfWeek ?? existing.dayOfWeek;
+    const updatedInput = {
+      dayOfWeek,
+      scheduledDate,
+      startMinute: input.startMinute ?? existing.startMinute,
+      endMinute: input.endMinute ?? existing.endMinute,
+      roomId: input.roomId === undefined
+        ? existing.roomId ?? undefined
+        : input.roomId ?? undefined,
+    };
+    await this.assertTimetableSlotInput(sectionId, updatedInput, slotId);
+    return this.prisma.timetableSlot.update({
+      where: { id: slotId },
+      data: {
+        dayOfWeek,
+        scheduledDate,
+        ...(input.startMinute !== undefined ? { startMinute: input.startMinute } : {}),
+        ...(input.endMinute !== undefined ? { endMinute: input.endMinute } : {}),
+        ...(input.roomId !== undefined ? { roomId: input.roomId } : {}),
+      },
+      include: { room: { select: { id: true, code: true, name: true } } },
+    });
+  }
+
+  async deleteTimetableSlot(sectionId: number, slotId: number): Promise<void> {
+    const slot = await this.prisma.timetableSlot.findFirst({
+      where: { id: slotId, courseSectionId: sectionId },
+      include: { _count: { select: { attendanceSessions: true } } },
+    });
+    if (!slot) {
+      throw new NotFoundException('Không tìm thấy ca học trong lớp học phần.');
+    }
+    if (slot._count.attendanceSessions > 0) {
+      throw new ConflictException(
+        'Không thể xóa ca học đã được dùng cho phiên điểm danh.',
+      );
+    }
+    await this.prisma.timetableSlot.delete({ where: { id: slotId } });
+  }
+
+  private async assertTimetableSlotInput(
+    sectionId: number,
+    input: {
+      dayOfWeek: number;
+      scheduledDate?: Date | null;
+      startMinute: number;
+      endMinute: number;
+      roomId?: number;
+    },
+    excludeSlotId?: number,
+  ): Promise<void> {
+    const section = await this.prisma.courseSection.findUnique({
+      where: { id: sectionId },
+      select: {
+        id: true,
+        roomId: true,
+        term: { select: { startDate: true, endDate: true } },
+      },
+    });
+    if (!section) {
+      throw new NotFoundException('Không tìm thấy lớp học phần.');
+    }
+    if (input.endMinute <= input.startMinute) {
+      throw new BadRequestException('Giờ kết thúc phải sau giờ bắt đầu.');
+    }
+    if (!Number.isInteger(input.dayOfWeek) || input.dayOfWeek < 1 || input.dayOfWeek > 7) {
+      throw new BadRequestException('Vui lòng chọn một Thứ hợp lệ.');
+    }
+    if (input.scheduledDate) {
+      const dateKey = input.scheduledDate.toISOString().slice(0, 10);
+      const termStart = section.term.startDate.toISOString().slice(0, 10);
+      const termEnd = section.term.endDate.toISOString().slice(0, 10);
+      if (dateKey < termStart || dateKey > termEnd) {
+        throw new BadRequestException('Ngày học cụ thể phải nằm trong khoảng ngày của học kỳ.');
+      }
+    }
+
+    const effectiveRoomId = input.roomId ?? section.roomId ?? undefined;
+    if (effectiveRoomId !== undefined) {
+      const room = await this.prisma.room.findUnique({
+        where: { id: effectiveRoomId },
+        select: { status: true },
+      });
+      if (!room || room.status !== 'ACTIVE') {
+        throw new BadRequestException(
+          'Phòng học được chọn không hợp lệ hoặc đã ngừng sử dụng.',
+        );
+      }
+    }
+
+    const overlappingSlots = await this.prisma.timetableSlot.findMany({
+      where: {
+        dayOfWeek: input.dayOfWeek,
+        startMinute: { lt: input.endMinute },
+        endMinute: { gt: input.startMinute },
+        ...(excludeSlotId !== undefined ? { id: { not: excludeSlotId } } : {}),
+      },
+      select: {
+        id: true,
+        courseSectionId: true,
+        roomId: true,
+        scheduledDate: true,
+        courseSection: { select: { roomId: true } },
+      },
+    });
+    const targetDateKey = input.scheduledDate?.toISOString().slice(0, 10) ?? null;
+    const overlap = overlappingSlots.some(
+      (slot) =>
+        (targetDateKey === null ||
+          slot.scheduledDate === null ||
+          slot.scheduledDate.toISOString().slice(0, 10) === targetDateKey) &&
+        (slot.courseSectionId === sectionId ||
+          (effectiveRoomId !== undefined &&
+            (slot.roomId ?? slot.courseSection.roomId) === effectiveRoomId)),
+    );
+    if (overlap) {
+      throw new ConflictException(
+        'Ca học bị trùng giờ với một ca khác trong cùng ngày hoặc phòng đã được dùng.',
+      );
+    }
   }
 
   async getDetail(

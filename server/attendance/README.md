@@ -251,7 +251,7 @@ Trả `{ accessToken, refreshToken }`. Access: `JWT_SECRET` / `EXPIRES_IN` (mặ
 
 | Method | Path | Quyền | Mục đích |
 |---|---|---|---|
-| POST | `/` | lecturer/admin | Tạo phiên từ lớp học phần, Building đã xác minh và enrollment active |
+| POST | `/` | lecturer/admin | Tạo phiên từ lớp học phần có enrollment active, thời khóa biểu và Building đã xác minh |
 | GET | `/me` | student | Phiên/attendance của sinh viên hiện tại |
 | GET | `/mine` | student | Sessions được gán |
 | GET | `/teaching-sections` | lecturer/admin | Lớp được phân công; admin thấy toàn bộ |
@@ -259,7 +259,10 @@ Trả `{ accessToken, refreshToken }`. Access: `JWT_SECRET` / `EXPIRES_IN` (mặ
 | POST | `/courses/import` | admin | Nhập danh mục mã học phần |
 | POST | `/sections` | admin | Tạo course/term nếu cần và tạo lớp học phần |
 | GET | `/sections/:sectionId/roster` | admin hoặc giảng viên được phân công | Roster active |
-| POST | `/sections/:sectionId/roster/import` | admin | Ghi danh student codes đã có tài khoản |
+| POST | `/sections/:sectionId/roster/import` | admin | Import hồ sơ, tạo tài khoản student thiếu nếu đủ dữ liệu và ghi danh |
+| POST | `/sections/:sectionId/timetable` | admin | Thêm lịch lặp theo Thứ hoặc buổi ngày cụ thể, giờ/phòng; không cho trùng ca |
+| PATCH | `/sections/:sectionId/timetable/:slotId` | admin | Cập nhật ca học |
+| DELETE | `/sections/:sectionId/timetable/:slotId` | admin | Xóa ca chưa được dùng trong session |
 | GET | `/analytics` | lecturer/admin | Thống kê chuyên cần |
 | GET | `/created-by-me` | lecturer/admin | Phiên do user hiện tại tạo |
 | GET | `/created-by?userId=` | admin | Phiên theo người tạo |
@@ -268,6 +271,10 @@ Trả `{ accessToken, refreshToken }`. Access: `JWT_SECRET` / `EXPIRES_IN` (mặ
 | DELETE | `/:id` | lecturer/admin, ownership được kiểm tra | Xóa phiên và dữ liệu liên quan |
 | POST | `/:id/close` | lecturer/admin, ownership được kiểm tra | Đóng phiên |
 | PATCH | `/:id/cancel` | lecturer/admin, ownership được kiểm tra | Hủy phiên |
+
+Luồng chuẩn bị lớp để tạo phiên: admin tạo lớp với ngày bắt đầu/kết thúc học kỳ, phân công giảng viên, nhập roster sinh viên đã có tài khoản, sau đó khai báo lịch lặp theo Thứ hoặc buổi học ngày cụ thể cùng giờ/phòng. Ngày buổi học cụ thể phải nằm trong học kỳ; phiên tạo từ buổi cụ thể phải mở đúng ngày đó. Lịch lặp theo tuần vẫn yêu cầu ngày mở phiên khớp Thứ đã chọn. Backend từ chối tạo phiên nếu lớp chưa có roster active hoặc chưa có thời khóa biểu. Giảng viên chỉ thấy lớp được phân công; admin thấy tất cả lớp.
+
+Import roster nhận các cột `Mã số SV`, `User` (tùy chọn), `Họ lót`, `Tên`, `Ngày sinh`, `Giới tính`, `Lớp` (cũng nhận alias tiếng Anh). Lớp được lưu vào `cohort`; ngày sinh chuẩn hóa về `YYYY-MM-DD`. Mã sinh viên là khóa nhận diện; tài khoản student mới được tạo khi có họ tên, dùng MSSV làm username nếu file không có `User`, và dùng MSSV làm mật khẩu. Khi nhập hồ sơ chi tiết, mật khẩu các tài khoản sinh viên hợp lệ đã có trong danh sách cũng được đặt lại thành MSSV; username hiện có không đổi. Dạng yêu cầu cũ chỉ gửi mã sinh viên để ghi danh không đặt lại mật khẩu. Mật khẩu được hash bằng bcrypt; không trả mật khẩu/hash trong response. Trường `Mật Khẩu` từ file cũ được bỏ qua.
 | GET | `/by-user/:userId` | admin | Sessions theo sinh viên |
 | GET | `/:id/detail` | lecturer/admin | Chi tiết participants, attempts, history |
 | GET | `/:id` | lecturer/admin | Thông tin phiên |
@@ -291,7 +298,9 @@ Validation trả kết quả `VALID`, `REVIEW` hoặc `REJECTED` cùng reasons. 
 
 | Method | Path | Quyền | Mục đích |
 |---|---|---|---|
+| GET | `/v0/location-registry/campuses` | admin/lecturer + JWT | Danh sách khuôn viên để đăng ký tòa nhà |
 | GET | `/v0/location-registry/buildings?includeInactive=` | admin/lecturer + JWT | Building registry |
+| POST | `/v0/location-registry/buildings` | admin | Đăng ký tòa nhà với mã, tên và tọa độ; mặc định chưa xác minh, radius/accuracy để trống đến sau field test |
 | PATCH | `/v0/location-registry/buildings/:id` | admin | Tọa độ/radius/accuracy/verify/status |
 | GET | `/v0/location-registry/rooms?includeInactive=` | admin/lecturer + JWT | Rooms và liên kết Building |
 | POST | `/v0/location-registry/rooms` | admin | Tạo phòng và link Building |
@@ -326,7 +335,9 @@ Các enum gồm role, session/enrollment/attendance status, attempt result, loca
 
 Migration tuần tự nằm trong `prisma/migrations/`; không sửa migration đã áp dụng. Tạo migration mới khi đổi schema.
 
-`prisma/seed.ts`: chỉ dùng cho development; tạo/cập nhật các demo accounts/users. Mật khẩu lấy từ `SEED_*_PASSWORD`; dùng giá trị riêng trong `.env`, không dựa vào giá trị mặc định hoặc đưa credentials vào tài liệu/commit.
+Migration `20261014000300_make_user_unit_optional` đồng bộ `users.unit_id` trong PostgreSQL với Prisma schema hiện tại: tài khoản mẫu và sinh viên có thể chưa được gán đơn vị. Sau khi lấy thay đổi này, chạy `pnpm.cmd --filter @gps-attendance/attendance exec prisma migrate deploy` trước khi chạy seed.
+
+`prisma/seed.ts`: chỉ dùng cho development; tạo/cập nhật demo accounts/users và 10 lớp học phần `SAMPLE101`–`SAMPLE110`, mỗi lớp có roster từ các sinh viên seed, giảng viên `GV001`, phòng mẫu và một ca thời khóa biểu. Seed có thể chạy lại; các tòa nhà/phòng mẫu vẫn chưa được xác minh GPS, nên cần field test trước khi dùng tạo phiên điểm danh. Từ thư mục gốc monorepo chạy `pnpm seed:attendance`, hoặc từ `server/attendance` chạy `pnpm exec prisma db seed`. Tài khoản mẫu development: `admin` / `123456`; giảng viên `quangtn` / `123456`; mật khẩu mỗi sinh viên mẫu luôn là chính MSSV của tài khoản đó. `SEED_ADMIN_PASSWORD` và `SEED_LECTURER_PASSWORD` có thể được đặt trong `server/attendance/.env`; seed ghi lại mật khẩu sinh viên mẫu theo MSSV. Chạy lại seed để cập nhật database hiện tại. Không dùng các mật khẩu mẫu này ngoài development và không đưa credentials thật vào tài liệu/commit.
 
 ---
 
@@ -344,7 +355,7 @@ REFRESH_TOKEN_SECRET=<different-random-secret>
 REFRESH_TOKEN_EXPIRES_IN=14d
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
-SEED_ADMIN_PASSWORD / SEED_LECTURER_PASSWORD / SEED_STUDENT_*_PASSWORD
+SEED_ADMIN_PASSWORD / SEED_LECTURER_PASSWORD
 ```
 
 Không commit giá trị thật. `prisma/seed.ts` chỉ cho phép chạy `NODE_ENV=development`; mật khẩu seed lấy từ `SEED_*_PASSWORD`.
@@ -389,6 +400,22 @@ pnpm --filter @gps-attendance/attendance dev
 Để dùng script root có ngrok: `pnpm dev:attendance` (cần cài/xác thực ngrok; script mở tunnel rồi chạy Nest). Trên mạng LAN/local có thể dùng package command ở trên. Script package: `dev`, `debug`, `build`, `start`, `clean`, `lint`, `test`, `test:watch`, `test:cov`, `test:e2e`.
 
 `predev` xóa tsbuildinfo; root `predev:attendance` build shared trước.
+
+### Khắc phục lỗi database `gps_attendance` chưa tồn tại
+
+Nếu PostgreSQL đang chạy nhưng backend báo database `gps_attendance` không tồn tại, hãy kết nối vào database quản trị `postgres` trên đúng máy chủ/port được cấu hình trong `DATABASE_URL` rồi tạo database rỗng:
+
+```sql
+CREATE DATABASE gps_attendance;
+```
+
+Không chạy lệnh này nếu database đã tồn tại; không dùng `migrate reset` để khắc phục lỗi thiếu database. Sau khi tạo, kiểm tra `DATABASE_URL` trong `server/attendance/.env` trỏ đến database vừa tạo, rồi chạy từ root:
+
+```powershell
+pnpm.cmd --filter @gps-attendance/attendance exec prisma migrate deploy
+```
+
+Nếu dùng PostgreSQL của Docker Compose lần đầu, `docker compose up -d postgres` tự tạo database theo `POSTGRES_DB` (mặc định `gps_attendance`). Nếu volume PostgreSQL đã được khởi tạo trước đó, thay đổi `POSTGRES_DB` trong môi trường Compose không tự tạo thêm database; hãy tạo database thủ công như trên. Không xóa volume PostgreSQL để xử lý lỗi này vì thao tác đó có thể xóa dữ liệu khác.
 
 ---
 

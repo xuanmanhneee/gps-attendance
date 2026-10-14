@@ -11,6 +11,7 @@ import type {
   CourseSectionCreationOptions,
   CourseSectionRoster,
   ImportCourseItem,
+  ImportSectionStudent,
   RosterImportResult,
 } from '../api/course-sections.api';
 import type { TeachingSectionOption } from '../api/attendance-sessions.api';
@@ -45,6 +46,59 @@ const normalizeHeader = (value: unknown) =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 
+const cellText = (value: unknown): string => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
+  }
+  if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
+  return '';
+};
+
+const toIsoDate = (year: number, month: number, day: number): string | undefined => {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return undefined;
+  }
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
+const dateCellToIso = (value: unknown): string | undefined => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return toIsoDate(value.getUTCFullYear(), value.getUTCMonth() + 1, value.getUTCDate());
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const parts = XLSX.SSF.parse_date_code(value);
+    if (parts) {
+      return toIsoDate(parts.y, parts.m, parts.d);
+    }
+  }
+  const text = cellText(value).split(/[T ]/, 1)[0];
+  const isoDate = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (isoDate) {
+    return toIsoDate(Number(isoDate[1]), Number(isoDate[2]), Number(isoDate[3]));
+  }
+  const localDate = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (localDate) {
+    return toIsoDate(Number(localDate[3]), Number(localDate[2]), Number(localDate[1]));
+  }
+  return undefined;
+};
+
+const formatDateOfBirth = (value?: string | null): string => {
+  if (!value) return '';
+  const isoDate = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoDate) return `${isoDate[3]}/${isoDate[2]}/${isoDate[1]}`;
+  const localDate = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (localDate) {
+    return `${localDate[1].padStart(2, '0')}/${localDate[2].padStart(2, '0')}/${localDate[3]}`;
+  }
+  return value;
+};
+
 const CourseSectionsPage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -59,12 +113,13 @@ const CourseSectionsPage = () => {
   });
   const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
   const [roster, setRoster] = useState<CourseSectionRoster | null>(null);
-  const [studentCodes, setStudentCodes] = useState<string[]>([]);
+  const [studentRows, setStudentRows] = useState<ImportSectionStudent[]>([]);
   const [fileName, setFileName] = useState('');
   const [importResult, setImportResult] = useState<RosterImportResult | null>(null);
   const [isLoadingSections, setIsLoadingSections] = useState(true);
   const [isLoadingRoster, setIsLoadingRoster] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isExpandingCapacity, setIsExpandingCapacity] = useState(false);
   const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [sectionDraft, setSectionDraft] = useState(createInitialSectionDraft);
@@ -73,6 +128,15 @@ const CourseSectionsPage = () => {
   const [courseRows, setCourseRows] = useState<ImportCourseItem[]>([]);
   const [courseImportResult, setCourseImportResult] = useState<CourseImportResult | null>(null);
   const [isImportingCourses, setIsImportingCourses] = useState(false);
+  const [slotDay, setSlotDay] = useState('1');
+  const [slotScheduleMode, setSlotScheduleMode] = useState<'weekly' | 'specific'>('weekly');
+  const [slotDate, setSlotDate] = useState('');
+  const [slotStart, setSlotStart] = useState('08:00');
+  const [slotEnd, setSlotEnd] = useState('09:00');
+  const [slotRoomId, setSlotRoomId] = useState('');
+  const [editingSlotId, setEditingSlotId] = useState<number | null>(null);
+  const [isSavingSlot, setIsSavingSlot] = useState(false);
+  const [savingSlotId, setSavingSlotId] = useState<number | null>(null);
 
   const selectedSection = useMemo(
     () => sections.find((section) => section.id === selectedSectionId) ?? null,
@@ -125,9 +189,7 @@ const CourseSectionsPage = () => {
 
   const downloadTemplate = () => {
     const sheet = XLSX.utils.aoa_to_sheet([
-      ['ma_sinh_vien'],
-      ['2312686'],
-      ['2312716'],
+      ['STT', 'Mã số SV', 'Họ lót', 'Tên', 'Ngày sinh', 'Giới tính', 'Lớp'],
     ]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, 'Sinh vien');
@@ -220,7 +282,7 @@ const CourseSectionsPage = () => {
   };
 
   const readFile = async (file?: File) => {
-    setStudentCodes([]);
+    setStudentRows([]);
     setFileName('');
     setImportResult(null);
     if (!file) return;
@@ -241,6 +303,7 @@ const CourseSectionsPage = () => {
         header: 1,
         defval: '',
         blankrows: false,
+        raw: true,
       });
       if (rows.length < 2) throw new Error('File cần có dòng tiêu đề và ít nhất một mã sinh viên.');
       if (rows.length > MAX_STUDENTS_PER_IMPORT + 1) {
@@ -249,25 +312,57 @@ const CourseSectionsPage = () => {
 
       const headers = rows[0].map(normalizeHeader);
       const codeColumn = headers.findIndex((header) =>
-        ['mssv', 'masinhvien', 'studentcode', 'studentid', 'usercode', 'code'].includes(header),
+        ['mssv', 'masosv', 'masinhvien', 'studentcode', 'studentid', 'usercode', 'code'].includes(header),
       );
       if (codeColumn < 0) {
         throw new Error('Không tìm thấy cột mã sinh viên. Dùng tiêu đề “Mã sinh viên” hoặc “student_code”.');
       }
 
-      const codes = rows
-        .slice(1)
-        .map((row) => row[codeColumn])
-        .filter((value): value is string | number =>
-          typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value)),
-        )
-        .map((value) => String(value).trim())
-        .filter(Boolean);
-      if (codes.length === 0) throw new Error('Không tìm thấy mã sinh viên trong file.');
+      const findColumn = (...names: string[]) =>
+        headers.findIndex((header) => names.includes(header));
+      const middleNameColumn = findColumn('holot', 'tenlot', 'middlename');
+      const firstNameColumn = findColumn('ten', 'firstname', 'firstandlastname');
+      const fullnameColumn = findColumn('hoten', 'fullname', 'studentname');
+      const dobColumn = headers.findIndex((header) =>
+        ['ngaysinh', 'ngaythangnamsinh', 'dateofbirth', 'birthdate', 'dob']
+          .some((name) => header === name || header.startsWith(name)),
+      );
+      const genderColumn = findColumn('gioitinh', 'gender');
+      const cohortColumn = findColumn('lop', 'cohort', 'class', 'program');
+      if (dobColumn < 0) {
+        throw new Error('Không tìm thấy cột Ngày sinh. Hãy đặt tiêu đề cột là “Ngày sinh” và nhập theo dạng dd/mm/yyyy.');
+      }
 
-      setStudentCodes(codes);
+      const students = rows.slice(1).flatMap((row, index): ImportSectionStudent[] => {
+        const studentCode = cellText(row[codeColumn]);
+        if (!studentCode) return [];
+        const middleName = middleNameColumn >= 0 ? cellText(row[middleNameColumn]) : '';
+        const firstName = firstNameColumn >= 0 ? cellText(row[firstNameColumn]) : '';
+        const fullname = fullnameColumn >= 0 ? cellText(row[fullnameColumn]) : '';
+        const dateOfBirth = dateCellToIso(row[dobColumn]);
+        if (!dateOfBirth) {
+          throw new Error(
+            `Ngày sinh của sinh viên ${studentCode} ở dòng ${index + 2} bị trống hoặc không hợp lệ. Dùng dạng dd/mm/yyyy, ví dụ 31/07/2004.`,
+          );
+        }
+        const gender = genderColumn >= 0 ? cellText(row[genderColumn]) : '';
+        const cohort = cohortColumn >= 0 ? cellText(row[cohortColumn]) : '';
+        return [{
+          studentCode,
+          username: studentCode,
+          ...(fullname ? { fullname } : {}),
+          ...(middleName ? { middleName } : {}),
+          ...(firstName ? { firstName } : {}),
+          ...(dateOfBirth ? { dateOfBirth } : {}),
+          ...(gender ? { gender } : {}),
+          ...(cohort ? { cohort } : {}),
+        }];
+      });
+      if (students.length === 0) throw new Error('Không tìm thấy mã sinh viên trong file.');
+
+      setStudentRows(students);
       setFileName(file.name);
-      toast.success(`Đã đọc ${codes.length} mã sinh viên từ file.`);
+      toast.success(`Đã đọc ${students.length} hồ sơ sinh viên từ file.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không đọc được file danh sách.');
     } finally {
@@ -276,16 +371,24 @@ const CourseSectionsPage = () => {
   };
 
   const importRoster = async () => {
-    if (!selectedSectionId || studentCodes.length === 0) return;
+    if (!selectedSectionId || studentRows.length === 0) return;
     setIsImporting(true);
     try {
-      const result = await courseSectionsApi.importRoster(selectedSectionId, studentCodes);
+      const result = await courseSectionsApi.importRoster(selectedSectionId, studentRows);
       setImportResult(result);
-      setStudentCodes([]);
-      setFileName('');
+      if (result.capacityExceededCodes.length === 0) {
+        setStudentRows([]);
+        setFileName('');
+      }
       await loadRoster(selectedSectionId);
       await loadSections();
-      toast.success(`Đã ghi danh ${result.importedCodes.length} sinh viên.`);
+      if (result.capacityExceededCodes.length > 0) {
+        toast.success(
+          `Đã ghi danh ${result.importedCodes.length} sinh viên. Nâng sức chứa rồi ghi danh lại để tiếp tục.`,
+        );
+      } else {
+        toast.success(`Đã ghi danh ${result.importedCodes.length} sinh viên.`);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Không nhập được danh sách sinh viên.');
     } finally {
@@ -293,8 +396,119 @@ const CourseSectionsPage = () => {
     }
   };
 
+  const resetSlotDraft = () => {
+    setSlotDay('1');
+    setSlotScheduleMode('weekly');
+    setSlotDate('');
+    setSlotStart('08:00');
+    setSlotEnd('09:00');
+    setSlotRoomId('');
+    setEditingSlotId(null);
+  };
+
+  const toMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const formatMinutes = (minutes: number) =>
+    `${Math.floor(minutes / 60).toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}`;
+
+  const editTimetableSlot = (slot: TeachingSectionOption['timetable'][number]) => {
+    setEditingSlotId(slot.id);
+    setSlotDay(String(slot.dayOfWeek));
+    setSlotScheduleMode(slot.scheduledDate ? 'specific' : 'weekly');
+    setSlotDate(slot.scheduledDate ?? '');
+    setSlotStart(formatMinutes(slot.startMinute));
+    setSlotEnd(formatMinutes(slot.endMinute));
+    setSlotRoomId(slot.room?.id ? String(slot.room.id) : '');
+  };
+
+  const expandCapacity = async () => {
+    if (!selectedSectionId) return;
+    setIsExpandingCapacity(true);
+    try {
+      await courseSectionsApi.expandCapacity(selectedSectionId);
+      await loadRoster(selectedSectionId);
+      toast.success('Đã nâng sức chứa lớp lên 300 sinh viên. Bạn có thể ghi danh lại danh sách.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể nâng sức chứa lớp.');
+    } finally {
+      setIsExpandingCapacity(false);
+    }
+  };
+
+  const saveTimetableSlot = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedSectionId) return;
+
+    const startMinute = toMinutes(slotStart);
+    const endMinute = toMinutes(slotEnd);
+    if (endMinute <= startMinute) {
+      toast.error('Giờ kết thúc phải sau giờ bắt đầu.');
+      return;
+    }
+    if (slotScheduleMode === 'specific' && !slotDate) {
+      toast.error('Chọn ngày cụ thể của buổi học.');
+      return;
+    }
+
+    setIsSavingSlot(true);
+    try {
+      const roomId = slotRoomId ? Number(slotRoomId) : undefined;
+      const scheduledDate = slotScheduleMode === 'specific' ? slotDate : null;
+      const dayOfWeek = slotScheduleMode === 'specific'
+        ? new Date(`${slotDate}T00:00:00Z`).getUTCDay() || 7
+        : Number(slotDay);
+      if (editingSlotId !== null) {
+        await courseSectionsApi.updateTimetableSlot(selectedSectionId, editingSlotId, {
+          dayOfWeek,
+          scheduledDate,
+          startMinute,
+          endMinute,
+          roomId: roomId ?? null,
+        });
+      } else {
+        await courseSectionsApi.createTimetableSlot(selectedSectionId, {
+          ...(slotScheduleMode === 'weekly' ? { dayOfWeek } : { scheduledDate: slotDate }),
+          startMinute,
+          endMinute,
+          ...(roomId !== undefined ? { roomId } : {}),
+        });
+      }
+      await loadSections();
+      resetSlotDraft();
+      toast.success(editingSlotId === null ? 'Đã thêm ca học.' : 'Đã cập nhật ca học.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không lưu được ca học.');
+    } finally {
+      setIsSavingSlot(false);
+    }
+  };
+
+  const deleteTimetableSlot = async (slotId: number) => {
+    if (!selectedSectionId) return;
+    if (!window.confirm('Bạn có chắc muốn xóa ca học này?')) return;
+
+    setSavingSlotId(slotId);
+    try {
+      await courseSectionsApi.deleteTimetableSlot(selectedSectionId, slotId);
+      await loadSections();
+      if (editingSlotId === slotId) resetSlotDraft();
+      toast.success('Đã xóa ca học.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không xóa được ca học.');
+    } finally {
+      setSavingSlotId(null);
+    }
+  };
+
   const createSection = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (sectionDraft.endDate < sectionDraft.startDate) {
+      toast.error('Ngày kết thúc học kỳ phải từ ngày bắt đầu trở đi.');
+      return;
+    }
     const input: CreateCourseSectionInput = {
       courseCode: sectionDraft.courseCode.trim(),
       courseName: sectionDraft.courseName.trim(),
@@ -499,11 +713,11 @@ const CourseSectionsPage = () => {
                 </label>
                 <label className="text-sm font-medium text-slate-700">
                   Ngày bắt đầu *
-                  <input required type="date" value={sectionDraft.startDate} onChange={(event) => setSectionDraft({ ...sectionDraft, startDate: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-500" />
+                  <input required type="date" max={sectionDraft.endDate} value={sectionDraft.startDate} onChange={(event) => setSectionDraft({ ...sectionDraft, startDate: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-500" />
                 </label>
                 <label className="text-sm font-medium text-slate-700">
                   Ngày kết thúc *
-                  <input required type="date" value={sectionDraft.endDate} onChange={(event) => setSectionDraft({ ...sectionDraft, endDate: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-500" />
+                  <input required type="date" min={sectionDraft.startDate} value={sectionDraft.endDate} onChange={(event) => setSectionDraft({ ...sectionDraft, endDate: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-500" />
                 </label>
                 <label className="text-sm font-medium text-slate-700">
                   Giảng viên
@@ -521,7 +735,7 @@ const CourseSectionsPage = () => {
                 </label>
                 <label className="text-sm font-medium text-slate-700">
                   Sức chứa tối đa
-                  <input type="number" min={1} max={1000} value={sectionDraft.capacity} onChange={(event) => setSectionDraft({ ...sectionDraft, capacity: event.target.value })} placeholder="Không giới hạn" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-500" />
+                  <input type="number" min={1} max={300} value={sectionDraft.capacity} onChange={(event) => setSectionDraft({ ...sectionDraft, capacity: event.target.value })} placeholder="Tối đa 300" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 font-normal outline-none focus:border-blue-500" />
                 </label>
               </div>
 
@@ -572,41 +786,176 @@ const CourseSectionsPage = () => {
                 )}
               </div>
 
+              {selectedSection && (
+                <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div>
+                    <h2 className="font-semibold">Thời khóa biểu</h2>
+                    <p className="text-xs text-slate-500">
+                      Tạo lịch lặp hằng tuần hoặc một buổi theo ngày cụ thể; giờ và phòng được cấu hình riêng cho từng ca.
+                    </p>
+                  </div>
+                  <form onSubmit={(event) => void saveTimetableSlot(event)} className="grid gap-3 sm:grid-cols-2">
+                    <label className="text-xs font-medium text-slate-600">
+                      Kiểu lịch học
+                      <select value={slotScheduleMode} onChange={(event) => setSlotScheduleMode(event.target.value as 'weekly' | 'specific')} className="mt-1 w-full rounded border bg-white px-3 py-2 text-sm text-slate-900">
+                        <option value="weekly">Lặp hằng tuần theo Thứ</option>
+                        <option value="specific">Một buổi theo ngày cụ thể</option>
+                      </select>
+                    </label>
+                    {slotScheduleMode === 'weekly' ? (
+                      <label className="text-xs font-medium text-slate-600">
+                        Thứ
+                        <select value={slotDay} onChange={(event) => setSlotDay(event.target.value)} className="mt-1 w-full rounded border bg-white px-3 py-2 text-sm text-slate-900">
+                          <option value="1">Thứ 2</option>
+                          <option value="2">Thứ 3</option>
+                          <option value="3">Thứ 4</option>
+                          <option value="4">Thứ 5</option>
+                          <option value="5">Thứ 6</option>
+                          <option value="6">Thứ 7</option>
+                          <option value="7">Chủ nhật</option>
+                        </select>
+                      </label>
+                    ) : (
+                      <label className="text-xs font-medium text-slate-600">
+                        Ngày học cụ thể
+                        <input required type="date" min={selectedSection.term.startDate.slice(0, 10)} max={selectedSection.term.endDate.slice(0, 10)} value={slotDate} onChange={(event) => setSlotDate(event.target.value)} className="mt-1 w-full rounded border px-3 py-2 text-sm text-slate-900" />
+                      </label>
+                    )}
+                    <label className="text-xs font-medium text-slate-600">
+                      Phòng học
+                      <select value={slotRoomId} onChange={(event) => setSlotRoomId(event.target.value)} className="mt-1 w-full rounded border bg-white px-3 py-2 text-sm text-slate-900">
+                        <option value="">Dùng phòng mặc định của lớp</option>
+                        {creationOptions.rooms.map((room) => (
+                          <option key={room.id} value={room.id}>{room.code} — {room.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-xs font-medium text-slate-600">
+                      Bắt đầu
+                      <input required type="time" value={slotStart} onChange={(event) => setSlotStart(event.target.value)} className="mt-1 w-full rounded border px-3 py-2 text-sm text-slate-900" />
+                    </label>
+                    <label className="text-xs font-medium text-slate-600">
+                      Kết thúc
+                      <input required type="time" value={slotEnd} onChange={(event) => setSlotEnd(event.target.value)} className="mt-1 w-full rounded border px-3 py-2 text-sm text-slate-900" />
+                    </label>
+                    <div className="flex gap-2 sm:col-span-2">
+                      <button type="submit" disabled={isSavingSlot} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                        {isSavingSlot ? 'Đang lưu…' : editingSlotId === null ? 'Thêm ca học' : 'Lưu thay đổi'}
+                      </button>
+                      {editingSlotId !== null && (
+                        <button type="button" onClick={resetSlotDraft} className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
+                          Hủy sửa
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                  {selectedSection.timetable.length === 0 ? (
+                    <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+                      Chưa có ca học. Thêm thời khóa biểu để lớp xuất hiện trong luồng tạo phiên điểm danh.
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+                      {selectedSection.timetable.map((slot) => (
+                        <li key={slot.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+                          <div>
+                            <span className="font-medium">
+                              {slot.scheduledDate
+                                ? `Ngày ${new Date(`${slot.scheduledDate}T00:00:00Z`).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`
+                                : slot.dayOfWeek === 7 ? 'Chủ nhật (hằng tuần)' : `Thứ ${slot.dayOfWeek + 1} (hằng tuần)`}
+                            </span>
+                            <span className="ml-2 text-slate-600">{formatMinutes(slot.startMinute)}–{formatMinutes(slot.endMinute)}</span>
+                            <span className="ml-2 text-xs text-slate-500">
+                              {slot.room ? `${slot.room.code} · ${slot.room.name}` : 'Phòng mặc định của lớp'}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => editTimetableSlot(slot)} className="rounded border border-slate-300 px-2.5 py-1 text-xs hover:bg-slate-50">Sửa</button>
+                            <button type="button" disabled={savingSlotId === slot.id} onClick={() => void deleteTimetableSlot(slot.id)} className="rounded border border-rose-200 px-2.5 py-1 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50">
+                              {savingSlotId === slot.id ? 'Đang xóa…' : 'Xóa'}
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              )}
+
               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                   <div>
                     <h2 className="font-semibold">Danh sách sinh viên</h2>
-                    <p className="text-xs text-slate-500">Sinh viên đang được ghi danh trong lớp này.</p>
+                    <p className="text-xs text-slate-500">
+                      {roster
+                        ? `${roster.students.length}/${roster.section.capacity ?? 300} sinh viên · tối đa 300`
+                        : 'Sinh viên đang được ghi danh trong lớp này.'}
+                    </p>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                    {roster?.students.length ?? 0}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {roster?.section.capacity !== undefined &&
+                      roster.section.capacity !== null &&
+                      roster.section.capacity < 300 && (
+                        <button
+                          type="button"
+                          onClick={() => void expandCapacity()}
+                          disabled={isExpandingCapacity || isLoadingRoster}
+                          className="rounded-lg border border-blue-300 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                        >
+                          {isExpandingCapacity ? 'Đang cập nhật…' : 'Nâng lên 300'}
+                        </button>
+                      )}
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                      {roster?.students.length ?? 0}
+                    </span>
+                  </div>
                 </div>
                 {isLoadingRoster ? (
                   <p className="p-6 text-center text-sm text-slate-500">Đang tải danh sách…</p>
                 ) : !roster?.students.length ? (
                   <p className="p-6 text-center text-sm text-slate-500">Lớp chưa có sinh viên. Nhập danh sách ở khung bên cạnh.</p>
                 ) : (
-                  <div className="max-h-[560px] overflow-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
-                        <tr>
-                          <th className="px-4 py-3">Mã sinh viên</th>
-                          <th className="px-4 py-3">Họ và tên</th>
-                          <th className="px-4 py-3">Email</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {roster.students.map((student) => (
-                          <tr key={student.id}>
-                            <td className="px-4 py-3 font-mono text-xs">{student.code}</td>
-                            <td className="px-4 py-3 font-medium">{student.fullname}</td>
-                            <td className="px-4 py-3 text-slate-500">{student.email || '—'}</td>
+                  <>
+                    <div className="divide-y divide-slate-100 md:hidden">
+                      {roster.students.map((student) => (
+                        <article key={student.id} className="space-y-1.5 px-4 py-3 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                            <span className="font-mono text-xs text-slate-500">{student.code}</span>
+                            <span className="font-medium text-slate-900">{formatDateOfBirth(student.dateOfBirth) || '—'}</span>
+                          </div>
+                          <p className="font-medium">{student.fullname}</p>
+                          <p className="text-xs text-slate-500">
+                            {[student.gender, student.cohort, student.email].filter(Boolean).join(' · ') || 'Chưa có thông tin bổ sung'}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                    <div className="hidden max-h-[560px] overflow-auto md:block">
+                      <table className="min-w-[820px] w-full text-left text-sm">
+                        <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
+                          <tr>
+                            <th className="whitespace-nowrap px-4 py-3">Mã sinh viên</th>
+                            <th className="px-4 py-3">Họ và tên</th>
+                            <th className="whitespace-nowrap px-4 py-3">Ngày sinh</th>
+                            <th className="whitespace-nowrap px-4 py-3">Giới tính</th>
+                            <th className="px-4 py-3">Lớp</th>
+                            <th className="px-4 py-3">Email</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {roster.students.map((student) => (
+                            <tr key={student.id}>
+                              <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">{student.code}</td>
+                              <td className="px-4 py-3 font-medium">{student.fullname}</td>
+                              <td className="whitespace-nowrap px-4 py-3">{formatDateOfBirth(student.dateOfBirth) || '—'}</td>
+                              <td className="whitespace-nowrap px-4 py-3">{student.gender || '—'}</td>
+                              <td className="px-4 py-3">{student.cohort || '—'}</td>
+                              <td className="px-4 py-3 text-slate-500">{student.email || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </div>
             </section>
@@ -614,7 +963,7 @@ const CourseSectionsPage = () => {
             <section className="h-fit rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="font-semibold">Nạp danh sách sinh viên</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Tải file Excel/CSV có cột mã sinh viên. Chỉ các tài khoản sinh viên đã có trong hệ thống mới được ghi danh.
+                Tải Excel/CSV có mã sinh viên, họ lót, tên, ngày sinh, giới tính và lớp. Tài khoản mới dùng MSSV làm tên đăng nhập nếu file không có User; mật khẩu tài khoản mới và tài khoản đã có trong danh sách được đồng bộ thành MSSV.
               </p>
               <button
                 type="button"
@@ -642,12 +991,27 @@ const CourseSectionsPage = () => {
               {fileName && (
                 <div className="mt-4 rounded-lg bg-slate-50 p-3">
                   <p className="truncate text-sm font-medium">{fileName}</p>
-                  <p className="mt-1 text-xs text-slate-600">Đã đọc {studentCodes.length} mã · xem trước tối đa 8 mã:</p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {studentCodes.slice(0, 8).map((code, index) => (
-                      <span key={`${code}-${index}`} className="rounded bg-white px-2 py-1 font-mono text-xs text-slate-700">{code}</span>
+                  <p className="mt-1 text-xs text-slate-600">Đã đọc {studentRows.length} hồ sơ · xem trước tối đa 8 hồ sơ:</p>
+                  <div className="mt-2 space-y-1.5">
+                    {studentRows.slice(0, 8).map((student, index) => (
+                      <div key={`${student.studentCode}-${index}`} className="rounded bg-white px-2 py-1.5 text-xs text-slate-700">
+                        <p>
+                          <span className="font-mono">{student.studentCode}</span>
+                          {' · '}
+                          {student.fullname || [student.middleName, student.firstName].filter(Boolean).join(' ') || 'Chưa có họ tên'}
+                        </p>
+                        <p className="mt-0.5 text-slate-500">
+                          {formatDateOfBirth(student.dateOfBirth) || 'Chưa có ngày sinh'}
+                          {' · '}
+                          {student.gender || 'Chưa có giới tính'}
+                          {' · '}
+                          {student.cohort || 'Chưa có lớp'}
+                          {' · '}
+                          {student.studentCode}@dlu.edu.vn
+                        </p>
+                      </div>
                     ))}
-                    {studentCodes.length > 8 && <span className="px-1 py-1 text-xs text-slate-500">+{studentCodes.length - 8} mã</span>}
+                    {studentRows.length > 8 && <span className="px-1 py-1 text-xs text-slate-500">+{studentRows.length - 8} hồ sơ</span>}
                   </div>
                 </div>
               )}
@@ -655,17 +1019,21 @@ const CourseSectionsPage = () => {
               <button
                 type="button"
                 onClick={() => void importRoster()}
-                disabled={!selectedSectionId || studentCodes.length === 0 || isImporting}
+                disabled={!selectedSectionId || studentRows.length === 0 || isImporting}
                 className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isImporting ? 'Đang ghi danh…' : `Ghi danh ${studentCodes.length || ''} sinh viên`}
+                {isImporting ? 'Đang ghi danh…' : `Ghi danh ${studentRows.length || ''} sinh viên`}
               </button>
 
               {importResult && (
                 <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
                   <p className="font-semibold text-emerald-800">Đã thêm: {importResult.importedCodes.length}</p>
+                  {importResult.createdAccountCodes.length > 0 && <p className="text-emerald-800">Đã tạo tài khoản mới: {importResult.createdAccountCodes.join(', ')}</p>}
                   <p className="text-slate-600">Đã có trong lớp: {importResult.alreadyEnrolledCodes.length}</p>
                   {importResult.unknownCodes.length > 0 && <p className="text-amber-800">Không tìm thấy mã: {importResult.unknownCodes.join(', ')}</p>}
+                  {importResult.missingAccountDataCodes.length > 0 && <p className="text-amber-800">Thiếu họ tên để tạo tài khoản: {importResult.missingAccountDataCodes.join(', ')}</p>}
+                  {importResult.usernameConflictCodes.length > 0 && <p className="text-rose-800">User đã được tài khoản khác sử dụng hoặc trùng trong file: {importResult.usernameConflictCodes.join(', ')}</p>}
+                  {importResult.conflictingCodes.length > 0 && <p className="text-rose-800">Mã đang thuộc tài khoản không phải sinh viên: {importResult.conflictingCodes.join(', ')}</p>}
                   {importResult.duplicateCodes.length > 0 && <p className="text-amber-800">Mã trùng trong file: {importResult.duplicateCodes.join(', ')}</p>}
                   {importResult.capacityExceededCodes.length > 0 && <p className="text-rose-800">Vượt sức chứa: {importResult.capacityExceededCodes.join(', ')}</p>}
                 </div>

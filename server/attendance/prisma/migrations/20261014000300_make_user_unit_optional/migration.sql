@@ -1,0 +1,2 @@
+ALTER TABLE "users"
+  ALTER COLUMN "unit_id" DROP NOT NULL;

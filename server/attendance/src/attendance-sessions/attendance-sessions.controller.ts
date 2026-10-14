@@ -25,6 +25,8 @@ import { ReviewAttendanceAttemptDto } from './dto/review-attendance-attempt.dto'
 import { ImportSectionRosterDto } from './dto/import-section-roster.dto';
 import { CreateCourseSectionDto } from './dto/create-course-section.dto';
 import { ImportCoursesDto } from './dto/import-courses.dto';
+import { CreateTimetableSlotDto } from './dto/create-timetable-slot.dto';
+import { UpdateTimetableSlotDto } from './dto/update-timetable-slot.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -141,6 +143,19 @@ export class AttendanceSessionsController {
     };
   }
 
+  @ApiOperation({ summary: 'Mở rộng sức chứa lớp học phần lên 300 sinh viên (admin)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Patch('sections/:sectionId/capacity')
+  async expandCourseSectionCapacity(
+    @Param('sectionId', ParseIntPipe) sectionId: number,
+  ) {
+    return {
+      success: true,
+      data: await this.attendanceSessionQueryService.expandCourseSectionCapacity(sectionId),
+    };
+  }
+
   @ApiOperation({ summary: 'Nhập danh sách sinh viên vào lớp học phần (admin)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
@@ -153,9 +168,60 @@ export class AttendanceSessionsController {
       success: true,
       data: await this.attendanceSessionQueryService.importSectionRoster(
         sectionId,
-        dto.studentCodes,
+        dto.students ?? dto.studentCodes ?? [],
       ),
     };
+  }
+
+  @ApiOperation({ summary: 'Thêm ca học vào thời khóa biểu lớp học phần (admin)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('sections/:sectionId/timetable')
+  async createTimetableSlot(
+    @Param('sectionId', ParseIntPipe) sectionId: number,
+    @Body() dto: CreateTimetableSlotDto,
+  ) {
+    return {
+      success: true,
+      data: await this.attendanceSessionQueryService.createTimetableSlot(
+        sectionId,
+        dto,
+      ),
+    };
+  }
+
+  @ApiOperation({ summary: 'Cập nhật ca học trong thời khóa biểu lớp học phần (admin)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Patch('sections/:sectionId/timetable/:slotId')
+  async updateTimetableSlot(
+    @Param('sectionId', ParseIntPipe) sectionId: number,
+    @Param('slotId', ParseIntPipe) slotId: number,
+    @Body() dto: UpdateTimetableSlotDto,
+  ) {
+    return {
+      success: true,
+      data: await this.attendanceSessionQueryService.updateTimetableSlot(
+        sectionId,
+        slotId,
+        dto,
+      ),
+    };
+  }
+
+  @ApiOperation({ summary: 'Xóa ca học chưa được sử dụng trong phiên điểm danh (admin)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Delete('sections/:sectionId/timetable/:slotId')
+  async deleteTimetableSlot(
+    @Param('sectionId', ParseIntPipe) sectionId: number,
+    @Param('slotId', ParseIntPipe) slotId: number,
+  ) {
+    await this.attendanceSessionQueryService.deleteTimetableSlot(
+      sectionId,
+      slotId,
+    );
+    return { success: true, data: null };
   }
 
   @ApiOperation({ summary: 'Danh sách session do chính tôi tạo (lecturer)' })

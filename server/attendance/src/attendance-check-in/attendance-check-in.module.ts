@@ -11,12 +11,18 @@ import {
 } from './attendance-check-in.token';
 import { AttemptCheck } from './checks/attempt.check';
 import { DeviceCheck } from './checks/device.check';
+import { AuditLogService } from '../common/audit/audit-log.service';
+import { DeviceAttestationService } from '../common/device-attestation/device-attestation.service';
+import { DeviceRateLimitGuard } from '../common/guards/device-rate-limit.guard';
+import { RateLimitService } from '../common/rate-limit/rate-limit.service';
+import { HealthModule } from '../health/health.module';
 
 @Module({
   imports: [
     AttendanceSessionsModule,
     AttendanceValidationModule,
     AttendanceRecordModule,
+    HealthModule,
   ],
   controllers: [AttendanceCheckInController],
   providers: [
@@ -32,6 +38,10 @@ import { DeviceCheck } from './checks/device.check';
     },
     AttemptCheck,
     DeviceCheck,
+    AuditLogService,
+    DeviceAttestationService,
+    DeviceRateLimitGuard,
+    RateLimitService,
   ],
   exports: [AttendanceCheckInService],
 })

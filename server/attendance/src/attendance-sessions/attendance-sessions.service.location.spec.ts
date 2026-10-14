@@ -22,7 +22,20 @@ const createRegistrySection = (overrides: Record<string, unknown> = {}) => ({
       gpsAccuracyThreshold: 20,
     },
   },
-  timetable: [],
+  timetable: [{
+    id: 8,
+    scheduledDate: null,
+    dayOfWeek: (() => {
+      const weekday = new Intl.DateTimeFormat('en-US', {
+        weekday: 'short',
+        timeZone: 'Asia/Ho_Chi_Minh',
+      }).format(new Date(Date.now() + 60_000));
+      return ({ Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 })[weekday];
+    })(),
+    startMinute: 0,
+    endMinute: 1440,
+    room: null,
+  }],
   enrollments: [{ userId: 101 }, { userId: 102 }],
   ...overrides,
 });
@@ -60,6 +73,7 @@ describe('AttendanceSessionsService registry-backed creation', () => {
     openAt: new Date(now + 60_000).toISOString(),
     closeAt: new Date(now + 3_600_000).toISOString(),
     courseSectionId: 41,
+    timetableSlotId: 8,
     participantCriteria: { codeFilter: { addCodes: ['UNTRUSTED-CLIENT-LIST'] } },
   }) as CreateAttendanceSessionDto;
 
@@ -79,6 +93,61 @@ describe('AttendanceSessionsService registry-backed creation', () => {
       }),
       [101, 102],
     );
+  });
+
+  it('accepts a session on the selected one-time timetable date', async () => {
+    prisma.courseSection.findUnique.mockResolvedValue(
+      createRegistrySection({
+        timetable: [{
+          id: 8,
+          dayOfWeek: 3,
+          scheduledDate: new Date('2026-10-14T00:00:00.000Z'),
+          startMinute: 480,
+          endMinute: 540,
+          room: null,
+        }],
+      }),
+    );
+
+    await service.create(
+      {
+        ...dto(),
+        openAt: '2026-10-14T02:00:00.000Z',
+        closeAt: '2026-10-14T03:00:00.000Z',
+      },
+      7,
+      'lecturer',
+    );
+
+    expect(repository.createWithRecords).toHaveBeenCalled();
+  });
+
+  it('rejects a session whose date differs from the one-time timetable date', async () => {
+    prisma.courseSection.findUnique.mockResolvedValue(
+      createRegistrySection({
+        timetable: [{
+          id: 8,
+          dayOfWeek: 3,
+          scheduledDate: new Date('2026-10-14T00:00:00.000Z'),
+          startMinute: 480,
+          endMinute: 540,
+          room: null,
+        }],
+      }),
+    );
+
+    await expect(
+      service.create(
+        {
+          ...dto(),
+          openAt: '2026-10-15T02:00:00.000Z',
+          closeAt: '2026-10-15T03:00:00.000Z',
+        },
+        7,
+        'lecturer',
+      ),
+    ).rejects.toThrow('Ngày mở session không khớp ngày cụ thể');
+    expect(repository.createWithRecords).not.toHaveBeenCalled();
   });
 
   it('rejects a lecturer who is not assigned to the selected section', async () => {
@@ -114,6 +183,28 @@ describe('AttendanceSessionsService registry-backed creation', () => {
 
     await expect(service.create(dto(), 7, 'lecturer')).rejects.toBeInstanceOf(
       BadRequestException,
+    );
+    expect(repository.createWithRecords).not.toHaveBeenCalled();
+  });
+
+  it('rejects creating a session when the section has no active enrollments', async () => {
+    prisma.courseSection.findUnique.mockResolvedValue(
+      createRegistrySection({ enrollments: [] }),
+    );
+
+    await expect(service.create(dto(), 7, 'lecturer')).rejects.toThrow(
+      'Lớp học phần chưa có sinh viên ghi danh active',
+    );
+    expect(repository.createWithRecords).not.toHaveBeenCalled();
+  });
+
+  it('rejects creating a session when the section has no timetable', async () => {
+    prisma.courseSection.findUnique.mockResolvedValue(
+      createRegistrySection({ timetable: [] }),
+    );
+
+    await expect(service.create(dto(), 7, 'lecturer')).rejects.toThrow(
+      'Lớp học phần chưa có thời khóa biểu',
     );
     expect(repository.createWithRecords).not.toHaveBeenCalled();
   });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
+import { Link } from 'react-router-dom';
 import { IoClose } from 'react-icons/io5';
 import {
   MdAccessTime,
@@ -46,6 +47,20 @@ const formatDateTimeLocal = (date: Date): string => {
   const minutes = pad(date.getMinutes());
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
+
+const shiftDate = (dateValue: string, days: number): string => {
+  const date = new Date(`${dateValue}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return formatDateTimeLocal(date).split('T')[0];
+};
+
+const getDateWeekday = (dateValue: string): number => {
+  const day = new Date(`${dateValue}T12:00:00`).getDay();
+  return day === 0 ? 7 : day;
+};
+
+const getWeekdayLabel = (dayOfWeek: number): string =>
+  dayOfWeek === 7 ? 'Chủ nhật' : `Thứ ${dayOfWeek + 1}`;
 
 export const CreateSessionModal = ({
   isOpen,
@@ -104,15 +119,19 @@ export const CreateSessionModal = ({
     name: 'courseSectionId',
   });
   const timetableSlotId = useWatch({ control, name: 'timetableSlotId' });
+  const openDate = useWatch({ control, name: 'openDate' });
+  const closeDate = useWatch({ control, name: 'closeDate' });
   const selectedSection = sections.find((section) => section.id === courseSectionId);
   const selectedSlot = selectedSection?.timetable.find(
     (slot) => slot.id === timetableSlotId,
   );
   const selectedRoom = selectedSlot?.room ?? selectedSection?.room;
   const selectedBuilding = selectedRoom?.building;
-  const needsTimetableSlot = (selectedSection?.timetable.length ?? 0) > 0;
+  const needsTimetableSlot = !!selectedSection;
   const isSelectedLocationReady =
+    selectedRoom?.status === 'ACTIVE' &&
     selectedBuilding?.type === 'BUILDING' &&
+    selectedBuilding.status === 'ACTIVE' &&
     selectedBuilding.verified &&
     selectedBuilding.geofenceRadius !== null &&
     selectedBuilding.gpsAccuracyThreshold !== null;
@@ -162,7 +181,15 @@ export const CreateSessionModal = ({
         toast.error('Vui lòng chọn lớp học phần');
         return;
       }
-      if (needsTimetableSlot && values.timetableSlotId <= 0) {
+      if (selectedSection.activeEnrollmentCount === 0) {
+        toast.error('Lớp chưa có sinh viên ghi danh active; hãy nhờ quản trị viên nhập roster.');
+        return;
+      }
+      if (selectedSection.timetable.length === 0) {
+        toast.error('Lớp chưa có thời khóa biểu; hãy nhờ quản trị viên khai báo ca học.');
+        return;
+      }
+      if (values.timetableSlotId <= 0) {
         toast.error('Vui lòng chọn ca học trong thời khóa biểu');
         return;
       }
@@ -296,11 +323,15 @@ export const CreateSessionModal = ({
             )}
             {!isLoadingSections && sections.length === 0 && (
               <p className="text-xs text-amber-800">
-                Chưa có lớp học phần được phân công. Cần nạp CourseSection, enrollment và timetable trước khi tạo session theo registry.
+                Chưa có lớp học phần được phân công. Quản trị viên cần tạo lớp, phân công giảng viên, nhập danh sách sinh viên và khai báo thời khóa biểu trước khi tạo phiên.
+                {' '}
+                <Link to="/course-sections" className="font-semibold underline underline-offset-2">
+                  Mở trang quản lý lớp học phần
+                </Link>
               </p>
             )}
 
-            {selectedSection && needsTimetableSlot && (
+            {selectedSection && selectedSection.timetable.length > 0 && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-600">
                   Ca học trong thời khóa biểu <span className="text-red-500">*</span>
@@ -311,18 +342,48 @@ export const CreateSessionModal = ({
                     validate: (value) =>
                       !needsTimetableSlot || value > 0 || 'Vui lòng chọn ca học',
                   })}
-                  onChange={(event) => setValue('timetableSlotId', Number(event.target.value))}
+                  onChange={(event) => {
+                    const slotId = Number(event.target.value);
+                    setValue('timetableSlotId', slotId);
+                    const slot = selectedSection.timetable.find((item) => item.id === slotId);
+                    if (!slot || !openDate || !closeDate) return;
+
+                    if (slot.scheduledDate) {
+                      setValue('openDate', slot.scheduledDate);
+                      setValue('closeDate', slot.scheduledDate);
+                      return;
+                    }
+                    const weekdayOffset =
+                      (slot.dayOfWeek - getDateWeekday(openDate) + 7) % 7;
+                    if (weekdayOffset > 0) {
+                      setValue('openDate', shiftDate(openDate, weekdayOffset));
+                      setValue('closeDate', shiftDate(closeDate, weekdayOffset));
+                    }
+                  }}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
                 >
                   <option value={0}>Chọn ca học</option>
                   {selectedSection.timetable.map((slot) => (
                     <option key={slot.id} value={slot.id}>
-                      Thứ {slot.dayOfWeek} · {Math.floor(slot.startMinute / 60).toString().padStart(2, '0')}:{(slot.startMinute % 60).toString().padStart(2, '0')}–{Math.floor(slot.endMinute / 60).toString().padStart(2, '0')}:{(slot.endMinute % 60).toString().padStart(2, '0')}
+                      {slot.scheduledDate
+                        ? `${slot.scheduledDate} · `
+                        : `${getWeekdayLabel(slot.dayOfWeek)} hằng tuần · `}
+                      {Math.floor(slot.startMinute / 60).toString().padStart(2, '0')}:{(slot.startMinute % 60).toString().padStart(2, '0')}–{Math.floor(slot.endMinute / 60).toString().padStart(2, '0')}:{(slot.endMinute % 60).toString().padStart(2, '0')}
                     </option>
                   ))}
                 </select>
                 {errors.timetableSlotId && (
                   <p className="text-xs text-red-600">{errors.timetableSlotId.message}</p>
+                )}
+                {selectedSlot && selectedSlot.scheduledDate && openDate !== selectedSlot.scheduledDate && (
+                  <p className="mt-2 text-xs font-medium text-amber-800">
+                    Ngày bắt đầu cần là {selectedSlot.scheduledDate} theo buổi học đã chọn.
+                  </p>
+                )}
+                {selectedSlot && !selectedSlot.scheduledDate && openDate && getDateWeekday(openDate) !== selectedSlot.dayOfWeek && (
+                  <p className="mt-2 text-xs font-medium text-amber-800">
+                    Ngày bắt đầu cần rơi vào {getWeekdayLabel(selectedSlot.dayOfWeek)} theo ca đã chọn.
+                  </p>
                 )}
               </div>
             )}
@@ -352,7 +413,7 @@ export const CreateSessionModal = ({
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-amber-700">Lớp hiện chưa có sinh viên active; phiên sẽ được tạo không có attendance record.</p>
+                    <p className="text-xs text-amber-700">Lớp chưa có sinh viên active; cần ghi danh roster trước khi tạo phiên.</p>
                   )}
                   <p className="mt-2 text-[11px] text-gray-500">Backend sẽ chụp lại toàn bộ enrollment active tại thời điểm tạo phiên.</p>
                 </div>
@@ -369,10 +430,25 @@ export const CreateSessionModal = ({
                     Tâm cố định: {selectedBuilding.latitude}, {selectedBuilding.longitude}
                   </p>
                 )}
-                {!isSelectedLocationReady && (
-                  <p className="mt-2 text-xs font-medium text-red-700">
-                    Session chỉ mở được sau khi Building là BUILDING, tọa độ đã xác minh và radius/accuracy đã hiệu chuẩn.
+                {selectedSection.activeEnrollmentCount === 0 && (
+                  <p className="mt-2 text-xs font-medium text-amber-800">
+                    Chưa có sinh viên active; cần ghi danh roster trước khi tạo phiên.
                   </p>
+                )}
+                {selectedSection.timetable.length === 0 && (
+                  <p className="mt-2 text-xs font-medium text-amber-800">
+                    Chưa có thời khóa biểu; quản trị viên cần khai báo ca học trên trang quản lý lớp học phần.
+                  </p>
+                )}
+                {!isSelectedLocationReady && (
+                  <div className="mt-2 rounded-md bg-red-50 p-2 text-xs text-red-800">
+                    <p className="font-medium">
+                      Chưa thể tạo phiên: phòng và Building phải ACTIVE; Building phải là BUILDING, đã xác minh tọa độ và có Radius/Accuracy sau field test.
+                    </p>
+                    <Link to="/locations" className="mt-1 inline-block font-semibold underline underline-offset-2">
+                      Mở Location Registry để kiểm tra cấu hình
+                    </Link>
+                  </div>
                 )}
               </div>
             )}
@@ -468,7 +544,9 @@ export const CreateSessionModal = ({
                 !!rosterError ||
                 !selectedSection ||
                 !isSelectedLocationReady ||
-                (needsTimetableSlot && timetableSlotId <= 0)
+                selectedSection.activeEnrollmentCount === 0 ||
+                selectedSection.timetable.length === 0 ||
+                timetableSlotId <= 0
               }
               className="px-5 py-2 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
             >

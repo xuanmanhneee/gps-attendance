@@ -20,6 +20,7 @@ export interface RegistryRoomOption {
     code: string;
     name: string;
     type: 'BUILDING' | 'FACILITY';
+    status: 'ACTIVE' | 'INACTIVE';
     verified: boolean;
     latitude: number;
     longitude: number;
@@ -32,12 +33,19 @@ export interface TeachingSectionOption {
   id: number;
   code: string;
   course: { code: string; name: string };
-  term: { name: string; academicYear: string; semester: number };
+  term: {
+    name: string;
+    academicYear: string;
+    semester: number;
+    startDate: string;
+    endDate: string;
+  };
   room: RegistryRoomOption | null;
   activeEnrollmentCount: number;
   timetable: Array<{
     id: number;
     dayOfWeek: number;
+    scheduledDate: string | null;
     startMinute: number;
     endMinute: number;
     room: RegistryRoomOption | null;
@@ -168,4 +176,3 @@ export const attendanceSessionsApi = {
     return httpClient.delete<null>(`/v0/attendance-sessions/${id}`);
   },
 };
-

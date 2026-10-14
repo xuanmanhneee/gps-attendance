@@ -79,11 +79,11 @@ export class CreateCourseSectionDto {
   @Min(1)
   roomId?: number;
 
-  @ApiPropertyOptional({ example: 60 })
+  @ApiPropertyOptional({ example: 60, minimum: 1, maximum: 300 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(1000)
+  @Max(300)
   capacity?: number;
 }

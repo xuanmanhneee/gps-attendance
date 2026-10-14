@@ -1,5 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../common/database/prisma.service';
+import { CreateBuildingRegistryDto } from './dto/create-building-registry.dto';
 import { CreateRegistryRoomDto } from './dto/create-registry-room.dto';
 import { UpdateRegistryRoomDto } from './dto/update-registry-room.dto';
 import { UpdateBuildingRegistryDto } from './dto/update-building-registry.dto';
@@ -7,6 +13,13 @@ import { UpdateBuildingRegistryDto } from './dto/update-building-registry.dto';
 @Injectable()
 export class LocationRegistryService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async listCampuses() {
+    return this.prisma.campus.findMany({
+      select: { id: true, code: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+  }
 
   async listBuildings(includeInactive = false) {
     const buildings = await this.prisma.building.findMany({
@@ -42,6 +55,85 @@ export class LocationRegistryService {
       status: building.status,
       roomCount: building._count.rooms,
     }));
+  }
+
+  async createBuilding(dto: CreateBuildingRegistryDto, actorUserId: number) {
+    const campus = await this.prisma.campus.findUnique({
+      where: { id: dto.campusId },
+      select: { id: true },
+    });
+    if (!campus) {
+      throw new NotFoundException('Không tìm thấy khuôn viên trường');
+    }
+
+    try {
+      return await this.prisma.$transaction(async (transaction) => {
+        const building = await transaction.building.create({
+          data: {
+            campusId: dto.campusId,
+            code: dto.code.trim(),
+            name: dto.name.trim(),
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+            type: 'BUILDING',
+            verified: false,
+          },
+          include: {
+            campus: { select: { code: true, name: true } },
+          },
+        });
+
+        await transaction.auditLog.create({
+          data: {
+            actorUserId,
+            action: 'LOCATION_REGISTRY_CREATED',
+            entityType: 'Building',
+            entityId: String(building.id),
+            metadata: {
+              before: null,
+              after: {
+                campusId: building.campusId,
+                campus: building.campus,
+                code: building.code,
+                name: building.name,
+                latitude: Number(building.latitude),
+                longitude: Number(building.longitude),
+                geofenceRadius: null,
+                gpsAccuracyThreshold: null,
+                verified: false,
+                status: building.status,
+              },
+            },
+          },
+        });
+
+        return {
+          id: building.id,
+          campus: building.campus,
+          code: building.code,
+          name: building.name,
+          latitude: Number(building.latitude),
+          longitude: Number(building.longitude),
+          geofenceRadius: null,
+          gpsAccuracyThreshold: null,
+          lecturerValidationRadius: null,
+          type: building.type,
+          verified: building.verified,
+          status: building.status,
+          roomCount: 0,
+        };
+      });
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Mã tòa nhà đã tồn tại trong Location Registry');
+      }
+      throw error;
+    }
   }
 
   async updateBuilding(
