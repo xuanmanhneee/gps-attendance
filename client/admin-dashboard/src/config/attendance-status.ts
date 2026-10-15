@@ -14,11 +14,15 @@ export const ATTENDANCE_STATUS_LABEL_KEYS: Record<
 > = {
   present: 'sessionDetail.present',
   absent: 'sessionDetail.absent',
+  late: 'sessionDetail.late',
+  excused: 'sessionDetail.excused',
 };
 
 export const ATTENDANCE_STATUS_TONE_CLASS: Record<AttendanceStatus, string> = {
   present: 'bg-positive-soft text-positive',
   absent: 'bg-surface-subtle text-muted',
+  late: 'bg-warning-soft text-warning',
+  excused: 'bg-accent-soft text-accent-strong',
 };
 
 /** Nhãn vai trò của participant, dùng chung key `roles.*` với profile. */

@@ -22,11 +22,6 @@ export interface CodeFilterStep {
   exclude?: string[];
 }
 
-type RequireAtLeastOne<T, K extends keyof T = keyof T> = Omit<T, K> &
-  {
-    [P in K]-?: Required<Pick<T, P>> & Partial<Omit<Pick<T, K>, P>>;
-  }[K];
-
 /**
  * Tiêu chí lọc user.
  *
@@ -40,8 +35,8 @@ type RequireAtLeastOne<T, K extends keyof T = keyof T> = Omit<T, K> &
  * Include của các filter được UNION.
  * Exclude luôn được áp dụng sau cùng.
  */
-export type UserFilterCriteria = RequireAtLeastOne<{
+export type UserFilterCriteria = {
   unitFilter?: UnitFilterStep;
   tagFilter?: TagFilterStep;
   codeFilter?: CodeFilterStep;
-}>;
+};

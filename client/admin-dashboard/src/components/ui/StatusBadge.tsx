@@ -7,6 +7,7 @@ const statusToneClass: Record<SessionStatus, string> = {
   open: 'bg-positive-soft text-positive',
   pending: 'bg-warning-soft text-warning',
   closed: 'bg-surface-subtle text-muted',
+  cancelled: 'bg-danger-soft text-danger',
 };
 
 type StatusBadgeProps = {

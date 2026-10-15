@@ -1,7 +1,7 @@
 // users/user-filter.service.ts
 
-import { Injectable } from '@nestjs/common';
-import type { UserFilterCriteria } from '@gps-attendance/shared';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { AttendanceSessionErrorCode, type UserFilterCriteria } from '@gps-attendance/shared';
 
 import { UsersService } from './users.service';
 import { TagService } from '../tags/tag.service';
@@ -14,6 +14,39 @@ export class UserFilterService {
     private readonly tagService: TagService,
     private readonly unitService: UnitService,
   ) {}
+
+  /**
+   * Tag là dữ liệu cá nhân: chỉ được dùng tag do chính mình tạo.
+   * Kiểm tra cả include lẫn exclude, vì exclude cũng làm lộ thành viên
+   * của tag (danh sách kết quả thu hẹp lại).
+   */
+  async assertTagsOwnedBy(
+    criteria: UserFilterCriteria,
+    ownerId: number,
+  ): Promise<void> {
+    const tagIds = [
+      ...new Set([
+        ...(criteria.tagFilter?.include ?? []),
+        ...(criteria.tagFilter?.exclude ?? []),
+      ]),
+    ];
+
+    if (tagIds.length === 0) {
+      return;
+    }
+
+    const ownedTags = await this.tagService.findByOwner(ownerId);
+    const ownedIds = new Set(ownedTags.map((tag) => tag.id));
+
+    if (!tagIds.every((id) => ownedIds.has(id))) {
+      // Cố ý dùng một thông báo chung cho cả "không tồn tại" và "của người
+      // khác", không nêu id nào sai, để không lộ id nào có thật.
+      throw new BadRequestException({
+        code: AttendanceSessionErrorCode.INVALID_TAG,
+        message: 'Tag không hợp lệ',
+      });
+    }
+  }
 
   async resolveUserIds(criteria: UserFilterCriteria): Promise<number[]> {
     const result = new Set<number>();

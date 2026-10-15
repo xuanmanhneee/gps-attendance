@@ -16,9 +16,19 @@ import type {
  */
 export type CreateSessionFormData = CreateAttendanceSessionRequest;
 
-const SESSION_STATUSES: readonly SessionStatus[] = ['pending', 'open', 'closed'];
+const SESSION_STATUSES: readonly SessionStatus[] = [
+  'pending',
+  'open',
+  'closed',
+  'cancelled',
+];
 
-const ATTENDANCE_STATUSES: readonly AttendanceStatus[] = ['present', 'absent'];
+const ATTENDANCE_STATUSES: readonly AttendanceStatus[] = [
+  'present',
+  'absent',
+  'late',
+  'excused',
+];
 
 const ROLES: readonly Role[] = ['admin', 'lecturer', 'student'];
 
@@ -73,14 +83,37 @@ export const isAttendanceSession = (
   );
 };
 
-export const isAttendanceSessionList = (
+/**
+ * Chuẩn hoá danh sách phiên từ API trước khi ghi state.
+ *
+ * Trả `null` khi payload không phải mảng: vi phạm contract ở mức không thể bỏ
+ * qua nên caller vẫn phải coi là lỗi tải.
+ *
+ * Với payload là mảng, chỉ giữ các item đúng shape và bỏ item lệch. Trước đây
+ * dùng `every` nên một bản ghi lỗi làm mất cả danh sách người dùng đang xem
+ * (vd khi backend thêm trạng thái `cancelled` mà guard chưa cập nhật).
+ */
+export const parseAttendanceSessionList = (
   value: unknown,
-): value is AttendanceSessionResponse[] =>
-  Array.isArray(value) && value.every(isAttendanceSession);
+): AttendanceSessionResponse[] | null => {
+  if (!Array.isArray(value)) return null;
+
+  const sessions = value.filter(isAttendanceSession);
+  const droppedCount = value.length - sessions.length;
+
+  // Chi tiết kỹ thuật chỉ ghi ra console, không render ra UI.
+  if (droppedCount > 0) {
+    console.warn(
+      `[attendance-sessions] Bỏ qua ${droppedCount} phiên sai shape khi tải danh sách`,
+    );
+  }
+
+  return sessions;
+};
 
 /**
  * Participant của phiên: cần `code`, `fullname`, `role` và trạng thái
- * `present`/`absent` (xem `AttendanceParticipantResponse`).
+ * `present`/`absent`/`late`/`excused` (xem `AttendanceParticipantResponse`).
  */
 export const isAttendanceParticipant = (
   value: unknown,

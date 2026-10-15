@@ -34,7 +34,7 @@ describe('resolveSessionErrorKey', () => {
 
   it('map domain code cá»§a attendance-session', () => {
     const forbidden = new ApiError(
-      AttendanceSessionErrorCode.CREATION_FORBIDDEN,
+      AttendanceSessionErrorCode.FORBIDDEN,
       RAW_TECHNICAL_MESSAGE,
       403,
     );
@@ -45,8 +45,8 @@ describe('resolveSessionErrorKey', () => {
     );
 
     assert.equal(
-      resolveSessionErrorKey(forbidden, 'create'),
-      'sessions.error.creationForbidden',
+      resolveSessionErrorKey(forbidden, 'list'),
+      'sessions.error.forbidden',
     );
     assert.equal(
       resolveSessionErrorKey(timeRange, 'create'),

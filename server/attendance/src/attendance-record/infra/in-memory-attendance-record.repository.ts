@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { AttendanceRecord } from '../attendance-record.model';
-import { IAttendanceRecordRepository } from '../attendance-record.repository';
+import { IAttendanceRecordBuffer } from '#attendance-record/attendance-record.buffer';
 
 @Injectable()
-export class InMemoryAttendanceRecordStore implements IAttendanceRecordRepository {
-  private recordsBySession = new Map<number, Map<number, AttendanceRecord>>(); // sessionId → userId → record
+export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
+  private recordsBySession = new Map<number, Map<number, AttendanceRecord>>();
 
   async getRecord(
     sessionId: number,
@@ -35,5 +35,9 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordRepositor
       this.recordsBySession.set(record.sessionId, sessionMap);
     }
     sessionMap.set(record.userId, { ...record, updatedAt: new Date() });
+  }
+
+  async clearSession(sessionId: number): Promise<void> {
+    this.recordsBySession.delete(sessionId);
   }
 }

@@ -34,7 +34,9 @@
       "#common/*": ["./src/common/*"],
       "#geo/*": ["./src/geo/*"],
       "#prisma/*": ["./src/prisma/*"],
-      "#user/*": ["./src/users/*"]
+      "#user/*": ["./src/users/*"],
+      "#redis/*": ["./src/redis/*"],
+      "#job-scheduler/*": ["./src/job-scheduler/*"]
     }
   },
   "include": ["src/**/*.ts"],

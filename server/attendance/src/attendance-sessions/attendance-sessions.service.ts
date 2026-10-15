@@ -1,19 +1,51 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  AttendanceSessionErrorCode,
+  SessionStatus,
+  UserFilterCriteria,
+  isValidUserFilterCriteria,
+} from '@gps-attendance/shared';
 
-import { AttendanceSession } from './attendance-session.model';
-import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
+import { IJobScheduler } from '#job-scheduler/job-scheduler.interface';
+import { JOB_SCHEDULER } from '#job-scheduler/job-scheduler.token';
+import { RedisService } from '#redis/redis.service';
+
+import { AttendanceRecordsService } from '#attendance-record/attendance-records.service';
+import { ILogger } from '#common/logging/logger.interface';
+import { ILoggerFactory } from '#common/logging/logger.factory';
+import { LOGGER_FACTORY } from '#common/logging/logger.token';
 import { UserFilterService } from '../users/user-filter.service';
 
-import { LOGGER_FACTORY } from '../common/logging/logger.token';
-import { ILogger } from '../common/logging/logger.interface';
-import { ILoggerFactory } from '../common/logging/logger.factory';
-import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
+import { AttendanceSession } from './attendance-session.model';
 import { IAttendanceSessionRepository } from './attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
-import {
-  AttendanceSessionResponse,
-  SessionStatus,
-} from '@gps-attendance/shared';
+import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
+import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto';
+
+const ROSTER_INIT_BUFFER_MS = 5 * 60 * 1000;
+
+const criteriaKeyFor = (sessionId: number) =>
+  `attendance:session:${sessionId}:criteria`;
+
+/** true nếu đã tới (hoặc qua) thời điểm khởi tạo roster */
+const isRosterInitDue = (session: AttendanceSession): boolean =>
+  Date.now() >= session.openAt.getTime() - ROSTER_INIT_BUFFER_MS;
+
+const isOwner = (session: AttendanceSession, userId: number): boolean =>
+  session.createdBy === userId;
+
+const notOwnerError = () =>
+  new ForbiddenException({
+    code: AttendanceSessionErrorCode.FORBIDDEN,
+    message: 'Chỉ giảng viên tạo session này mới được thao tác',
+  });
 
 @Injectable()
 export class AttendanceSessionsService {
@@ -24,6 +56,10 @@ export class AttendanceSessionsService {
     private readonly attendanceSessionRepository: IAttendanceSessionRepository,
     private readonly userFilterService: UserFilterService,
     private readonly attendanceRecordsService: AttendanceRecordsService,
+    private readonly redisService: RedisService,
+
+    @Inject(JOB_SCHEDULER)
+    private readonly jobScheduler: IJobScheduler,
 
     @Inject(LOGGER_FACTORY)
     loggerFactory: ILoggerFactory,
@@ -31,34 +67,248 @@ export class AttendanceSessionsService {
     this.logger = loggerFactory.create(AttendanceSessionsService.name);
   }
 
+  onModuleInit() {
+    this.jobScheduler.onJob<{ sessionId: number }>(
+      'attendance:init-roster',
+      async (payload) => {
+        const rawCriteria = await this.redisService.get(
+          criteriaKeyFor(payload.sessionId),
+        );
+
+        if (!rawCriteria) {
+          this.logger.warn(
+            `Init roster session ${payload.sessionId}: không tìm thấy criteria trong Redis`,
+          );
+          return;
+        }
+
+        const criteria: unknown = JSON.parse(rawCriteria);
+
+        if (!isValidUserFilterCriteria(criteria)) {
+          this.logger.warn(
+            `Init roster session ${payload.sessionId}: criteria trong Redis không hợp lệ`,
+          );
+          return;
+        }
+
+        const userIds = await this.userFilterService.resolveUserIds(criteria);
+
+        await this.attendanceRecordsService.initializeForSession(
+          payload.sessionId,
+          userIds,
+        );
+
+        await this.redisService.del(criteriaKeyFor(payload.sessionId));
+      },
+    );
+  }
+
   async create(
     dto: CreateAttendanceSessionDto,
     createdBy: number,
   ): Promise<AttendanceSession> {
-    const now = new Date();
+    // 1. Giá trị dẫn xuất
+    const openAt = new Date(dto.openAt);
+    const closeAt = new Date(dto.closeAt);
+    const initAt = new Date(openAt.getTime() - ROSTER_INIT_BUFFER_MS);
 
-    const userIds = await this.userFilterService.resolveUserIds(
+    // 2. Guards (rẻ trước, tốn I/O sau)
+    if (openAt >= closeAt) {
+      throw new BadRequestException({
+        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
+        message: 'Khoảng thời gian không hợp lệ.',
+      });
+    }
+    if (initAt.getTime() <= Date.now()) {
+      throw new BadRequestException({
+        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
+        message: 'openAt phải cách hiện tại ít nhất 5 phút.',
+      });
+    }
+    if (!isValidUserFilterCriteria(dto.participantCriteria)) {
+      throw new BadRequestException({
+        code: AttendanceSessionErrorCode.INVALID_CRITERIA,
+        message: 'participantCriteria không hợp lệ',
+      });
+    }
+    await this.userFilterService.assertTagsOwnedBy(
       dto.participantCriteria,
+      createdBy,
     );
 
+    // 3. Ghi
     const session = await this.attendanceSessionRepository.create({
       title: dto.title,
       latitude: dto.latitude,
       longitude: dto.longitude,
       radius: dto.radius,
-      openAt: new Date(dto.openAt),
-      closeAt: new Date(dto.closeAt),
+      openAt,
+      closeAt,
       createdBy,
-      createdAt: now,
-      updatedAt: now,
     });
 
-    await this.attendanceRecordsService.initializeForSession(
-      session.id,
-      userIds,
+    await this.redisService.set(
+      criteriaKeyFor(session.id),
+      JSON.stringify(dto.participantCriteria),
+    );
+
+    await this.jobScheduler.schedule(
+      'attendance:init-roster',
+      initAt,
+      { sessionId: session.id },
+      `init-roster:${session.id}`,
+    );
+    await this.jobScheduler.schedule(
+      'attendance:flush',
+      session.closeAt,
+      { sessionId: session.id },
+      `flush:${session.id}`,
     );
 
     return this.withComputedStatus(session);
+  }
+
+  async update(
+    sessionId: number,
+    dto: UpdateAttendanceSessionDto,
+    userId: number,
+  ): Promise<AttendanceSession> {
+    // 1. Load + giá trị dẫn xuất
+    const session = await this.findById(sessionId);
+
+    const openAt = dto.openAt ? new Date(dto.openAt) : session.openAt;
+    const closeAt = dto.closeAt ? new Date(dto.closeAt) : session.closeAt;
+    const isEnded =
+      session.status === 'closed' || session.status === 'cancelled';
+    const isOpen = session.status === 'open';
+    const rosterLocked =
+      session.status !== 'pending' || isRosterInitDue(session);
+    const touchesLockedField = Object.entries(dto).some(
+      ([key, value]) => key !== 'closeAt' && value !== undefined,
+    );
+    const initAt = openAt.getTime() - ROSTER_INIT_BUFFER_MS;
+
+    // 2. Guards (rẻ trước, tốn I/O sau)
+    if (!isOwner(session, userId)) throw notOwnerError();
+    if (isEnded) {
+      throw new ConflictException({
+        code: AttendanceSessionErrorCode.UPDATE_INVALID_STATUS,
+        message: `Không thể sửa session đang ở trạng thái "${session.status}"`,
+      });
+    }
+    if (isOpen && touchesLockedField) {
+      throw new ConflictException({
+        code: AttendanceSessionErrorCode.UPDATE_FIELD_LOCKED,
+        message: 'Session đang mở chỉ được sửa thời gian đóng.',
+      });
+    }
+    if (dto.participantCriteria && rosterLocked) {
+      throw new ConflictException({
+        code: AttendanceSessionErrorCode.CRITERIA_LOCKED,
+        message: 'Roster đã khởi tạo, không thể sửa criteria.',
+      });
+    }
+    if (
+      dto.participantCriteria &&
+      !isValidUserFilterCriteria(dto.participantCriteria)
+    ) {
+      throw new BadRequestException({
+        code: AttendanceSessionErrorCode.INVALID_CRITERIA,
+        message: 'participantCriteria không hợp lệ',
+      });
+    }
+    if (openAt >= closeAt || closeAt <= new Date()) {
+      throw new BadRequestException({
+        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
+        message: 'Khoảng thời gian không hợp lệ.',
+      });
+    }
+    if (dto.openAt && !rosterLocked && initAt <= Date.now()) {
+      throw new BadRequestException({
+        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
+        message: 'openAt phải cách hiện tại ít nhất 5 phút.',
+      });
+    }
+    if (dto.participantCriteria) {
+      await this.userFilterService.assertTagsOwnedBy(
+        dto.participantCriteria,
+        userId,
+      );
+    }
+
+    // 3. Ghi
+    const updated = await this.attendanceSessionRepository.update(sessionId, {
+      title: dto.title,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      radius: dto.radius,
+      openAt,
+      closeAt,
+    });
+
+    if (dto.participantCriteria) {
+      await this.redisService.set(
+        criteriaKeyFor(sessionId),
+        JSON.stringify(dto.participantCriteria),
+      );
+    }
+    if (dto.openAt && !rosterLocked) {
+      await this.reschedule('init-roster', sessionId, new Date(initAt));
+    }
+    if (dto.closeAt) {
+      await this.reschedule('flush', sessionId, closeAt);
+    }
+
+    return this.withComputedStatus(updated);
+  }
+
+  // Huỷ session — chỉ cho phép khi chưa đóng (pending hoặc open), chưa từng
+  // bị huỷ trước đó. Nếu đang open, dọn luôn buffer để không lẫn dữ liệu
+  // check-in dở dang vào lần flush kế (dù job flush đã bị cancel, phòng
+  // trường hợp job đã trót chạy trước khi cancel kịp tới nơi).
+  async cancel(sessionId: number, userId: number): Promise<AttendanceSession> {
+    // 1. Load + giá trị dẫn xuất
+    const session = await this.findById(sessionId);
+    const isEnded =
+      session.status === 'closed' || session.status === 'cancelled';
+    const wasOpen = session.status === 'open';
+
+    // 2. Guards
+    if (!isOwner(session, userId)) throw notOwnerError();
+    if (isEnded) {
+      throw new ConflictException({
+        code: AttendanceSessionErrorCode.CANCEL_INVALID_STATUS,
+        message: `Không thể huỷ session ${sessionId} vì đang ở trạng thái "${session.status}"`,
+      });
+    }
+
+    // 3. Ghi
+    await this.attendanceSessionRepository.update(sessionId, {
+      status: 'cancelled',
+    });
+
+    await this.jobScheduler.cancel(`init-roster:${sessionId}`);
+    await this.jobScheduler.cancel(`flush:${sessionId}`);
+    await this.redisService.del(criteriaKeyFor(sessionId));
+
+    if (wasOpen) {
+      await this.attendanceRecordsService.clearSessionBuffer(sessionId);
+    }
+
+    return { ...session, status: 'cancelled' };
+  }
+
+  // null = roster đã khởi tạo hoặc session đã huỷ, không còn criteria
+  async getCriteria(
+    sessionId: number,
+    userId: number,
+  ): Promise<UserFilterCriteria | null> {
+    const session = await this.findById(sessionId);
+
+    if (!isOwner(session, userId)) throw notOwnerError();
+
+    const raw = await this.redisService.get(criteriaKeyFor(sessionId));
+    return raw ? (JSON.parse(raw) as UserFilterCriteria) : null;
   }
 
   async findAll(): Promise<AttendanceSession[]> {
@@ -71,7 +321,10 @@ export class AttendanceSessionsService {
     const session = await this.attendanceSessionRepository.findById(id);
 
     if (!session) {
-      throw new NotFoundException(`Không tìm thấy session id=${id}`);
+      throw new NotFoundException({
+        code: AttendanceSessionErrorCode.NOT_FOUND,
+        message: `Không tìm thấy session id=${id}`,
+      });
     }
 
     return this.withComputedStatus(session);
@@ -101,7 +354,29 @@ export class AttendanceSessionsService {
     return sessions.map((session) => this.withComputedStatus(session));
   }
 
+  private async reschedule(
+    name: 'init-roster' | 'flush',
+    sessionId: number,
+    at: Date,
+  ) {
+    const jobId = `${name}:${sessionId}`;
+    await this.jobScheduler.cancel(jobId);
+    await this.jobScheduler.schedule(
+      `attendance:${name}`,
+      at,
+      { sessionId },
+      jobId,
+    );
+  }
+
   private withComputedStatus(session: AttendanceSession): AttendanceSession {
+    // 'cancelled' là stored state (sự kiện rời rạc do giảng viên set), phải
+    // kiểm tra và giữ nguyên TRƯỚC khi tính theo giờ — nếu không, session đã
+    // huỷ nhưng qua closeAt sẽ bị tính đè thành 'closed', mất thông tin huỷ.
+    if (session.status === 'cancelled') {
+      return session;
+    }
+
     const now = new Date();
 
     let status: SessionStatus = 'pending';
@@ -115,19 +390,6 @@ export class AttendanceSessionsService {
     return {
       ...session,
       status,
-    };
-  }
-
-  private toResponse(session: AttendanceSession): AttendanceSessionResponse {
-    return {
-      id: session.id,
-      title: session.title,
-      latitude: session.latitude,
-      longitude: session.longitude,
-      radius: session.radius,
-      openAt: session.openAt.toISOString(),
-      closeAt: session.closeAt.toISOString(),
-      status: session.status,
     };
   }
 }

@@ -44,7 +44,7 @@ export class InMemoryAttendanceCheckInStore
     return this.deviceUsageBySession.get(sessionId)?.has(deviceId) ?? false;
   }
 
-  async markUsed(sessionId: number, deviceId: string): Promise<void> {
+  async markUsed(sessionId: number, deviceId: string): Promise<boolean> {
     let deviceSet = this.deviceUsageBySession.get(sessionId);
 
     if (!deviceSet) {
@@ -52,6 +52,11 @@ export class InMemoryAttendanceCheckInStore
       this.deviceUsageBySession.set(sessionId, deviceSet);
     }
 
+    if (deviceSet.has(deviceId)) {
+      return false; // đã dùng trước đó rồi
+    }
+
     deviceSet.add(deviceId);
+    return true; // lần đầu dùng
   }
 }

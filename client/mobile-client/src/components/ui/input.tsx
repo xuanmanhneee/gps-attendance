@@ -7,7 +7,7 @@ import {
   Text,
   TouchableOpacity,
 } from 'react-native';
-import { COLORS } from '../../constants/theme';
+import { colors } from '../../../theme';
 
 interface InputProps extends TextInputProps {
   placeholder?: string;
@@ -42,12 +42,12 @@ export const Input = ({
       <TextInput
         style={styles.input}
         placeholder={placeholder}
-        placeholderTextColor={COLORS.text.secondary}
+        placeholderTextColor={colors.textMuted}
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={isPassword && !isPasswordVisible}
         editable={editable}
-        selectionColor={COLORS.primary}
+        selectionColor={colors.primary}
         {...props}
       />
         {rightIcon ?? (isPassword && (
@@ -80,6 +80,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1A1A1A',
   },
-  toggle: { color: COLORS.primary, paddingHorizontal: 12 },
-  error: { color: COLORS.error, fontSize: 12, marginTop: 4 },
+  toggle: { color: colors.primary, paddingHorizontal: 12 },
+  error: { color: colors.danger, fontSize: 12, marginTop: 4 },
 });

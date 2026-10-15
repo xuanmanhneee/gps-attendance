@@ -27,8 +27,10 @@ export const sessionErrorKeyByCode: Record<string, TranslationKey> = {
   [AttendanceSessionErrorCode.INVALID_TIME_RANGE]:
     'sessions.error.invalidTimeRange',
   [AttendanceSessionErrorCode.INVALID_RADIUS]: 'sessions.error.invalidRadius',
-  [AttendanceSessionErrorCode.CREATION_FORBIDDEN]:
-    'sessions.error.creationForbidden',
+  // Shared gộp `CREATION_FORBIDDEN`/`CANCEL_FORBIDDEN` thành 1 code chung
+  // `ATTENDANCE_SESSION_FORBIDDEN` dùng cho lỗi "không phải chủ phiên" ở mọi
+  // thao tác (xem `notOwnerError` ở server) nên phải map về message generic.
+  [AttendanceSessionErrorCode.FORBIDDEN]: 'sessions.error.forbidden',
 };
 
 /** Ngữ cảnh gọi API — quyết định message fallback khi không map được code. */

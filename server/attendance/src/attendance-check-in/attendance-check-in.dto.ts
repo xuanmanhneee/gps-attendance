@@ -9,7 +9,7 @@ import {
   IsNotEmpty,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 import {
   CheckInRequest,
@@ -48,6 +48,13 @@ export class LocationDto implements Location {
     description: 'Thời điểm lấy vị trí, epoch milliseconds',
     example: 1755345600000,
   })
+  // ExpoLocation có máy trả timestamp độ phân giải cao (có phần thập phân,
+  // ví dụ 1728656592123.456). Epoch ms luôn là số nguyên nên làm tròn ngay ở
+  // tầng transform — `@IsInt()` bên dưới vẫn đảm bảo giá trị cuối là int,
+  // thay vì trả 400 khó hiểu cho client.
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'number' ? Math.round(value) : value,
+  )
   @IsInt()
   timestamp!: number;
 
@@ -74,9 +81,16 @@ export class DeviceDto implements Device {
 
   @ApiProperty({
     description: 'Nền tảng thiết bị',
-    enum: ['android', 'ios'],
+    enum: ['android', 'ios', 'web'],
     example: 'android',
   })
+  // 'web' chỉ xuất hiện khi chạy app mobile trên Expo Web để dev/test, không
+  // phải nền tảng thật của domain Device. Quy về 'android' ngay ở transform để
+  // property vẫn khớp type `Device['platform']` (server không dùng field này để
+  // quyết định nghiệp vụ, chỉ deviceId là được dùng).
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'web' ? 'android' : value,
+  )
   @IsIn(['android', 'ios'])
   platform!: 'android' | 'ios';
 

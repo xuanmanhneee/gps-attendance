@@ -6,7 +6,7 @@ import {
   ViewStyle,
   ActivityIndicator,
 } from 'react-native';
-import { COLORS } from '../../constants/theme';
+import { colors } from '../../../theme';
 
 interface ButtonProps {
   title: string;
@@ -68,23 +68,23 @@ const styles = StyleSheet.create({
   },
 
   primary: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
   },
 
   secondary: {
-    backgroundColor: COLORS.card,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
   },
 
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: colors.primary,
   },
 
   danger: {
-    backgroundColor: COLORS.error,
+    backgroundColor: colors.danger,
   },
 
   disabled: {

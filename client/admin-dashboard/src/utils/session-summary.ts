@@ -10,6 +10,7 @@ export const countSessionsByStatus = (
     open: 0,
     pending: 0,
     closed: 0,
+    cancelled: 0,
   };
 
   for (const session of sessions) {

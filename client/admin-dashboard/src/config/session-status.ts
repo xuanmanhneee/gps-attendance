@@ -13,6 +13,7 @@ export const SESSION_STATUS_LABEL_KEYS: Record<SessionStatus, TranslationKey> = 
   open: 'sessions.status.open',
   pending: 'sessions.status.pending',
   closed: 'sessions.status.closed',
+  cancelled: 'sessions.status.cancelled',
 };
 
 /**
@@ -25,4 +26,5 @@ export const SESSION_STATUS_DOT_CLASS: Record<SessionStatus, string> = {
   open: 'bg-positive',
   pending: 'bg-warning',
   closed: 'bg-muted-soft',
+  cancelled: 'bg-danger',
 };

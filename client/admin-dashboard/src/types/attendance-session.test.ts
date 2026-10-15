@@ -5,7 +5,7 @@ import {
   isAttendanceParticipant,
   isAttendanceSession,
   isAttendanceSessionDetail,
-  isAttendanceSessionList,
+  parseAttendanceSessionList,
   parseSessionId,
 } from './attendance-session.ts';
 
@@ -45,8 +45,12 @@ describe('parseSessionId', () => {
 });
 
 describe('isAttendanceSession', () => {
-  it('chấp nhận response đúng shape list', () => {
-    assert.equal(isAttendanceSessionList([buildSession()]), true);
+  it('chấp nhận response đúng shape, kể cả trạng thái cancelled', () => {
+    assert.equal(isAttendanceSession(buildSession()), true);
+    assert.equal(
+      isAttendanceSession({ ...buildSession(), status: 'cancelled' }),
+      true,
+    );
   });
 
   it('từ chối payload thiếu field hoặc sai status', () => {
@@ -55,17 +59,59 @@ describe('isAttendanceSession', () => {
       isAttendanceSession({ ...buildSession(), status: 'archived' }),
       false,
     );
-    assert.equal(isAttendanceSessionList([buildSession(), null]), false);
-    assert.equal(isAttendanceSessionList('not-an-array'), false);
+  });
+});
+
+describe('parseAttendanceSessionList', () => {
+  it('giữ đủ item khi mọi item đúng shape (kể cả cancelled)', () => {
+    const sessions = parseAttendanceSessionList([
+      buildSession(),
+      { ...buildSession({ id: 2 }), status: 'cancelled' },
+    ]);
+
+    assert.deepEqual(
+      sessions?.map((session) => session.id),
+      [1, 2],
+    );
+  });
+
+  it('bỏ item lệch shape thay vì loại cả danh sách', () => {
+    const sessions = parseAttendanceSessionList([
+      buildSession(),
+      null,
+      { ...buildSession(), id: 'x' },
+    ]);
+
+    assert.deepEqual(
+      sessions?.map((session) => session.id),
+      [1],
+    );
+  });
+
+  it('trả null khi payload không phải mảng', () => {
+    assert.equal(parseAttendanceSessionList('not-an-array'), null);
+    assert.equal(parseAttendanceSessionList(null), null);
   });
 });
 
 describe('isAttendanceParticipant', () => {
-  it('yêu cầu code, fullname, role và trạng thái present/absent', () => {
+  it('yêu cầu code, fullname, role và trạng thái điểm danh hợp lệ', () => {
     assert.equal(isAttendanceParticipant(buildParticipant()), true);
     assert.equal(
       isAttendanceParticipant(
         buildParticipant({ status: 'absent', checkedInAt: null }),
+      ),
+      true,
+    );
+    assert.equal(
+      isAttendanceParticipant(
+        buildParticipant({ status: 'late', checkedInAt: '2026-09-20T08:20' }),
+      ),
+      true,
+    );
+    assert.equal(
+      isAttendanceParticipant(
+        buildParticipant({ status: 'excused', checkedInAt: null }),
       ),
       true,
     );

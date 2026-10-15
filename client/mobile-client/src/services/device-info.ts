@@ -1,6 +1,6 @@
 import * as ExpoDevice from 'expo-device';
 import { Platform } from 'react-native';
-import type { Device, DeviceIntegrity } from '@gps-attendance/shared';
+import type { Device } from '@gps-attendance/shared';
 import { getDeviceId } from './device-id';
 
 export async function buildDeviceInfo(): Promise<Device> {

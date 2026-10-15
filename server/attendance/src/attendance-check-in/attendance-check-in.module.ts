@@ -13,6 +13,8 @@ import {
 } from './attendance-check-in.token';
 import { AttemptCheck } from './checks/attempt.check';
 import { DeviceCheck } from './checks/device.check';
+import { RedisAttendanceCheckInAttemptRepository } from './infra/redis/redis-attendance-checkin-attempt.repository';
+import { RedisAttendanceCheckInDeviceUsageRepository } from './infra/redis/redis-attendance-checkin-device-usage.repository';
 
 @Module({
   imports: [
@@ -25,11 +27,11 @@ import { DeviceCheck } from './checks/device.check';
     InMemoryAttendanceCheckInStore,
     {
       provide: ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY,
-      useExisting: InMemoryAttendanceCheckInStore,
+      useClass: RedisAttendanceCheckInAttemptRepository,
     },
     {
       provide: ATTENDANCE_CHECK_IN_DEVICE_USAGE_REPOSITORY,
-      useExisting: InMemoryAttendanceCheckInStore,
+      useClass: RedisAttendanceCheckInDeviceUsageRepository,
     },
     AttemptCheck,
     DeviceCheck,

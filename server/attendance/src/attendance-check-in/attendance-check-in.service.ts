@@ -126,7 +126,7 @@ export class AttendanceCheckInService {
       latitude: dto.location.latitude,
       longitude: dto.location.longitude,
       accuracy: dto.location.accuracy,
-      updateBy: userId
+      updateBy: userId,
     });
 
     if (validation.status === 'VALID') {

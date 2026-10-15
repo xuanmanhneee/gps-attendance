@@ -20,6 +20,8 @@ describe('ATTENDANCE_STATUS_LABEL_KEYS', () => {
   it('mỗi trạng thái có tone riêng để không chỉ dựa vào màu', () => {
     assert.deepEqual(Object.keys(ATTENDANCE_STATUS_TONE_CLASS).sort(), [
       'absent',
+      'excused',
+      'late',
       'present',
     ]);
   });
