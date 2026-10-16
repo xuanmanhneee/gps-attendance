@@ -23,6 +23,7 @@ import {
   MyAttendanceSessionResponse,
 } from '@gps-attendance/shared';
 import { PrismaService } from '../common/database/prisma.service';
+import { GeoService } from '../geo/geo.service';
 
 @Injectable()
 export class AttendanceSessionQueryService {
@@ -31,6 +32,7 @@ export class AttendanceSessionQueryService {
     private readonly attendanceRecordsService: AttendanceRecordsService,
     private readonly usersService: UsersService,
     private readonly prisma: PrismaService,
+    private readonly geoService?: GeoService,
   ) {}
 
   async getTeachingSections(lecturerId: number, isAdmin = false) {
@@ -822,6 +824,10 @@ export class AttendanceSessionQueryService {
       include: { actor: { select: { fullname: true } } },
       orderBy: { createdAt: 'desc' },
     });
+    const latestLecturerVerification = await this.prisma.lecturerLocationVerification.findFirst({
+      where: { sessionId, status: 'PASS' },
+      orderBy: { createdAt: 'desc' },
+    });
     const registeredDevices = attempts.length
       ? await this.prisma.registeredDevice.findMany({
           where: {
@@ -837,9 +843,28 @@ export class AttendanceSessionQueryService {
         device,
       ]),
     );
+    const geo = this.geoService ?? new GeoService();
 
     const mappedAttempts: AttendanceAttemptDto[] = attempts.map((attempt) => {
       const device = deviceByUserAndId.get(`${attempt.userId}:${attempt.deviceId}`);
+      let distanceToLecturer: number | null = null;
+      let lecturerProximityVerdict: 'NEAR' | 'FAR' | 'NO_DATA' | null = null;
+
+      if (latestLecturerVerification) {
+        distanceToLecturer = Math.round(
+          geo.getDistanceInMeters(
+            Number(attempt.latitude),
+            Number(attempt.longitude),
+            Number(latestLecturerVerification.latitude),
+            Number(latestLecturerVerification.longitude),
+          ),
+        );
+        const nearThreshold = session.lecturerValidationRadius ?? 25;
+        lecturerProximityVerdict = distanceToLecturer <= nearThreshold ? 'NEAR' : 'FAR';
+      } else {
+        lecturerProximityVerdict = 'NO_DATA';
+      }
+
       return {
         registeredDeviceId: device?.id ?? null,
         deviceTrustStatus: device?.trustStatus ?? null,
@@ -851,6 +876,8 @@ export class AttendanceSessionQueryService {
         longitude: Number(attempt.longitude),
         accuracy: Number(attempt.accuracy),
         distanceToCenter: Number(attempt.distanceToCenter),
+        distanceToLecturer,
+        lecturerProximityVerdict,
         deviceId: attempt.deviceId,
         isMockLocation: attempt.isMockLocation,
         serverTimestamp: attempt.serverTimestamp.toISOString(),

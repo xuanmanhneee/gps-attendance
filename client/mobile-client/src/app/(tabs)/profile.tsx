@@ -27,6 +27,7 @@ import { ConfirmDialog } from '../../components/confirm-dialog';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../context/auth-context';
 import { userApi } from '../../api/user.api';
+import { checkDeviceSecurity } from '../../services/integrity';
 import { appAlert } from '../../utils/app-alert';
 
 type PermissionState = 'granted' | 'denied' | 'disabled' | 'unknown';
@@ -91,16 +92,19 @@ export default function ProfileScreen() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [hasMockLocation, setHasMockLocation] = useState<boolean | null>(null);
+  const [deviceSecurity, setDeviceSecurity] = useState<Awaited<ReturnType<typeof checkDeviceSecurity>> | null>(null);
 
   const refreshDeviceStatus = useCallback(async () => {
     try {
-      const [permission, locationEnabled, network] = await Promise.all([
+      const [permission, locationEnabled, network, security] = await Promise.all([
         Location.getForegroundPermissionsAsync(),
         Location.hasServicesEnabledAsync(),
         Network.getNetworkStateAsync(),
+        checkDeviceSecurity(),
       ]);
       setGpsState(!permission.granted ? 'denied' : locationEnabled ? 'granted' : 'disabled');
       setWifiConnected(network.type === Network.NetworkStateType.WIFI && network.isConnected === true);
+      setDeviceSecurity(security);
 
       if (permission.granted && locationEnabled) {
         try {
@@ -252,15 +256,19 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleSafetyPress = () => {
-    if (!Device.isDevice) {
+  const handleSafetyPress = async () => {
+    const security = await checkDeviceSecurity();
+    setDeviceSecurity(security);
+    if (!security.isRealDevice) {
       appAlert('Thiết bị mô phỏng', 'Ứng dụng đang chạy trên simulator/emulator, chưa thể xác minh an toàn thiết bị.');
     } else if (hasMockLocation) {
       appAlert('Vị trí giả lập', 'Thiết bị đang báo vị trí giả lập. Hãy tắt ứng dụng giả vị trí trước khi điểm danh.');
+    } else if (security.isRooted) {
+      appAlert('Cảnh báo can thiệp hệ thống', 'Thiết bị đã bị Root / Jailbreak. Vui lòng sử dụng thiết bị nguyên bản để đảm bảo an toàn.');
     } else {
       appAlert(
-        'Chưa xác minh bảo mật',
-        'Ứng dụng chưa tích hợp Play Integrity (Android) hoặc App Attest (iOS), nên chưa thể khẳng định thiết bị an toàn.',
+        'Thiết bị an toàn',
+        'Đã xác thực tính toàn vẹn: Thiết bị phần cứng thật, nguyên bản (chưa Root/Jailbreak), định vị GPS chuẩn xác.',
       );
     }
   };
@@ -299,15 +307,25 @@ export default function ProfileScreen() {
     : wifiConnected
       ? 'Đã kết nối'
       : 'Chưa kết nối';
-  const deviceSafetyLabel = !Device.isDevice
-    ? 'Thiết bị ảo'
-    : hasMockLocation
-      ? 'Không an toàn'
-      : 'Chưa xác minh';
-  const appVersion = Application.nativeApplicationVersion ?? '1.0.0';
   const green = '#16834B';
   const amber = '#A56A00';
   const red = '#C2413A';
+  const isDeviceSafe = deviceSecurity ? deviceSecurity.isSafe && !hasMockLocation : false;
+  const deviceSafetyLabel = !deviceSecurity
+    ? 'Đang kiểm tra'
+    : !deviceSecurity.isRealDevice
+      ? 'Thiết bị ảo'
+      : deviceSecurity.isRooted
+        ? 'Đã Root'
+        : hasMockLocation
+          ? 'Không an toàn'
+          : 'An toàn';
+  const deviceSafetyColor = !deviceSecurity
+    ? amber
+    : isDeviceSafe
+      ? green
+      : red;
+  const appVersion = Application.nativeApplicationVersion ?? '1.0.0';
 
   if (!user) {
     return (
@@ -415,7 +433,7 @@ export default function ProfileScreen() {
               <MaterialCommunityIcons name="shield-check-outline" size={15} color="#7A8580" />
               <Text style={styles.deviceLabel}>Trạng thái thiết bị</Text>
             </View>
-            <Text style={[styles.deviceValue, { color: hasMockLocation || !Device.isDevice ? red : amber }]}>
+            <Text style={[styles.deviceValue, { color: deviceSafetyColor }]}>
               {deviceSafetyLabel}
             </Text>
           </Pressable>

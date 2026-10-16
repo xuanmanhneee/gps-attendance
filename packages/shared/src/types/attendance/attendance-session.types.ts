@@ -38,6 +38,8 @@ export interface AttendanceAttemptDto {
   longitude: number;
   accuracy: number;
   distanceToCenter: number;
+  distanceToLecturer?: number | null;
+  lecturerProximityVerdict?: 'NEAR' | 'FAR' | 'NO_DATA' | null;
   deviceId: string;
   registeredDeviceId?: number | null;
   deviceTrustStatus?: 'UNVERIFIED' | 'TRUSTED' | 'BLOCKED' | null;

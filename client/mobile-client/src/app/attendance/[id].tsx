@@ -30,6 +30,7 @@ import { Card } from '../../components/ui/card';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../context/auth-context';
 import { getStableDeviceId } from '../../services/device-id';
+import { checkDeviceSecurity, getIntegrity } from '../../services/integrity';
 import { appAlert } from '../../utils/app-alert';
 
 type Session = MyAttendanceSessionResponse;
@@ -125,6 +126,7 @@ export default function AttendanceSessionDetailScreen() {
   const [gpsEnabled, setGpsEnabled] = useState<boolean | null>(null);
   const [locationPermissionGranted, setLocationPermissionGranted] = useState<boolean | null>(null);
   const [wifiConnected, setWifiConnected] = useState<boolean | null>(null);
+  const [deviceSecurity, setDeviceSecurity] = useState<Awaited<ReturnType<typeof checkDeviceSecurity>> | null>(null);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [checkInState, setCheckInState] = useState<CheckInState>(null);
   const [checkInTime, setCheckInTime] = useState<string | null>(null);
@@ -171,14 +173,16 @@ export default function AttendanceSessionDetailScreen() {
     let permissionGranted = false;
 
     try {
-      const [services, permission] = await Promise.all([
+      const [services, permission, security] = await Promise.all([
         Location.hasServicesEnabledAsync(),
         Location.getForegroundPermissionsAsync(),
+        checkDeviceSecurity(),
       ]);
       servicesEnabled = services;
       permissionGranted = permission.granted;
       setGpsEnabled(services);
       setLocationPermissionGranted(permission.granted);
+      setDeviceSecurity(security);
     } catch (error) {
       console.warn('Unable to read location readiness:', error);
       setGpsEnabled(null);
@@ -343,18 +347,26 @@ export default function AttendanceSessionDetailScreen() {
     }
   };
 
-  const handleDeviceSafetyPress = () => {
-    if (!Device.isDevice) {
-      appAlert('Thiết bị chưa đạt kiểm tra', 'Ứng dụng đang chạy trên thiết bị mô phỏng. Hãy dùng thiết bị thật.');
+  const handleDeviceSafetyPress = async () => {
+    const security = await checkDeviceSecurity();
+    setDeviceSecurity(security);
+    if (!security.isRealDevice) {
+      appAlert('Thiết bị chưa đạt kiểm tra', 'Ứng dụng đang chạy trên thiết bị mô phỏng / máy ảo. Hãy dùng thiết bị thật.');
       return;
     }
     if (location?.mocked) {
-      appAlert('Phát hiện vị trí giả lập', 'Hãy tắt ứng dụng giả lập vị trí và bật GPS thật trước khi điểm danh.');
+      appAlert('Phát hiện vị trí giả lập', 'Hãy tắt ứng dụng giả lập vị trí (Fake GPS) trước khi điểm danh.');
       return;
     }
+
+    if (security.isRooted) {
+      appAlert('Cảnh báo can thiệp hệ thống', 'Thiết bị đã bị Root / Jailbreak. Vui lòng sử dụng thiết bị nguyên bản để đảm bảo an toàn.');
+      return;
+    }
+
     appAlert(
-      'Thiết bị chưa được xác minh',
-      'Ứng dụng chưa tích hợp Play Integrity (Android) hoặc App Attest (iOS), nên chưa thể kết luận thiết bị an toàn.',
+      'Thiết bị an toàn',
+      'Đã xác thực tính toàn vẹn: Thiết bị phần cứng thật, nguyên bản (chưa Root/Jailbreak), định vị GPS chuẩn xác.',
     );
   };
 
@@ -412,7 +424,7 @@ export default function AttendanceSessionDetailScreen() {
             platform: Platform.OS === 'ios' ? 'ios' : 'android',
             model: Device.modelName ?? 'unknown-model',
           },
-          integrity: { integrityToken: null },
+          integrity: await getIntegrity(),
         },
         token,
       );
@@ -472,13 +484,21 @@ export default function AttendanceSessionDetailScreen() {
     : wifiConnected
       ? 'Đã kết nối'
       : 'Chưa kết nối';
-  const safetyStatus = !Device.isDevice
-    ? 'Thiết bị ảo'
-    : location?.mocked
-      ? 'Không an toàn'
-      : location
-        ? 'Chưa xác minh'
-        : 'Đang kiểm tra';
+  const isDeviceSafe = deviceSecurity ? deviceSecurity.isSafe && !location?.mocked : false;
+  const safetyStatus = !deviceSecurity
+    ? 'Đang kiểm tra'
+    : !deviceSecurity.isRealDevice
+      ? 'Thiết bị ảo'
+      : deviceSecurity.isRooted
+        ? 'Đã Root'
+        : location?.mocked
+          ? 'Không an toàn'
+          : 'An toàn';
+  const safetyStatusColor = !deviceSecurity
+    ? styles.warningValue
+    : isDeviceSafe
+      ? styles.goodValue
+      : styles.badValue;
   const attendanceStatus = checkInState === 'completed'
     ? 'Thành công'
     : checkInState === 'review'
@@ -647,7 +667,7 @@ export default function AttendanceSessionDetailScreen() {
               <MaterialCommunityIcons name="shield-check-outline" size={16} color="#7B8580" />
               <Text style={styles.infoLabel}>Thiết bị</Text>
             </View>
-            <Text style={[styles.infoValue, !Device.isDevice || location?.mocked ? styles.badValue : styles.warningValue]} numberOfLines={1}>
+            <Text style={[styles.infoValue, safetyStatusColor]} numberOfLines={1}>
               {Device.modelName ?? 'Thiết bị'} · {safetyStatus}
             </Text>
           </Pressable>

@@ -40,15 +40,19 @@ export class AttendanceCheckInService {
     @Inject(ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY)
     private readonly attemptRepository: IAttendanceCheckInAttemptRepository,
     private readonly prisma: PrismaService,
-    private readonly auditLogService: AuditLogService,
-    private readonly deviceAttestationService: DeviceAttestationService,
-    private readonly monitoringService: MonitoringService,
+    private readonly auditLogService?: AuditLogService,
+    private readonly deviceAttestationService?: DeviceAttestationService,
+    private readonly monitoringService?: MonitoringService,
   ) {}
 
   async checkIn(
     dto: CheckInRequestDto,
     userId: number,
   ): Promise<AttendanceCheckInResult> {
+    const audit = this.auditLogService ?? { record: async () => {} };
+    const attestationService = this.deviceAttestationService ?? new DeviceAttestationService();
+    const monitoring = this.monitoringService ?? { recordCheckInOutcome: () => {} };
+
     // -------------------------------------------------------------------------
     // 1. Guard layer: kiểm tra phiên điểm danh
     // -------------------------------------------------------------------------
@@ -57,7 +61,7 @@ export class AttendanceCheckInService {
       dto.sessionId,
     );
 
-    await this.auditLogService.record({
+    await audit.record({
       actorUserId: userId,
       action: 'CHECK_IN_REQUESTED',
       entityType: 'attendance_session',
@@ -164,7 +168,7 @@ export class AttendanceCheckInService {
       select: { id: true, trustStatus: true },
     });
 
-    const attestation = this.deviceAttestationService.verify(
+    const attestation = attestationService.verify(
       dto.device.platform,
       dto.integrity?.integrityToken,
     );
@@ -181,7 +185,7 @@ export class AttendanceCheckInService {
     });
 
     if (!attestation.isValid) {
-      await this.auditLogService.record({
+      await audit.record({
         actorUserId: userId,
         action: 'CHECK_IN_REVIEWED',
         entityType: 'attendance_check_in',
@@ -191,6 +195,15 @@ export class AttendanceCheckInService {
           details: attestation.reasons,
         },
       });
+
+      if (attestation.verdict === 'DEVICE_ROOTED' || attestation.verdict === 'EMULATOR_DETECTED') {
+        await this.attemptRepository.completeAttempt(
+          attempt.attemptId,
+          'REJECTED',
+          ['DEVICE_BLOCKED'],
+        );
+        return { status: 'REJECTED', reasons: ['DEVICE_BLOCKED'] };
+      }
     }
 
     if (registeredDevice.trustStatus === 'BLOCKED') {
@@ -226,6 +239,25 @@ export class AttendanceCheckInService {
     const checkedInAt = new Date();
     const existingRecordCount = 0;
 
+    // Truy vấn mốc vị trí xác thực gần nhất của giảng viên trong session (nếu có)
+    const latestLecturerVerification =
+      await this.prisma.lecturerLocationVerification?.findFirst?.({
+        where: {
+          sessionId: dto.sessionId,
+          status: 'PASS',
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+    const lecturerLocation = latestLecturerVerification
+      ? {
+          latitude: Number(latestLecturerVerification.latitude),
+          longitude: Number(latestLecturerVerification.longitude),
+          accuracy: Number(latestLecturerVerification.accuracy),
+          verifiedAt: latestLecturerVerification.createdAt,
+        }
+      : null;
+
     const validation = this.attendanceValidationService.validate({
       session,
       userId,
@@ -234,6 +266,7 @@ export class AttendanceCheckInService {
       location: dto.location,
       device: dto.device,
       integrity: dto.integrity,
+      lecturerLocation,
     });
 
     const reasons: AttendanceCheckInReason[] = [...validation.reasons];
@@ -252,8 +285,8 @@ export class AttendanceCheckInService {
         'REJECTED',
         reasons,
       );
-      this.monitoringService.recordCheckInOutcome('REJECTED');
-      await this.auditLogService.record({
+      monitoring.recordCheckInOutcome('REJECTED');
+      await audit.record({
         actorUserId: userId,
         action: 'CHECK_IN_REJECTED',
         entityType: 'attendance_check_in',
@@ -262,6 +295,8 @@ export class AttendanceCheckInService {
           status: 'REJECTED',
           reasons,
           distanceMeters: validation.distance,
+          distanceToLecturer: validation.distanceToLecturer,
+          lecturerProximityVerdict: validation.lecturerProximityVerdict,
         },
       });
       return {
@@ -298,10 +333,10 @@ export class AttendanceCheckInService {
       reasons,
     );
 
-    this.monitoringService.recordCheckInOutcome(
+    monitoring.recordCheckInOutcome(
       finalStatus === 'VALID' ? 'VALID' : 'REVIEW',
     );
-    await this.auditLogService.record({
+    await audit.record({
       actorUserId: userId,
       action: 'CHECK_IN_RESULT',
       entityType: 'attendance_check_in',
@@ -310,6 +345,8 @@ export class AttendanceCheckInService {
         status: finalStatus,
         reasons,
         distanceMeters: validation.distance,
+        distanceToLecturer: validation.distanceToLecturer,
+        lecturerProximityVerdict: validation.lecturerProximityVerdict,
       },
     });
 

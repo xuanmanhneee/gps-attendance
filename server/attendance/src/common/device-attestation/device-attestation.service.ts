@@ -27,6 +27,23 @@ export class DeviceAttestationService {
         };
       }
 
+      // Kiểm tra bảo mật thiết bị từ offline security checks
+      if (payload.securityChecks?.isRooted === true) {
+        return {
+          isValid: false,
+          verdict: 'DEVICE_ROOTED',
+          reasons: ['DEVICE_ROOTED'],
+        };
+      }
+
+      if (payload.securityChecks?.isRealDevice === false) {
+        return {
+          isValid: false,
+          verdict: 'EMULATOR_DETECTED',
+          reasons: ['EMULATOR_DETECTED'],
+        };
+      }
+
       if (normalizedPlatform === 'ios') {
         const appAttestResult =
           payload.appAttestStatus ??
@@ -39,7 +56,8 @@ export class DeviceAttestationService {
           status === 'verified' ||
           status === 'valid' ||
           status === 'success' ||
-          status === 'meets_attestation';
+          status === 'meets_attestation' ||
+          payload.securityChecks?.offlineAttestation === true;
 
         return {
           isValid: isVerified,
@@ -48,7 +66,12 @@ export class DeviceAttestationService {
         };
       }
 
+      const recognitionVerdict = Array.isArray(payload.deviceRecognitionVerdict)
+        ? payload.deviceRecognitionVerdict.join(' ')
+        : payload.deviceRecognitionVerdict;
+
       const verdictCandidates = [
+        recognitionVerdict,
         payload.deviceIntegrityVerdict,
         payload.device_integrity_verdict,
         payload.integrityVerdict,
@@ -64,7 +87,8 @@ export class DeviceAttestationService {
         normalizedVerdict.includes('meets_strong_integrity') ||
         normalizedVerdict.includes('meets_device_integrity') ||
         normalizedVerdict.includes('strong_integrity') ||
-        normalizedVerdict.includes('device_integrity');
+        normalizedVerdict.includes('device_integrity') ||
+        payload.securityChecks?.offlineAttestation === true;
 
       return {
         isValid: isStrong,
@@ -81,7 +105,16 @@ export class DeviceAttestationService {
   }
 
   private decodePayload(token: string): Record<string, any> | null {
-    const segments = token.split('.');
+    const trimmed = (token ?? '').trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        return JSON.parse(trimmed) as Record<string, any>;
+      } catch {
+        return null;
+      }
+    }
+
+    const segments = trimmed.split('.');
     if (segments.length < 2) {
       return null;
     }

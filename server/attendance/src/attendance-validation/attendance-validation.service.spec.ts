@@ -47,6 +47,7 @@ describe('AttendanceValidationService', () => {
       integrityCheck,
       mockLocationCheck,
       locationCheck,
+      geoService,
     );
   });
 
@@ -275,6 +276,74 @@ describe('AttendanceValidationService', () => {
       expect(result.status).toBe('REJECTED');
       expect(result.reasons).toContain('LOW_LOCATION_ACCURACY');
       expect(result.reasons).toContain('LOW_CONFIDENCE_SCORE');
+    });
+
+    it('giữ ở trạng thái REVIEW và gắn cờ NEAR_LECTURER khi ở vùng biên UNCERTAIN nhưng gần vị trí giảng viên', () => {
+      // Vị trí UNCERTAIN: khoảng cách ~55m (bán kính 50m, accuracy 15m)
+      const borderlineLat = mockSession.latitude + 0.00050;
+      const borderlineLocation: LocationPayload = {
+        latitude: borderlineLat,
+        longitude: mockSession.longitude,
+        accuracy: 15,
+        timestamp: Date.now(),
+        isMockLocation: false,
+      };
+
+      // Giảng viên đang đứng ngay cạnh sinh viên (cách ~5m)
+      const lecturerLocation = {
+        latitude: borderlineLat + 0.00004,
+        longitude: mockSession.longitude,
+        accuracy: 10,
+      };
+
+      const result = validationService.validate({
+        session: mockSession,
+        userId: 10,
+        existingRecordCount: 0,
+        checkedInAt: new Date(),
+        location: borderlineLocation,
+        device: defaultDevice,
+        integrity: defaultIntegrity,
+        lecturerLocation,
+      });
+
+      expect(result.status).toBe('REVIEW');
+      expect(result.reasons).toContain('NEAR_LECTURER');
+      expect(result.lecturerProximityVerdict).toBe('NEAR');
+      expect(result.distanceToLecturer).toBeLessThanOrEqual(25);
+    });
+
+    it('gắn nhãn FAR_FROM_LECTURER khi ở vùng biên UNCERTAIN và xa vị trí giảng viên', () => {
+      const borderlineLat = mockSession.latitude + 0.00050;
+      const borderlineLocation: LocationPayload = {
+        latitude: borderlineLat,
+        longitude: mockSession.longitude,
+        accuracy: 15,
+        timestamp: Date.now(),
+        isMockLocation: false,
+      };
+
+      // Giảng viên ở xa (cách hơn 60m)
+      const lecturerLocation = {
+        latitude: mockSession.latitude - 0.00050,
+        longitude: mockSession.longitude,
+        accuracy: 10,
+      };
+
+      const result = validationService.validate({
+        session: mockSession,
+        userId: 10,
+        existingRecordCount: 0,
+        checkedInAt: new Date(),
+        location: borderlineLocation,
+        device: defaultDevice,
+        integrity: defaultIntegrity,
+        lecturerLocation,
+      });
+
+      expect(result.reasons).toContain('FAR_FROM_LECTURER');
+      expect(result.lecturerProximityVerdict).toBe('FAR');
+      expect(result.distanceToLecturer).toBeGreaterThan(35);
     });
   });
 });

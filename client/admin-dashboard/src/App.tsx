@@ -5,6 +5,7 @@ import DashboardPage from './pages/DashboardPage';
 import SessionDetailPage from './pages/SessionDetailPage';
 import LocationRegistryPage from './pages/LocationRegistryPage';
 import CourseSectionsPage from './pages/CourseSectionsPage';
+import DevicesPage from './pages/DevicesPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useAuth } from './hooks/useAuth';
@@ -59,6 +60,14 @@ function App() {
           element={
             <ProtectedRoute>
               <CourseSectionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/devices"
+          element={
+            <ProtectedRoute>
+              <DevicesPage />
             </ProtectedRoute>
           }
         />

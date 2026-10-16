@@ -33,6 +33,7 @@ const DashboardSidebar = ({ user, onLogout }: DashboardSidebarProps) => (
       {user?.role === 'admin' && (
         <NavItem label="Lớp học phần" to="/course-sections" />
       )}
+      <NavItem label="Quản lý thiết bị" to="/devices" />
       <NavItem label="Location Registry" to="/locations" />
     </nav>
 

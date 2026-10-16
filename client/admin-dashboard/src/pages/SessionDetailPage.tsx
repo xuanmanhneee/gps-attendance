@@ -14,6 +14,8 @@ import type {
 } from '@gps-attendance/shared';
 
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
+import { deviceTrustApi } from '../api/device-trust.api';
+import { toast } from 'react-toastify';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Pagination } from '../components/Pagination';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
@@ -31,6 +33,10 @@ const reasonLabels: Record<string, string> = {
   TOO_MANY_ATTEMPTS: 'Đã vượt quá số lần thử cho phép (3 lần)',
   LOW_CONFIDENCE_SCORE: 'Độ tin cậy vị trí thấp',
   LOW_LOCATION_ACCURACY: 'Sai số GPS lớn, vị trí chưa chắc chắn nằm gọn trong phạm vi',
+  UNCERTAIN_BOUNDARY: 'Vị trí ở vùng biên Geofence',
+  NEAR_LECTURER: '🎯 Ở gần giảng viên (Khuyến nghị duyệt)',
+  FAR_FROM_LECTURER: '⚠️ Ở xa vị trí giảng viên',
+  NO_LECTURER_LOCATION: 'Chưa có GPS đối chiếu từ giảng viên',
   DEVICE_UNVERIFIED: 'Thiết bị chưa được admin xác minh',
   DEVICE_BLOCKED: 'Thiết bị đã bị admin chặn',
 };
@@ -216,6 +222,30 @@ const SessionDetailPage = () => {
     } catch (trustError) {
       console.error('Không cập nhật được device trust:', trustError);
       window.alert('Không cập nhật được trạng thái thiết bị.');
+    } finally {
+      setDeviceUpdatingId(null);
+    }
+  };
+
+  const handleResetDevice = async (
+    registeredDeviceId: number,
+    userCode: string,
+  ) => {
+    const note = window.prompt(
+      `Xác nhận gỡ thiết bị cũ cho sinh viên (${userCode}) để sinh viên liên kết điện thoại mới? Nhập ghi chú nếu có:`,
+      'Sinh viên đổi điện thoại',
+    );
+    if (note === null) return;
+    try {
+      setDeviceUpdatingId(registeredDeviceId);
+      await deviceTrustApi.resetDevice(registeredDeviceId, note.trim() || undefined);
+      toast.success(`Đã gỡ thiết bị cũ cho sinh viên (${userCode}). Sinh viên có thể dùng điện thoại mới điểm danh lại ngay!`);
+      setSession(
+        normalizeSessionDetail(await attendanceSessionsApi.getDetail(Number(id))),
+      );
+    } catch (err) {
+      console.error('Lỗi khi đặt lại thiết bị:', err);
+      toast.error('Không thể đặt lại thiết bị cho sinh viên.');
     } finally {
       setDeviceUpdatingId(null);
     }
@@ -626,9 +656,20 @@ const SessionDetailPage = () => {
                                   : 'Có dấu hiệu bất thường'}
                               </span>
                             </div>
-                            <p className="mt-1.5 text-[11px] text-slate-600">
-                              Distance {studentAttempt.distanceToCenter}m · Accuracy ±{studentAttempt.accuracy}m · Radius {session.radius}m · Mock GPS {studentAttempt.isMockLocation ? 'YES' : 'NO'} · Device {studentAttempt.deviceTrustStatus ?? 'UNVERIFIED'} · {attemptCountByStudent.get(studentAttempt.userCode) ?? 1} lần thử
-                            </p>
+                            <div className="mt-1.5 text-[11px] text-slate-600 flex flex-wrap items-center gap-1.5">
+                              <span>Distance {studentAttempt.distanceToCenter}m · Accuracy ±{studentAttempt.accuracy}m · Radius {session.radius}m · Mock GPS {studentAttempt.isMockLocation ? 'YES' : 'NO'} · Device {studentAttempt.deviceTrustStatus ?? 'UNVERIFIED'} · {attemptCountByStudent.get(studentAttempt.userCode) ?? 1} lần thử</span>
+                              {studentAttempt.distanceToLecturer != null && (
+                                <span className={`inline-flex items-center gap-1 font-semibold ${
+                                  studentAttempt.lecturerProximityVerdict === 'NEAR' || studentAttempt.reasons?.includes('NEAR_LECTURER')
+                                    ? 'text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5'
+                                    : 'text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5'
+                                }`}>
+                                  {studentAttempt.lecturerProximityVerdict === 'NEAR' || studentAttempt.reasons?.includes('NEAR_LECTURER')
+                                    ? `🎯 Cách GV: ${studentAttempt.distanceToLecturer}m (Gần GV)`
+                                    : `⚠️ Cách GV: ${studentAttempt.distanceToLecturer}m (Xa GV)`}
+                                </span>
+                              )}
+                            </div>
                             <div className="mt-2 flex gap-2">
                               <button
                                 type="button"
@@ -794,20 +835,33 @@ const SessionDetailPage = () => {
                           <span className={attempt.deviceTrustStatus === 'TRUSTED' ? 'text-emerald-700' : attempt.deviceTrustStatus === 'BLOCKED' ? 'text-rose-700' : 'text-amber-700'}>
                             {attempt.deviceTrustStatus ?? 'UNVERIFIED'}
                           </span>
-                          {user?.role === 'admin' && attempt.registeredDeviceId && (
-                            <div className="mt-1 flex gap-1">
+                          {(user?.role === 'admin' || user?.role === 'lecturer') && attempt.registeredDeviceId && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {attempt.deviceTrustStatus !== 'TRUSTED' && (
+                                <button
+                                  type="button"
+                                  disabled={deviceUpdatingId === attempt.registeredDeviceId}
+                                  onClick={() => void handleDeviceTrust(attempt.registeredDeviceId!, 'TRUSTED')}
+                                  className="rounded bg-emerald-50 hover:bg-emerald-100 px-1.5 py-1 text-[10px] font-semibold text-emerald-800 disabled:opacity-50"
+                                  title="Duyệt tin cậy thiết bị này"
+                                >Trust</button>
+                              )}
+                              {attempt.deviceTrustStatus !== 'BLOCKED' && (
+                                <button
+                                  type="button"
+                                  disabled={deviceUpdatingId === attempt.registeredDeviceId}
+                                  onClick={() => void handleDeviceTrust(attempt.registeredDeviceId!, 'BLOCKED')}
+                                  className="rounded bg-rose-50 hover:bg-rose-100 px-1.5 py-1 text-[10px] font-semibold text-rose-800 disabled:opacity-50"
+                                  title="Chặn thiết bị này"
+                                >Block</button>
+                              )}
                               <button
                                 type="button"
                                 disabled={deviceUpdatingId === attempt.registeredDeviceId}
-                                onClick={() => void handleDeviceTrust(attempt.registeredDeviceId!, 'TRUSTED')}
-                                className="rounded bg-emerald-50 px-1.5 py-1 text-[10px] font-semibold text-emerald-800 disabled:opacity-50"
-                              >Trust</button>
-                              <button
-                                type="button"
-                                disabled={deviceUpdatingId === attempt.registeredDeviceId}
-                                onClick={() => void handleDeviceTrust(attempt.registeredDeviceId!, 'BLOCKED')}
-                                className="rounded bg-rose-50 px-1.5 py-1 text-[10px] font-semibold text-rose-800 disabled:opacity-50"
-                              >Block</button>
+                                onClick={() => void handleResetDevice(attempt.registeredDeviceId!, attempt.userCode)}
+                                className="rounded bg-blue-50 hover:bg-blue-100 px-1.5 py-1 text-[10px] font-semibold text-blue-800 disabled:opacity-50"
+                                title="Gỡ thiết bị cũ để sinh viên đổi điện thoại mới"
+                              >Đổi máy</button>
                             </div>
                           )}
                         </td>

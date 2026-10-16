@@ -53,7 +53,11 @@ export type AttendanceValidationReason =
   | 'LOW_CONFIDENCE_SCORE'
   | 'MOCK_LOCATION'
   | 'OUT_OF_RANGE'
-  | 'LOW_LOCATION_ACCURACY';
+  | 'LOW_LOCATION_ACCURACY'
+  | 'UNCERTAIN_BOUNDARY'
+  | 'NEAR_LECTURER'
+  | 'FAR_FROM_LECTURER'
+  | 'NO_LECTURER_LOCATION';
 
 // -----------------------------------------------------------------------------
 // Attendance Check-in

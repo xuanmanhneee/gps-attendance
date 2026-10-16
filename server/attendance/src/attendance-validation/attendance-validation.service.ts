@@ -12,6 +12,7 @@ import {
 import { IntegrityCheck } from './checks/integrity.check';
 import { LocationCheck } from './checks/location.check';
 import { MockLocationCheck } from './checks/mock-location.check';
+import { GeoService } from '../geo/geo.service';
 import { AttendanceSession } from '../attendance-sessions/attendance-session.model';
 
 @Injectable()
@@ -24,6 +25,7 @@ export class AttendanceValidationService {
     private readonly integrityCheck: IntegrityCheck,
     private readonly mockLocationCheck: MockLocationCheck,
     private readonly locationCheck: LocationCheck,
+    private readonly geoService: GeoService,
   ) {}
 
   distanceToCenter(
@@ -43,11 +45,32 @@ export class AttendanceValidationService {
     const distance = locationCheck.distance;
     const gpsAccuracy = Math.max(0, input.location.accuracy ?? 0);
 
+    let distanceToLecturer: number | null = null;
+    let lecturerProximityVerdict: 'NEAR' | 'FAR' | 'NO_DATA' | null = null;
+
+    if (input.lecturerLocation) {
+      distanceToLecturer = Math.round(
+        this.geoService.getDistanceInMeters(
+          input.location.latitude,
+          input.location.longitude,
+          input.lecturerLocation.latitude,
+          input.lecturerLocation.longitude,
+        ),
+      );
+      // Bán kính lân cận giảng viên (mặc định 25m hoặc theo cấu hình phòng/phiên)
+      const nearThreshold = input.session.lecturerValidationRadius ?? 25;
+      lecturerProximityVerdict = distanceToLecturer <= nearThreshold ? 'NEAR' : 'FAR';
+    } else {
+      lecturerProximityVerdict = 'NO_DATA';
+    }
+
     if (mockCheck.coefficient === 0) {
       return {
         status: 'REJECTED',
         reasons: ['MOCK_LOCATION'],
         distance,
+        distanceToLecturer,
+        lecturerProximityVerdict,
       };
     }
 
@@ -56,6 +79,8 @@ export class AttendanceValidationService {
         status: 'REJECTED',
         reasons: ['OUT_OF_RANGE'],
         distance,
+        distanceToLecturer,
+        lecturerProximityVerdict,
       };
     }
 
@@ -70,6 +95,8 @@ export class AttendanceValidationService {
         status: 'REVIEW',
         reasons: ['LOW_LOCATION_ACCURACY'],
         distance,
+        distanceToLecturer,
+        lecturerProximityVerdict,
       };
     }
 
@@ -78,36 +105,74 @@ export class AttendanceValidationService {
         status: 'REVIEW',
         reasons: ['LOW_LOCATION_ACCURACY', 'LOW_CONFIDENCE_SCORE'],
         distance,
+        distanceToLecturer,
+        lecturerProximityVerdict,
       };
     }
 
+    // -------------------------------------------------------------------------
+    // Cơ chế điều chỉnh quyết định tại vùng biên (Dual-Anchor Decision Support)
+    // -------------------------------------------------------------------------
     if (locationCheck.certainty === 'UNCERTAIN') {
       const nearSessionBoundary = distance >= input.session.radius * 0.75;
-      const riskySignal = gpsAccuracy >= 60 || integrityCheck.coefficient < 0.7;
+      const reasons: AttendanceValidationReason[] = ['UNCERTAIN_BOUNDARY'];
 
-      if (integrityCheck.coefficient < 0.75 && gpsAccuracy >= 35) {
+      if (lecturerProximityVerdict === 'NEAR') {
+        // Sinh viên ở gần giảng viên: Tận dụng vị trí giảng viên để hỗ trợ
+        // Thay vì bị loại cứng, hệ thống giữ ở trạng thái REVIEW kèm nhãn NEAR_LECTURER
+        reasons.push('NEAR_LECTURER');
         return {
-          status: nearSessionBoundary ? 'REJECTED' : 'REVIEW',
-          reasons: nearSessionBoundary
-            ? ['LOW_LOCATION_ACCURACY', 'LOW_CONFIDENCE_SCORE']
-            : ['LOW_LOCATION_ACCURACY', 'LOW_CONFIDENCE_SCORE'],
+          status: 'REVIEW',
+          reasons: reasons as [AttendanceValidationReason, ...AttendanceValidationReason[]],
           distance,
+          distanceToLecturer,
+          lecturerProximityVerdict,
+        };
+      } else if (lecturerProximityVerdict === 'FAR') {
+        // Sinh viên ở xa giảng viên khi đang ở vùng biên
+        reasons.push('FAR_FROM_LECTURER');
+        reasons.push('LOW_LOCATION_ACCURACY');
+        const riskySignal = gpsAccuracy >= 60 || integrityCheck.coefficient < 0.7;
+        if (riskySignal || nearSessionBoundary) {
+          reasons.push('LOW_CONFIDENCE_SCORE');
+          return {
+            status: 'REJECTED',
+            reasons: reasons as [AttendanceValidationReason, ...AttendanceValidationReason[]],
+            distance,
+            distanceToLecturer,
+            lecturerProximityVerdict,
+          };
+        }
+        return {
+          status: 'REVIEW',
+          reasons: reasons as [AttendanceValidationReason, ...AttendanceValidationReason[]],
+          distance,
+          distanceToLecturer,
+          lecturerProximityVerdict,
+        };
+      } else {
+        // Không có dữ liệu GPS giảng viên (NO_DATA) -> fallback an toàn
+        reasons.push('NO_LECTURER_LOCATION');
+        reasons.push('LOW_LOCATION_ACCURACY');
+        const riskySignal = gpsAccuracy >= 60 || integrityCheck.coefficient < 0.7;
+        if (nearSessionBoundary && (riskySignal || (integrityCheck.coefficient < 0.75 && gpsAccuracy >= 35))) {
+          reasons.push('LOW_CONFIDENCE_SCORE');
+          return {
+            status: 'REJECTED',
+            reasons: reasons as [AttendanceValidationReason, ...AttendanceValidationReason[]],
+            distance,
+            distanceToLecturer,
+            lecturerProximityVerdict,
+          };
+        }
+        return {
+          status: 'REVIEW',
+          reasons: reasons as [AttendanceValidationReason, ...AttendanceValidationReason[]],
+          distance,
+          distanceToLecturer,
+          lecturerProximityVerdict,
         };
       }
-
-      if (riskySignal && nearSessionBoundary) {
-        return {
-          status: 'REJECTED',
-          reasons: ['LOW_LOCATION_ACCURACY', 'LOW_CONFIDENCE_SCORE'],
-          distance,
-        };
-      }
-
-      return {
-        status: 'REVIEW',
-        reasons: ['LOW_LOCATION_ACCURACY'],
-        distance,
-      };
     }
 
     const score =
@@ -126,7 +191,13 @@ export class AttendanceValidationService {
     }
 
     if (score >= 80 && reasons.length === 0) {
-      return { status: 'VALID', reasons: [], distance };
+      return {
+        status: 'VALID',
+        reasons: [],
+        distance,
+        distanceToLecturer,
+        lecturerProximityVerdict,
+      };
     }
 
     if (score >= 60) {
@@ -137,6 +208,8 @@ export class AttendanceValidationService {
           ...AttendanceValidationReason[],
         ],
         distance,
+        distanceToLecturer,
+        lecturerProximityVerdict,
       };
     }
 
@@ -151,6 +224,8 @@ export class AttendanceValidationService {
         ...AttendanceValidationReason[],
       ],
       distance,
+      distanceToLecturer,
+      lecturerProximityVerdict,
     };
   }
 }

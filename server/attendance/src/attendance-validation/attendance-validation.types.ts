@@ -18,6 +18,13 @@ export type Coefficient = number;
 // Validation input
 // -----------------------------------------------------------------------------
 
+export interface LecturerLocationContext {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  verifiedAt?: Date;
+}
+
 export interface AttendanceValidationInput {
   // Server-resolved data
   session: AttendanceSession;
@@ -29,6 +36,9 @@ export interface AttendanceValidationInput {
   location: Location;
   device: Device;
   integrity: DeviceIntegrity;
+
+  // Auxiliary context for dual-anchor validation
+  lecturerLocation?: LecturerLocationContext | null;
 }
 
 // -----------------------------------------------------------------------------
@@ -58,5 +68,7 @@ export interface AttendanceValidationResult {
   status: AttendanceValidationStatus;
   reasons: AttendanceValidationReason[];
   distance?: number;
+  distanceToLecturer?: number | null;
+  lecturerProximityVerdict?: 'NEAR' | 'FAR' | 'NO_DATA' | null;
 }
 
