@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { FaLock, FaRegEyeSlash } from 'react-icons/fa';
+import { FaLock, FaMoon, FaRegEyeSlash, FaSun } from 'react-icons/fa';
 import { FaRegEye } from 'react-icons/fa6';
 import { RiAccountCircleFill } from 'react-icons/ri';
 import { useForm } from 'react-hook-form';
@@ -11,10 +11,11 @@ import type { LoginRequest } from '@gps-attendance/shared';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { ROUTE_PATHS } from '../routes/paths';
+import { toggleResolvedTheme } from '../types/theme';
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { resolvedTheme } = useTheme();
+  const { resolvedTheme, setMode } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const togglePasswordView = () => setShowPassword(!showPassword);
@@ -76,6 +77,27 @@ const LoginPage = () => {
             : 'linear-gradient(135deg, transparent 0 24%, rgba(216,221,215,.28) 24.1% 36%, transparent 36.1% 52%, rgba(216,221,215,.22) 52.1% 63%, transparent 63.1%)',
         }}
       />
+
+      <div className="relative z-10 flex w-full max-w-[500px] justify-end">
+        <button
+          type="button"
+          onClick={() => setMode(toggleResolvedTheme(resolvedTheme))}
+          aria-label="Giao diện tối"
+          aria-pressed={isDark}
+          title={`Chuyển sang giao diện ${isDark ? 'sáng' : 'tối'}`}
+          className={`flex h-10 w-10 items-center justify-center border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+            isDark
+              ? 'border-slate-600 bg-[#1d2932] text-amber-300 hover:bg-[#27343e]'
+              : 'border-[#d3dbe5] bg-white text-[#548000] hover:bg-[#f1f4ec]'
+          }`}
+        >
+          {isDark ? (
+            <FaSun aria-hidden="true" />
+          ) : (
+            <FaMoon aria-hidden="true" />
+          )}
+        </button>
+      </div>
 
       <header className="relative z-10 mt-1 flex items-center justify-center gap-4 text-center">
         <div
