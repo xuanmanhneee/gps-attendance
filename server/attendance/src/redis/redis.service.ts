@@ -68,6 +68,10 @@ export class RedisService implements OnModuleDestroy {
     return this.redis.hgetall(key);
   }
 
+  eval(script: string, keys: string[], args: string[]): Promise<unknown> {
+    return this.redis.eval(script, keys.length, ...keys, ...args);
+  }
+
   scan(
     cursor: string,
     matchPattern: string,

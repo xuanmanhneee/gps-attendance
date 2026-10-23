@@ -3,6 +3,22 @@
   "rootDir": ".",
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
+  "moduleNameMapper": {
+    "^#account/(.*)$": "<rootDir>/../src/account/$1",
+    "^#attendance-check-in/(.*)$": "<rootDir>/../src/attendance-check-in/$1",
+    "^#attendance-record/(.*)$": "<rootDir>/../src/attendance-record/$1",
+    "^#attendance-sessions/(.*)$": "<rootDir>/../src/attendance-sessions/$1",
+    "^#attendance-validation/(.*)$": "<rootDir>/../src/attendance-validation/$1",
+    "^#auth/(.*)$": "<rootDir>/../src/auth/$1",
+    "^#tag/(.*)$": "<rootDir>/../src/tags/$1",
+    "^#units/(.*)$": "<rootDir>/../src/units/$1",
+    "^#common/(.*)$": "<rootDir>/../src/common/$1",
+    "^#geo/(.*)$": "<rootDir>/../src/geo/$1",
+    "^#prisma/(.*)$": "<rootDir>/../src/prisma/$1",
+    "^#user/(.*)$": "<rootDir>/../src/users/$1",
+    "^#redis/(.*)$": "<rootDir>/../src/redis/$1",
+    "^#job-scheduler/(.*)$": "<rootDir>/../src/job-scheduler/$1"
+  },
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   }

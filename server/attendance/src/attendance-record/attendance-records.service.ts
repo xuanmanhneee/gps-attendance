@@ -17,7 +17,10 @@ import {
   ATTENDANCE_RECORD_BUFFER,
   ATTENDANCE_RECORD_REPOSITORY,
 } from './attendance-record.token';
-import { IAttendanceRecordBuffer } from './attendance-record.buffer';
+import {
+  IAttendanceRecordBuffer,
+  MarkPresentResult,
+} from './attendance-record.buffer';
 
 @Injectable()
 export class AttendanceRecordsService {
@@ -104,21 +107,16 @@ export class AttendanceRecordsService {
     }
   }
 
-  async markPresent(input: MarkPresentInput): Promise<AttendanceRecord> {
-    const base = {
-      sessionId: input.sessionId,
-      userId: input.userId,
-      status: 'present' as const,
-      checkedInAt: input.checkedInAt,
-      latitude: input.latitude,
-      longitude: input.longitude,
-      accuracy: input.accuracy,
-      updateBy: input.updateBy,
-    };
-
-    await this.attendanceRecordBuffer.upsertRecord(base);
-
-    return { ...base, updatedAt: new Date() };
+  async markPresent(
+    input: MarkPresentInput,
+    deviceId: string,
+    deviceTtlSeconds: number,
+  ): Promise<MarkPresentResult> {
+    return this.attendanceRecordBuffer.markPresentIfEligible(
+      input,
+      deviceId,
+      deviceTtlSeconds,
+    );
   }
 
   // Đọc buffer trước (dữ liệu mới nhất khi session đang mở), fallback sang
