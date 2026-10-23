@@ -13,14 +13,17 @@ export type SessionFormValues = {
   latitude: number;
   longitude: number;
   radius: number;
-  /** `YYYY-MM-DD` theo giờ local (đúng định dạng input type="date"). */
   openDate: string;
-  /** `HH:mm` theo giờ local (đúng định dạng input type="time"). */
   openTime: string;
   closeDate: string;
   closeTime: string;
-  /** Vùng nhập tạm: mã sinh viên phân cách bằng dấu phẩy. */
-  studentCodesText: string;
+
+  unitInclude: number[];
+  unitExclude: number[];
+  tagInclude: number[];
+  tagExclude: number[];
+  codeIncludeText: string;
+  codeExcludeText: string;
 };
 
 /** Field thật của form; mọi message đều gắn được vào một input cụ thể. */
@@ -30,7 +33,7 @@ export type SessionFormField =
   | 'longitude'
   | 'radius'
   | 'closeTime'
-  | 'studentCodesText';
+  | 'codeIncludeText';
 
 export const SESSION_FORM_FIELDS: readonly SessionFormField[] = [
   'title',
@@ -38,7 +41,7 @@ export const SESSION_FORM_FIELDS: readonly SessionFormField[] = [
   'longitude',
   'radius',
   'closeTime',
-  'studentCodesText',
+  'codeIncludeText',
 ];
 
 export type SessionFormErrors = Partial<
@@ -75,7 +78,12 @@ export const createDefaultSessionFormValues = (
     openTime: openTime ?? '',
     closeDate: closeDate ?? '',
     closeTime: closeTime ?? '',
-    studentCodesText: '',
+    unitInclude: [],
+    unitExclude: [],
+    tagInclude: [],
+    tagExclude: [],
+    codeIncludeText: '',
+    codeExcludeText: '',
   };
 };
 
@@ -83,9 +91,8 @@ export const createDefaultSessionFormValues = (
 export const parseStudentCodes = (raw: string): string[] => {
   const seen = new Set<string>();
 
-  for (const part of raw.split(',')) {
+  for (const part of raw.split(/[,\n\r]+/)) {
     const code = part.trim();
-
     if (code) seen.add(code);
   }
 
@@ -173,8 +180,15 @@ export const validateSessionForm = (
     errors.closeTime = 'sessions.form.timeRangeInvalid';
   }
 
-  if (parseStudentCodes(values.studentCodesText).length === 0) {
-    errors.studentCodesText = 'sessions.form.participantCodesRequired';
+  if (
+    parseStudentCodes(values.codeIncludeText).length === 0 &&
+    parseStudentCodes(values.codeExcludeText).length === 0 &&
+    values.unitInclude.length === 0 &&
+    values.unitExclude.length === 0 &&
+    values.tagInclude.length === 0 &&
+    values.tagExclude.length === 0
+  ) {
+    errors.codeIncludeText = 'sessions.form.participantCodesRequired';
   }
 
   return errors;
@@ -187,32 +201,44 @@ export const validateSessionForm = (
  */
 export const buildCreateSessionRequest = (
   values: SessionFormValues,
-): CreateAttendanceSessionRequest => ({
-  title: values.title.trim(),
-  latitude: values.latitude,
-  longitude: values.longitude,
-  radius: values.radius,
-  openAt: combineLocalDateTime(values.openDate, values.openTime),
-  closeAt: combineLocalDateTime(values.closeDate, values.closeTime),
-  participantCriteria: {
-    codeFilter: {
-      include: parseStudentCodes(values.studentCodesText),
+): CreateAttendanceSessionRequest => {
+  const includeCodes = parseStudentCodes(values.codeIncludeText);
+  const excludeCodes = parseStudentCodes(values.codeExcludeText);
+
+  return {
+    title: values.title.trim(),
+    latitude: values.latitude,
+    longitude: values.longitude,
+    radius: values.radius,
+    openAt: combineLocalDateTime(values.openDate, values.openTime),
+    closeAt: combineLocalDateTime(values.closeDate, values.closeTime),
+    participantCriteria: {
+      ...(values.unitInclude.length > 0 || values.unitExclude.length > 0
+        ? {
+            unitFilter: {
+              include: values.unitInclude,
+              exclude: values.unitExclude,
+            },
+          }
+        : {}),
+      ...(values.tagInclude.length > 0 || values.tagExclude.length > 0
+        ? {
+            tagFilter: {
+              include: values.tagInclude,
+              exclude: values.tagExclude,
+            },
+          }
+        : {}),
+      ...(includeCodes.length > 0 || excludeCodes.length > 0
+        ? {
+            codeFilter: {
+              ...(includeCodes.length > 0 && { include: includeCodes }),
+              ...(excludeCodes.length > 0 && { exclude: excludeCodes }),
+            },
+          }
+        : {}),
     },
-  },
-});
-
-/** Mã lỗi `GeolocationPositionError`: 1 denied, 2 unavailable, 3 timeout. */
-export const resolveGeolocationErrorKey = (error: unknown): TranslationKey => {
-  const code =
-    typeof error === 'object' && error !== null && 'code' in error
-      ? (error as { code?: unknown }).code
-      : undefined;
-
-  if (code === 1) return 'sessions.form.locationPermissionDenied';
-  if (code === 2) return 'sessions.form.locationUnavailable';
-  if (code === 3) return 'sessions.form.locationTimeout';
-
-  return 'sessions.form.locationError';
+  };
 };
 
 /** Giới hạn trùng DTO backend (`@IsLatitude`, `@IsLongitude`, `@IsPositive`). */
@@ -221,3 +247,33 @@ export const LATITUDE_MAX = 90;
 export const LONGITUDE_MIN = -180;
 export const LONGITUDE_MAX = 180;
 export const RADIUS_MIN = 1;
+
+/** Bước nhảy bán kính hiển thị trên UI — bội số của 50 m. */
+export const RADIUS_STEP = 10;
+
+/**
+ * Snap bán kính về bội số gần nhất của `RADIUS_STEP`, tối thiểu `RADIUS_STEP`.
+ *
+ * Dùng cho UI (kéo trên bản đồ, blur khỏi input) để giá trị hiển thị luôn
+ * đẹp. Không dùng trong `validateSessionForm` — validation vẫn cho phép giá
+ * trị nhỏ hơn nếu người dùng sửa phiên cũ.
+ */
+export const snapRadius = (value: number): number => {
+  if (!Number.isFinite(value)) return RADIUS_STEP;
+  return Math.max(RADIUS_STEP, Math.round(value / RADIUS_STEP) * RADIUS_STEP);
+};
+
+export const resolveGeolocationErrorKey = (
+  error: GeolocationPositionError,
+): TranslationKey => {
+  switch (error.code) {
+    case error.PERMISSION_DENIED:
+      return 'sessions.form.geolocationPermissionDenied';
+    case error.POSITION_UNAVAILABLE:
+      return 'sessions.form.geolocationUnavailable';
+    case error.TIMEOUT:
+      return 'sessions.form.geolocationTimeout';
+    default:
+      return 'sessions.form.geolocationUnavailable';
+  }
+};

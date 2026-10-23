@@ -36,7 +36,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     id: 'overview',
     labelKey: 'navigation.overview',
     path: ROUTE_PATHS.overview,
-    roles: ['admin', 'lecturer'],
+    roles: ['admin'],
   },
   {
     id: 'users',
@@ -89,8 +89,17 @@ export const NAVIGATION_GROUP_LABEL_KEYS: Record<UserRole, TranslationKey> = {
 
 export const DEFAULT_ROUTE_BY_ROLE: Record<UserRole, string> = {
   admin: ROUTE_PATHS.overview,
-  lecturer: ROUTE_PATHS.overview,
+  lecturer: ROUTE_PATHS.attendanceSessions,
 };
+
+/**
+ * Trang mặc định của vai trò. Nhận `string` vì vai trò từ API có thể nằm ngoài
+ * `UserRole` (vd `student` không dùng dashboard này); vai trò lạ về trang login.
+ */
+export const getDefaultRoute = (role: string | undefined): string =>
+  role !== undefined && role in DEFAULT_ROUTE_BY_ROLE
+    ? DEFAULT_ROUTE_BY_ROLE[role as UserRole]
+    : ROUTE_PATHS.login;
 
 export const getNavigationForRole = (
   role: UserRole,
@@ -101,8 +110,7 @@ export const getNavigationForRole = (
 export const isNavigationItemActive = (
   itemPath: string,
   pathname: string,
-): boolean =>
-  pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+): boolean => pathname === itemPath || pathname.startsWith(`${itemPath}/`);
 
 export const findNavigationItem = (
   pathname: string,

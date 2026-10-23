@@ -1,9 +1,6 @@
 import { NavLink } from 'react-router-dom';
 
-import {
-  getNavigationForRole,
-  NAVIGATION_GROUP_LABEL_KEYS,
-} from '../../config/navigation';
+import { getNavigationForRole } from '../../config/navigation';
 import { useRole } from '../../hooks/useRole';
 import { useTranslation } from '../../hooks/useTranslation';
 import { NAVIGATION_ICONS } from './navigation-icons';
@@ -16,10 +13,6 @@ export const SidebarNav = () => {
 
   return (
     <nav aria-label={t('app.primaryNavAria')}>
-      <p className="hidden px-3 pb-2 text-[10px] font-extrabold tracking-[0.12em] text-muted-soft uppercase md:block">
-        {t(NAVIGATION_GROUP_LABEL_KEYS[role])}
-      </p>
-
       {items.map((item) => {
         const Icon = NAVIGATION_ICONS[item.id];
 

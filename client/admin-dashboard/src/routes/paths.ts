@@ -10,10 +10,19 @@ export const ROUTE_PATHS = {
   units: '/units',
   tags: '/tags',
   attendanceSessions: '/sessions',
+  attendanceSessionCreate: '/sessions/new',
   attendanceSessionDetail: '/sessions/:id',
+  attendanceSessionEdit: '/sessions/:id/edit',
   attendanceRecords: '/attendance-records',
   statistics: '/statistics',
 } as const;
 
 export const buildSessionDetailPath = (sessionId: number): string =>
   `/sessions/${sessionId}`;
+
+/**
+ * Trang đầu tiên của từng vai trò sau khi đăng nhập.
+ * Lecturer không có trang tổng quan: vào thẳng danh sách phiên điểm danh.
+ */
+export const getHomePath = (role: string | undefined): string =>
+  role === 'lecturer' ? ROUTE_PATHS.attendanceSessions : ROUTE_PATHS.overview;

@@ -31,10 +31,24 @@ export const sessionErrorKeyByCode: Record<string, TranslationKey> = {
   // `ATTENDANCE_SESSION_FORBIDDEN` dùng cho lỗi "không phải chủ phiên" ở mọi
   // thao tác (xem `notOwnerError` ở server) nên phải map về message generic.
   [AttendanceSessionErrorCode.FORBIDDEN]: 'sessions.error.forbidden',
+  [AttendanceSessionErrorCode.INVALID_CRITERIA]:
+    'sessions.error.invalidCriteria',
+  [AttendanceSessionErrorCode.CANCEL_INVALID_STATUS]:
+    'sessions.error.cancelInvalidStatus',
+  [AttendanceSessionErrorCode.UPDATE_INVALID_STATUS]:
+    'sessions.error.updateInvalidStatus',
+  [AttendanceSessionErrorCode.UPDATE_FIELD_LOCKED]:
+    'sessions.error.updateFieldLocked',
+  [AttendanceSessionErrorCode.CRITERIA_LOCKED]: 'sessions.error.criteriaLocked',
 };
 
 /** Ngữ cảnh gọi API — quyết định message fallback khi không map được code. */
-export type SessionErrorContext = 'list' | 'detail' | 'create';
+export type SessionErrorContext =
+  | 'list'
+  | 'detail'
+  | 'create'
+  | 'update'
+  | 'cancel';
 
 export const sessionErrorFallbackKeyByContext: Record<
   SessionErrorContext,
@@ -43,6 +57,8 @@ export const sessionErrorFallbackKeyByContext: Record<
   list: 'sessions.loadError',
   detail: 'sessionDetail.loadError',
   create: 'sessions.createError',
+  update: 'sessions.updateError',
+  cancel: 'sessions.cancelError',
 };
 
 export const getSessionApiErrorCode = (error: unknown): string | null =>
