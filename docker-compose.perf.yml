@@ -1,0 +1,107 @@
+name: gps-attendance-perf
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: perf
+      POSTGRES_PASSWORD: perf
+      POSTGRES_DB: perf
+    volumes:
+      - perf_postgres:/var/lib/postgresql/data
+    cpus: "${PERF_DB_CPUS:-2.0}"
+    mem_limit: "${PERF_DB_MEMORY:-2g}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U perf -d perf"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - perf_redis:/data
+    cpus: "${PERF_REDIS_CPUS:-1.0}"
+    mem_limit: "${PERF_REDIS_MEMORY:-512m}"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api:
+    image: gps-attendance-perf-api:local
+    build:
+      context: .
+      dockerfile: server/attendance/Dockerfile.perf
+    command: ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/main.js"]
+    environment: &api_environment
+      DATABASE_URL: postgresql://perf:perf@postgres:5432/perf
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JWT_SECRET: "${PERF_JWT_SECRET:-local-performance-test-secret}"
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:3100:3000"
+    cpus: "${PERF_API_CPUS:-2.0}"
+    mem_limit: "${PERF_API_MEMORY:-2g}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  prepare:
+    image: gps-attendance-perf-api:local
+    profiles: ["tools"]
+    command: ["pnpm", "exec", "tsx", "scripts/prepare-load.ts"]
+    environment:
+      <<: *api_environment
+      LOAD_USERS: "${LOAD_USERS:-1000}"
+      LOAD_SESSION_MINUTES: "${LOAD_SESSION_MINUTES:-10}"
+      LOAD_DATA_PATH: /perf-data/load-data.json
+    volumes:
+      - perf_data:/perf-data
+    depends_on:
+      api:
+        condition: service_healthy
+
+  verify:
+    image: gps-attendance-perf-api:local
+    profiles: ["tools"]
+    command: ["pnpm", "exec", "tsx", "scripts/verify-load.ts"]
+    environment:
+      <<: *api_environment
+      LOAD_DATA_PATH: /perf-data/load-data.json
+      VERIFY_PHASE: "${VERIFY_PHASE:-before-flush}"
+    volumes:
+      - perf_data:/perf-data:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+  load:
+    image: grafana/k6:latest
+    profiles: ["load"]
+    entrypoint: ["k6", "run", "/scripts/check-in.js"]
+    environment:
+      API_URL: http://api:3000
+      LOAD_TIME_UNIT: "${LOAD_TIME_UNIT:-1m}"
+      LOAD_VUS: "${LOAD_VUS:-100}"
+    volumes:
+      - perf_data:/data:ro
+      - ./server/attendance/perf:/scripts:ro
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  perf_postgres:
+  perf_redis:
+  perf_data:
