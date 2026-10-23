@@ -2,6 +2,8 @@ import type {
   AttendanceSessionDetailResponse,
   AttendanceSessionResponse,
   CreateAttendanceSessionRequest,
+  UpdateAttendanceSessionRequest,
+  UserFilterCriteria,
 } from '@gps-attendance/shared';
 
 import { httpClient } from './http';
@@ -59,6 +61,25 @@ export const attendanceSessionsApi = {
   getDetail(id: number) {
     return httpClient.get<AttendanceSessionDetailResponse>(
       `/v0/attendance-sessions/${assertSessionId(id)}`,
+    );
+  },
+
+  update(id: number, request: UpdateAttendanceSessionRequest) {
+    return httpClient.patch<AttendanceSessionResponse>(
+      `/v0/attendance-sessions/${assertSessionId(id)}`,
+      request,
+    );
+  },
+
+  cancel(id: number) {
+    return httpClient.patch<AttendanceSessionResponse>(
+      `/v0/attendance-sessions/${assertSessionId(id)}/cancel`,
+    );
+  },
+
+  getCriteria(id: number) {
+    return httpClient.get<{ criteria: UserFilterCriteria | null }>(
+      `/v0/attendance-sessions/${assertSessionId(id)}/criteria`,
     );
   },
 };

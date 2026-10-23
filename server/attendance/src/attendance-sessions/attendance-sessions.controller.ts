@@ -23,6 +23,8 @@ import {
   MyAttendanceSessionResponse,
 } from '@gps-attendance/shared';
 import { AttendanceSessionQueryService } from './attendance-session-query.service';
+import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto';
+import { UserFilterCriteria } from '@gps-attendance/shared'; // gộp vào import @gps-attendance/shared có sẵn
 
 @ApiTags('attendance-sessions')
 @ApiBearerAuth()
@@ -63,6 +65,23 @@ export class AttendanceSessionsController {
       user.userId,
     );
     return toAttendanceSessionResponse(cancelled);
+  }
+
+  @ApiOperation({ summary: 'Sửa session (chỉ lecturer tạo ra session đó)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('lecturer')
+  @Patch(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateAttendanceSessionDto,
+    @CurrentUser() user: { userId: number },
+  ): Promise<AttendanceSessionResponse> {
+    const updated = await this.attendanceSessionsService.update(
+      id,
+      dto,
+      user.userId,
+    );
+    return toAttendanceSessionResponse(updated);
   }
 
   // ---- Các route tĩnh (static path) PHẢI khai báo trước ':id' ----
@@ -123,5 +142,23 @@ export class AttendanceSessionsController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<AttendanceSessionDetailResponse> {
     return this.attendanceSessionQueryService.getDetail(id);
+  }
+
+  @ApiOperation({
+    summary:
+      'Lấy criteria người tham gia (chỉ lecturer tạo, khi roster chưa khởi tạo)',
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('lecturer')
+  @Get(':id/criteria')
+  async getCriteria(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ): Promise<{ criteria: UserFilterCriteria | null }> {
+    const criteria = await this.attendanceSessionsService.getCriteria(
+      id,
+      user.userId,
+    );
+    return { criteria };
   }
 }
