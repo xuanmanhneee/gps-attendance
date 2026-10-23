@@ -1,6 +1,9 @@
+import type {
+  TagResponse,
+} from '@gps-attendance/shared';
+
 import { httpClient } from './http';
 import { MAX_TAG_NAME_LENGTH, validateTagName } from '../types/tag';
-import type { Tag } from '../types/tag';
 
 const assertValidId = (id: number, label: string) => {
   if (!Number.isInteger(id) || id <= 0) {
@@ -11,14 +14,13 @@ const assertValidId = (id: number, label: string) => {
 /**
  * Client cho domain Tags.
  *
- * Backend controller là `@Controller('tags')` (không có prefix `/v0`),
- * response thô được bọc `{ success: true, data }` và `httpClient` đã unwrap
- * `data` nên client chỉ làm việc với `Tag`/`number[]`.
- * Không có update client vì backend chưa expose `PATCH /tags/:id`.
+ * Backend controller dùng @Controller('tags').
+ * httpClient đã unwrap response.data nên client làm việc
+ * trực tiếp với kiểu dữ liệu API.
  */
 export const tagsApi = {
   getAll() {
-    return httpClient.get<Tag[]>('/tags');
+    return httpClient.get<TagResponse[]>('/tags');
   },
 
   create(name: string) {
@@ -34,7 +36,9 @@ export const tagsApi = {
       );
     }
 
-    return httpClient.post<Tag>('/tags', { name: result.value });
+    return httpClient.post<TagResponse>('/tags', {
+      name: result.value,
+    });
   },
 
   remove(id: number) {
@@ -53,13 +57,17 @@ export const tagsApi = {
     assertValidId(tagId, 'tag id');
     assertValidId(userId, 'user id');
 
-    return httpClient.post<void>(`/tags/${tagId}/users/${userId}`);
+    return httpClient.post<void>(
+      `/tags/${tagId}/users/${userId}`,
+    );
   },
 
   unassignUser(tagId: number, userId: number) {
     assertValidId(tagId, 'tag id');
     assertValidId(userId, 'user id');
 
-    return httpClient.delete<void>(`/tags/${tagId}/users/${userId}`);
+    return httpClient.delete<void>(
+      `/tags/${tagId}/users/${userId}`,
+    );
   },
 };

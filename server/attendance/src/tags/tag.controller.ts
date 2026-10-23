@@ -16,6 +16,8 @@ import { CreateTagDto } from './dto/create-tag.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/types/authenticated-user.type';
+import { TagMapper } from './tag.mapper';
+import { TagResponse } from '@gps-attendance/shared';
 
 @ApiTags('Tags')
 @ApiBearerAuth()
@@ -29,8 +31,12 @@ export class TagController {
    */
   @Post()
   @ApiOperation({ summary: 'Create a tag' })
-  create(@Body() dto: CreateTagDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.tagService.create(dto.name, user.userId);
+  async create(
+    @Body() dto: CreateTagDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<TagResponse> {
+    const tag = await this.tagService.create(dto.name, user.userId);
+    return TagMapper.toResponse(tag);
   }
 
   /**
@@ -38,8 +44,11 @@ export class TagController {
    */
   @Get()
   @ApiOperation({ summary: 'Get my tags' })
-  async findMine(@CurrentUser() user: AuthenticatedUser) {
-    return await this.tagService.findByOwner(user.userId);
+  async findMine(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<TagResponse[]> {
+    const tags = await this.tagService.findByOwner(user.userId);
+    return TagMapper.toResponses(tags);
   }
 
   /**
