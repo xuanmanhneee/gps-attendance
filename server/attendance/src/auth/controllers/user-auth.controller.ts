@@ -9,10 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import {
-  AuthErrorCode,
-  type TokenPairResponse,
-} from '@gps-attendance/shared';
+import { AuthErrorCode, type LoginResponse } from '@gps-attendance/shared';
 
 import { AuthService } from '../auth.service';
 import { CurrentUser } from '../decorators/current-user.decorator';
@@ -33,7 +30,7 @@ export class UserAuthController {
   @UseGuards(LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: LoginDto })
-  async login(@CurrentUser() user: AuthenticatedUser): Promise<TokenPairResponse> {
+  async login(@CurrentUser() user: AuthenticatedUser): Promise<LoginResponse> {
     if (user.role !== 'participant') {
       throw new UnauthorizedException({
         code: AuthErrorCode.ROLE_NOT_ALLOWED,
@@ -41,14 +38,14 @@ export class UserAuthController {
       });
     }
 
-    return this.authService.loginWithRefresh(user);
+    return this.authService.login(user);
   }
 
   @ApiOperation({ summary: 'Đổi refresh token lấy cặp token mới' })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: RefreshTokenDto })
-  refresh(@Body() request: RefreshTokenDto): Promise<TokenPairResponse> {
+  refresh(@Body() request: RefreshTokenDto): Promise<LoginResponse> {
     return this.authService.refresh(request.refreshToken);
   }
 }

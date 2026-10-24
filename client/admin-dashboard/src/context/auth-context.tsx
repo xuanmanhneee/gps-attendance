@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadUser = async () => {
     const token = tokenService.get();
 
-    if (!token) {
+    if (!token && !tokenService.getRefresh()) {
       setIsLoading(false);
       return;
     }
@@ -38,19 +38,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    const handleExpired = () => setUser(null);
+    window.addEventListener('auth:expired', handleExpired);
     // Tải user một lần khi mount. Mọi setState trong loadUser đều nằm sau
     // `await` nên không gây cascading render như rule suy đoán.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadUser();
+    return () => window.removeEventListener('auth:expired', handleExpired);
   }, []);
 
-  const login = async (request: LoginRequest) => {
+  const login = async (request: LoginRequest, rememberMe: boolean) => {
     setIsLoading(true);
 
     try {
       const response = await authApi.login(request);
-      tokenService.set(response.accessToken);
+      tokenService.set(
+        response.accessToken,
+        rememberMe ? response.refreshToken : undefined,
+      );
       setUser(await usersApi.getMe());
+    } catch (error) {
+      tokenService.remove();
+      setUser(null);
+      throw error;
     } finally {
       setIsLoading(false);
     }

@@ -13,6 +13,8 @@ import type { LoginRequest } from '@gps-attendance/shared';
 import { useAuth } from '../hooks/useAuth';
 import { ROUTE_PATHS } from '../routes/paths';
 
+type LoginFormValues = LoginRequest & { rememberMe: boolean };
+
 const LoginPage = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -21,11 +23,11 @@ const LoginPage = () => {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginRequest>();
+  } = useForm<LoginFormValues>({ defaultValues: { rememberMe: false } });
 
   const { login, isLoading } = useAuth();
 
-  const handleLogin = async (data: LoginRequest) => {
+  const handleLogin = async (data: LoginFormValues) => {
     // Lấy lỗi từ backend theo error code thay vì hard-code cùng một chuỗi ở
     // nhiều component.
     const loginErrorMessages: Partial<Record<string, string>> = {
@@ -35,16 +37,17 @@ const LoginPage = () => {
     };
 
     try {
-      await login(data);
+      await login(
+        { username: data.username, password: data.password },
+        data.rememberMe,
+      );
 
       toast.success('Đăng nhập thành công!');
 
       navigate(ROUTE_PATHS.overview, { replace: true });
     } catch (error) {
       if (error instanceof ApiError) {
-        const message = error.code
-          ? loginErrorMessages[error.code]
-          : undefined;
+        const message = error.code ? loginErrorMessages[error.code] : undefined;
 
         toast.error(message ?? error.message);
         return;
@@ -69,6 +72,7 @@ const LoginPage = () => {
             <RiAccountCircleFill />
             <input
               type="text"
+              autoComplete="username"
               placeholder="Username"
               {...register('username', { required: 'Vui lòng nhập Username' })}
               className="bg-transparent border-0 w-full outline-none text-sm md:text-base"
@@ -79,6 +83,7 @@ const LoginPage = () => {
             <FaLock />
             <input
               type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
               placeholder="Password"
               {...register('password', { required: 'Vui lòng nhập Password' })}
               className="bg-transparent border-0 w-full outline-none text-sm md:text-base"
@@ -100,6 +105,10 @@ const LoginPage = () => {
               {errors.password.message}
             </span>
           )}
+          <label className="flex w-full cursor-pointer items-center gap-2 text-sm text-gray-200">
+            <input type="checkbox" {...register('rememberMe')} />
+            Ghi nhớ đăng nhập
+          </label>
         </div>
 
         <button

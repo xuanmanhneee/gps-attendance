@@ -1,11 +1,9 @@
 import type {
-  ApiErrorCode,
   CreateUnitRequest,
   UnitResponse,
   UnitTreeResponse,
   UpdateUnitRequest,
 } from '@gps-attendance/shared';
-import { ApiError } from '@gps-attendance/shared';
 
 import { httpClient } from './http';
 
@@ -38,46 +36,13 @@ const assertValidParentId = (parentId: number | null | undefined) => {
   }
 };
 
-type ApiSuccessPayload<T> = { success: true; data: T };
-type ApiErrorPayload = { success: false; code: ApiErrorCode; message: string };
-
-/**
- * `FetchHttpClient` trong shared package hiện chỉ expose get/post/put/delete
- * trong khi backend Units dùng `PATCH /units/:id`. Handoff cấm sửa `server`
- * nên PATCH được thực hiện cục bộ tại đây bằng `fetch`, tái sử dụng cùng
- * base URL, token provider và shape `{ success, data }` của `httpClient`.
- */
 const patchUnit = async (
   id: number,
   request: UpdateUnitRequest,
 ): Promise<UnitResponse> => {
   assertValidId(id);
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
-  const token = localStorage.getItem('token');
-  const response = await fetch(`${baseUrl}/units/${id}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(request),
-  });
-  const result = (await response.json().catch(() => null)) as
-    | ApiSuccessPayload<UnitResponse>
-    | ApiErrorPayload
-    | null;
-
-  if (!response.ok || !result || result.success !== true) {
-    if (result && result.success === false) {
-      const payload = result as ApiErrorPayload;
-      throw new ApiError(payload.code, payload.message, response.status);
-    }
-
-    throw new Error(`API request failed: ${response.status}`);
-  }
-
-  return result.data;
+  return httpClient.patch<UnitResponse>(`/units/${id}`, request);
 };
 
 /**

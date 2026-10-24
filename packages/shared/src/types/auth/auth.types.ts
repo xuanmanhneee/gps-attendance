@@ -1,6 +1,10 @@
 export type Role = 'admin' | 'organizer' | 'participant';
 
-export const ROLES: readonly Role[] = ['admin', 'organizer', 'participant'] as const;
+export const ROLES: readonly Role[] = [
+  'admin',
+  'organizer',
+  'participant',
+] as const;
 
 export interface LoginRequest {
   username: string;
@@ -9,12 +13,9 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   accessToken: string;
-}
-
-export interface RefreshRequest {
   refreshToken: string;
 }
 
-export interface TokenPairResponse extends LoginResponse {
+export interface RefreshRequest {
   refreshToken: string;
 }

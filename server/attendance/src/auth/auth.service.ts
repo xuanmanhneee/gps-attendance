@@ -4,7 +4,11 @@ import { AccountService } from '../account/account.service';
 import { UsersService } from '../users/users.service';
 import type { AuthenticatedUser } from './types/authenticated-user.type';
 import { JwtPayload } from './strategies/jwt.strategy';
-import { AuthErrorCode, type LoginResponse, type TokenPairResponse } from '@gps-attendance/shared';
+import {
+  AuthErrorCode,
+  type LoginResponse,
+  type Role,
+} from '@gps-attendance/shared';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
 import { REFRESH_SESSION_REPOSITORY } from './refresh-session.repository.token';
@@ -60,22 +64,17 @@ export class AuthService {
     };
   }
 
-  /**
-   * Cấp access token cho user đã được xác thực.
-   */
-  login(user: AuthenticatedUser): LoginResponse {
+  private createAccessToken(user: AuthenticatedUser): string {
     const payload: JwtPayload = {
       sub: user.userId,
       username: user.username,
       role: user.role,
     };
 
-    return {
-      accessToken: this.jwtService.sign(payload),
-    };
+    return this.jwtService.sign(payload);
   }
 
-  async loginWithRefresh(user: AuthenticatedUser): Promise<TokenPairResponse> {
+  async login(user: AuthenticatedUser): Promise<LoginResponse> {
     const account = await this.accountService.findByUserId(user.userId);
     if (!account || account.status !== 'active') {
       throw new UnauthorizedException({
@@ -90,10 +89,13 @@ export class AuthService {
       hashRefreshToken(refreshToken),
       new Date(Date.now() + REFRESH_TOKEN_LIFETIME_MS),
     );
-    return { ...this.login(user), refreshToken };
+    return { accessToken: this.createAccessToken(user), refreshToken };
   }
 
-  async refresh(refreshToken: string): Promise<TokenPairResponse> {
+  async refresh(
+    refreshToken: string,
+    allowedRoles: readonly Role[] = ['participant'],
+  ): Promise<LoginResponse> {
     const nextToken = randomBytes(32).toString('base64url');
     const accountId = await this.unitOfWork.runInTransaction((ctx) =>
       this.refreshSessions.rotate(
@@ -112,7 +114,12 @@ export class AuthService {
 
     const account = await this.accountService.findById(accountId);
     const user = account && (await this.usersService.findById(account.userId));
-    if (!account || account.status !== 'active' || !user || user.role !== 'participant') {
+    if (
+      !account ||
+      account.status !== 'active' ||
+      !user ||
+      !allowedRoles.includes(user.role)
+    ) {
       throw new UnauthorizedException({
         code: AuthErrorCode.INVALID_TOKEN,
         message: 'Tài khoản không còn được phép đăng nhập',
@@ -120,7 +127,11 @@ export class AuthService {
     }
 
     return {
-      ...this.login({ userId: user.id, username: account.username, role: user.role }),
+      accessToken: this.createAccessToken({
+        userId: user.id,
+        username: account.username,
+        role: user.role,
+      }),
       refreshToken: nextToken,
     };
   }
