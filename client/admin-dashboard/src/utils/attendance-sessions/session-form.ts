@@ -87,8 +87,8 @@ export const createDefaultSessionFormValues = (
   };
 };
 
-/** Parse chuỗi mã sinh viên phân cách bằng dấu phẩy: trim, bỏ rỗng, dedup. */
-export const parseStudentCodes = (raw: string): string[] => {
+/** Parse chuỗi mã người tham gia phân cách bằng dấu phẩy: trim, bỏ rỗng, dedup. */
+export const parseParticipantCodes = (raw: string): string[] => {
   const seen = new Set<string>();
 
   for (const part of raw.split(/[,\n\r]+/)) {
@@ -181,8 +181,8 @@ export const validateSessionForm = (
   }
 
   if (
-    parseStudentCodes(values.codeIncludeText).length === 0 &&
-    parseStudentCodes(values.codeExcludeText).length === 0 &&
+    parseParticipantCodes(values.codeIncludeText).length === 0 &&
+    parseParticipantCodes(values.codeExcludeText).length === 0 &&
     values.unitInclude.length === 0 &&
     values.unitExclude.length === 0 &&
     values.tagInclude.length === 0 &&
@@ -202,8 +202,8 @@ export const validateSessionForm = (
 export const buildCreateSessionRequest = (
   values: SessionFormValues,
 ): CreateAttendanceSessionRequest => {
-  const includeCodes = parseStudentCodes(values.codeIncludeText);
-  const excludeCodes = parseStudentCodes(values.codeExcludeText);
+  const includeCodes = parseParticipantCodes(values.codeIncludeText);
+  const excludeCodes = parseParticipantCodes(values.codeExcludeText);
 
   return {
     title: values.title.trim(),

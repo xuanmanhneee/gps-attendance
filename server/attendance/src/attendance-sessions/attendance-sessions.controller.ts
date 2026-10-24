@@ -35,9 +35,9 @@ export class AttendanceSessionsController {
     private readonly attendanceSessionQueryService: AttendanceSessionQueryService,
   ) {}
 
-  @ApiOperation({ summary: 'Tạo session điểm danh mới (lecturer)' })
+  @ApiOperation({ summary: 'Tạo session điểm danh mới (organizer)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer')
+  @Roles('organizer')
   @Post()
   async create(
     @Body() dto: CreateAttendanceSessionDto,
@@ -51,10 +51,10 @@ export class AttendanceSessionsController {
   }
 
   @ApiOperation({
-    summary: 'Huỷ session điểm danh (chỉ lecturer tạo ra session đó)',
+    summary: 'Huỷ session điểm danh (chỉ organizer tạo ra session đó)',
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer')
+  @Roles('organizer')
   @Patch(':id/cancel')
   async cancel(
     @Param('id', ParseIntPipe) id: number,
@@ -67,9 +67,9 @@ export class AttendanceSessionsController {
     return toAttendanceSessionResponse(cancelled);
   }
 
-  @ApiOperation({ summary: 'Sửa session (chỉ lecturer tạo ra session đó)' })
+  @ApiOperation({ summary: 'Sửa session (chỉ organizer tạo ra session đó)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer')
+  @Roles('organizer')
   @Patch(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
@@ -96,9 +96,9 @@ export class AttendanceSessionsController {
     return sessions.map(toAttendanceSessionResponse);
   }
 
-  @ApiOperation({ summary: 'Danh sách session do chính tôi tạo (lecturer)' })
+  @ApiOperation({ summary: 'Danh sách session do chính tôi tạo (organizer)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer')
+  @Roles('organizer')
   @Get('created-by-me')
   async findMyCreated(
     @CurrentUser() user: { userId: number },
@@ -110,7 +110,7 @@ export class AttendanceSessionsController {
   }
 
   @ApiOperation({
-    summary: 'Danh sách session do 1 lecturer bất kỳ tạo (chỉ admin)',
+    summary: 'Danh sách session do 1 organizer bất kỳ tạo (chỉ admin)',
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
@@ -146,10 +146,10 @@ export class AttendanceSessionsController {
 
   @ApiOperation({
     summary:
-      'Lấy criteria người tham gia (chỉ lecturer tạo, khi roster chưa khởi tạo)',
+      'Lấy criteria người tham gia (chỉ organizer tạo, khi roster chưa khởi tạo)',
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer')
+  @Roles('organizer')
   @Get(':id/criteria')
   async getCriteria(
     @Param('id', ParseIntPipe) id: number,

@@ -24,19 +24,19 @@ import { checkIn } from '../../services/attendance';
 import { LocationPermissionError } from '../../services/location';
 import { colors } from '../../../theme';
 
-// Trạng thái phiên nhìn từ phía sinh viên. Dẫn xuất từ type của shared (không
+// Trạng thái phiên nhìn từ phía người tham gia. Dẫn xuất từ type của shared (không
 // chép tay) để khi server thêm SessionStatus mới thì switch dưới đây hết
 // exhaustive và TS báo lỗi ngay, thay vì âm thầm rơi vào nhánh sai.
 // 'open' không nằm trong union: phiên đang mở thì trạng thái hiển thị chính là
 // `myAttendance.status`.
-type StudentSessionStatus = Exclude<SessionStatus, 'open'> | AttendanceStatus;
+type ParticipantSessionStatus = Exclude<SessionStatus, 'open'> | AttendanceStatus;
 
-function getStudentSessionStatus(
+function getParticipantSessionStatus(
   session: MyAttendanceSessionResponse,
-): StudentSessionStatus {
-  // 'cancelled' là stored state do giảng viên set, phải kiểm tra TRƯỚC khi
+): ParticipantSessionStatus {
+  // 'cancelled' là stored state do người tổ chức set, phải kiểm tra TRƯỚC khi
   // xét theo giờ/điểm danh — nếu không sẽ bị tính đè thành 'absent' và hiện
-  // như thể sinh viên còn điểm danh được.
+  // như thể người tham gia còn điểm danh được.
   if (session.status === 'cancelled') {
     return 'cancelled';
   }
@@ -52,7 +52,7 @@ function getStudentSessionStatus(
   return session.myAttendance.status;
 }
 
-function getStudentSessionStatusLabel(status: StudentSessionStatus): string {
+function getParticipantSessionStatusLabel(status: ParticipantSessionStatus): string {
   switch (status) {
     case 'pending':
       return 'Chưa mở';
@@ -77,7 +77,7 @@ function getStudentSessionStatusLabel(status: StudentSessionStatus): string {
   }
 }
 
-function getCheckInButtonLabel(status: StudentSessionStatus): string {
+function getCheckInButtonLabel(status: ParticipantSessionStatus): string {
   switch (status) {
     case 'absent':
       return 'Điểm danh ngay';
@@ -137,7 +137,7 @@ function formatTime(value: string) {
   });
 }
 
-function getStatusStyle(status: StudentSessionStatus) {
+function getStatusStyle(status: ParticipantSessionStatus) {
   switch (status) {
     case 'present':
       return {
@@ -348,7 +348,7 @@ export default function HomeScreen() {
           </View>
         }
         renderItem={({ item }) => {
-          const status = getStudentSessionStatus(item);
+          const status = getParticipantSessionStatus(item);
           const canCheckIn = status === 'absent';
           const isCheckingIn = checkingInId === item.id;
           const statusStyle = getStatusStyle(status);
@@ -364,7 +364,7 @@ export default function HomeScreen() {
 
                 <View style={[styles.statusBadge, statusStyle.container]}>
                   <Text style={[styles.statusText, statusStyle.text]}>
-                    {getStudentSessionStatusLabel(status)}
+                    {getParticipantSessionStatusLabel(status)}
                   </Text>
                 </View>
               </View>

@@ -51,7 +51,7 @@ const ReservedStat = ({
   </div>
 );
 
-export const LecturerOverview = () => {
+export const OrganizerOverview = () => {
   const { t } = useTranslation();
 
   const { sessions, isLoading, error, reload } = useAttendanceSessions({

@@ -16,11 +16,15 @@ const validateRole = (role: string) => {
 };
 
 describe('CreateAccountWithUserDto.role', () => {
-  it.each(['lecturer', 'student'])('accepts %s', (role) => {
+  it.each(['organizer', 'participant'])('accepts %s', (role) => {
     expect(validateRole(role)).toBeUndefined();
   });
 
   it('rejects admin', () => {
     expect(validateRole('admin')?.constraints?.isIn).toBeDefined();
+  });
+
+  it.each(['lecturer', 'student'])('rejects legacy role %s', (role) => {
+    expect(validateRole(role)?.constraints?.isIn).toBeDefined();
   });
 });

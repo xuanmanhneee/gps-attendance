@@ -13,7 +13,7 @@ export const vi = {
 
   // ---- Navigation ----
   'navigation.group.admin': 'Admin',
-  'navigation.group.lecturer': 'Giảng viên',
+  'navigation.group.organizer': 'Người tổ chức',
   'navigation.overview': 'Tổng quan',
   'navigation.users': 'Người dùng',
   'navigation.units': 'Đơn vị',
@@ -26,12 +26,12 @@ export const vi = {
   'roles.fieldLabel': 'Vai trò hiện tại',
   'roles.statusAria': 'Vai trò xác thực: {role}',
   'roles.admin': 'Quản trị viên',
-  'roles.lecturer': 'Giảng viên',
+  'roles.organizer': 'Người tổ chức',
   'roles.pill.admin': 'Admin',
-  'roles.pill.lecturer': 'Lecturer',
-  'roles.student': 'Sinh viên',
+  'roles.pill.organizer': 'Người tổ chức',
+  'roles.participant': 'Người tham gia',
   'roles.adminProfile': 'Admin hệ thống',
-  'roles.lecturerProfile': 'Giảng viên phụ trách',
+  'roles.organizerProfile': 'Người tổ chức phụ trách',
 
   // ---- Trạng thái chung ----
   'common.loading': 'Đang tải dữ liệu...',
@@ -62,7 +62,7 @@ export const vi = {
 
   // ---- Topbar ----
   'topbar.context.admin': 'Trung tâm điều hành',
-  'topbar.context.lecturer': 'Trung tâm giảng viên',
+  'topbar.context.organizer': 'Quản lý phiên điểm danh',
 
   // ---- Thẻ trợ giúp trong sidebar (theo prototype `help-card`) ----
   'help.title': 'Cần hỗ trợ?',
@@ -79,16 +79,16 @@ export const vi = {
   'dashboard.admin.eyebrow': 'Tổng quan hệ thống',
   'dashboard.admin.description':
     'Theo dõi phiên điểm danh và tình hình vận hành của hệ thống.',
-  'dashboard.lecturer.eyebrow': 'Tổng quan điểm danh',
-  'dashboard.lecturer.description':
-    'Theo dõi các phiên điểm danh và tình hình lớp bạn phụ trách.',
+  'dashboard.organizer.eyebrow': 'Tổng quan điểm danh',
+  'dashboard.organizer.description':
+    'Theo dõi các phiên điểm danh bạn phụ trách.',
   'dashboard.createSession': 'Tạo phiên điểm danh',
   'dashboard.sessionsByStatusTitle': 'Phân bố trạng thái phiên',
   'dashboard.sessionsByStatusSubtitle': 'Tổng hợp từ các phiên hiện có',
   'dashboard.recentSessionsTitle': 'Phiên điểm danh gần đây',
   'dashboard.recentSessionsSubtitle.admin':
     'Các phiên mới nhất đang có trên hệ thống',
-  'dashboard.recentSessionsSubtitle.lecturer': 'Các phiên bạn tạo gần đây nhất',
+  'dashboard.recentSessionsSubtitle.organizer': 'Các phiên bạn tạo gần đây nhất',
   'dashboard.mySessionsTitle': 'Phiên điểm danh của tôi',
   'dashboard.attendanceRateTitle': 'Tỷ lệ có mặt',
   'dashboard.attendanceRateSubtitle': '7 ngày gần nhất',
@@ -112,21 +112,21 @@ export const vi = {
 
   // ---- Mô tả các page theo role ----
   'pages.users.description': 'Quản lý tài khoản và vai trò người dùng.',
-  'pages.units.description': 'Cấu trúc khoa, bộ môn và lớp trong hệ thống.',
+  'pages.units.description': 'Cấu trúc các đơn vị trong hệ thống.',
   'pages.tags.description': 'Gán thẻ tag để lọc và gom nhóm người dùng.',
   'pages.attendanceRecords.description':
-    'Tra cứu chi tiết từng lượt điểm danh của sinh viên.',
+    'Tra cứu chi tiết từng lượt điểm danh của người tham gia.',
   'pages.statistics.description':
     'Báo cáo tỷ lệ có mặt và xu hướng điểm danh theo thời gian.',
   // ---- Phiên điểm danh ----
   'sessions.page.description':
     'Quản lý các phiên điểm danh GPS do bạn tạo và theo dõi trạng thái.',
   'sessions.total': '{count} phiên điểm danh',
-  'sessions.filter.label': 'Lọc theo lecturer',
-  'sessions.filter.allLecturers': 'Tất cả lecturer',
-  'sessions.filter.loading': 'Đang tải danh sách lecturer...',
-  'sessions.filter.loadError': 'Không thể tải danh sách lecturer.',
-  'sessions.filter.invalidLecturer': 'Lecturer được chọn không hợp lệ.',
+  'sessions.filter.label': 'Lọc theo người tổ chức',
+  'sessions.filter.allOrganizers': 'Tất cả người tổ chức',
+  'sessions.filter.loading': 'Đang tải danh sách người tổ chức...',
+  'sessions.filter.loadError': 'Không thể tải danh sách người tổ chức.',
+  'sessions.filter.invalidOrganizer': 'Người tổ chức được chọn không hợp lệ.',
   'sessions.filter.statusLabel': 'Trạng thái',
   'sessions.filter.allStatuses': 'Tất cả trạng thái',
   'sessions.emptyFiltered': 'Không có phiên điểm danh nào khớp bộ lọc.',
@@ -184,14 +184,14 @@ export const vi = {
   'sessions.form.title': 'Tên phiên',
   'sessions.form.heading': 'Tạo phiên điểm danh mới',
   'sessions.form.description':
-    'Cấu hình phạm vi GPS, thời gian và sinh viên áp dụng',
+    'Cấu hình phạm vi GPS, thời gian và danh sách người tham gia',
   'sessions.form.close': 'Đóng cửa sổ tạo phiên',
   'sessions.form.locationSection': 'Toạ độ GPS & bán kính',
   'sessions.form.openDate': 'Ngày mở',
   'sessions.form.openClock': 'Giờ mở',
   'sessions.form.closeDate': 'Ngày đóng',
   'sessions.form.closeClock': 'Giờ đóng',
-  'sessions.form.titlePlaceholder': 'Ví dụ: Điểm danh buổi học buổi sáng',
+  'sessions.form.titlePlaceholder': 'Ví dụ: Điểm danh ca sáng',
   'sessions.form.titleRequired': 'Vui lòng nhập tên phiên.',
   'sessions.form.latitude': 'Vĩ độ',
   'sessions.form.latitudeRequired':
@@ -212,10 +212,10 @@ export const vi = {
   'sessions.form.closeTimeRequired': 'Vui lòng chọn thời gian đóng phiên.',
   'sessions.form.timeRangeInvalid':
     'Thời gian kết thúc phải sau thời gian bắt đầu.',
-  'sessions.form.participantCodes': 'Mã sinh viên được tham gia',
+  'sessions.form.participantCodes': 'Mã người được phép tham gia',
   'sessions.form.participantCodesHint': 'Phân cách các mã bằng dấu phẩy',
   'sessions.form.participantCodesRequired':
-    'Vui lòng nhập ít nhất một mã sinh viên.',
+    'Vui lòng nhập ít nhất một mã người tham gia.',
   'sessions.form.participantCodesValid': '{count} mã hợp lệ',
   'sessions.form.useCurrentLocation': 'Lấy vị trí hiện tại',
   'sessions.form.locationSuccess': 'Đã lấy toạ độ hiện tại thành công.',
@@ -233,9 +233,9 @@ export const vi = {
   // ---- Wizard tạo phiên (trang `/sessions/new`) ----
   'sessions.form.step.details.title': 'Thông tin phiên',
   'sessions.form.step.details.description': 'Tên, vị trí và thời gian',
-  'sessions.form.step.participants.title': 'Sinh viên tham gia',
+  'sessions.form.step.participants.title': 'Người tham gia',
   'sessions.form.step.participants.description':
-    'Danh sách mã sinh viên được điểm danh',
+    'Danh sách mã người tham gia được điểm danh',
   'sessions.form.next': 'Tiếp tục',
   'sessions.form.back': 'Quay lại',
   'sessions.form.locationModeLabel': 'Cách chọn vị trí',
@@ -247,7 +247,7 @@ export const vi = {
   'sessions.form.mapHint':
     'Kéo điểm xanh để đổi tâm, kéo điểm ở rìa vòng tròn để đổi bán kính.',
   'sessions.form.participantsStepNote':
-    'Bước này tạm thời nhập mã sinh viên bằng tay; phần chọn theo lớp/đơn vị sẽ bổ sung sau.',
+    'Bước này tạm thời nhập mã người tham gia bằng tay; phần chọn theo đơn vị sẽ bổ sung sau.',
 
   'sessions.form.pickLocationTitle': 'Chọn vị trí trên bản đồ',
   'sessions.form.confirmLocation': 'Xác nhận',
@@ -265,9 +265,9 @@ export const vi = {
   'sessions.form.tagIncludeHint': 'Nhập ID tag, cách nhau dấu phẩy',
   'sessions.form.tagExclude': 'Tag (loại trừ)',
   'sessions.form.tagExcludeHint': 'Nhập ID tag cần loại trừ',
-  'sessions.form.codeInclude': 'Mã sinh viên (bao gồm)',
+  'sessions.form.codeInclude': 'Mã người tham gia (bao gồm)',
   'sessions.form.codeIncludeHint': 'Mỗi dòng 1 mã, VD: 20210001, 20210002',
-  'sessions.form.codeExclude': 'Mã sinh viên (loại trừ)',
+  'sessions.form.codeExclude': 'Mã người tham gia (loại trừ)',
   'sessions.form.codeExcludeHint': 'Mỗi dòng 1 mã cần loại trừ',
   // ---- Chi tiết phiên ----
   'sessionDetail.loading': 'Đang tải thông tin phiên điểm danh...',
@@ -286,7 +286,7 @@ export const vi = {
     'Không thể tải lại danh sách người tham gia. Vui lòng thử lại.',
   'sessionDetail.emptyParticipants':
     'Chưa có người tham gia trong phiên điểm danh này.',
-  'sessionDetail.studentCode': 'Mã sinh viên',
+  'sessionDetail.participantCode': 'Mã người tham gia',
   'sessionDetail.present': 'Đã điểm danh',
   'sessionDetail.absent': 'Chưa điểm danh',
   'sessionDetail.late': 'Đi muộn',
@@ -302,7 +302,7 @@ export const vi = {
   'units.create': 'Tạo đơn vị',
   'units.edit': 'Sửa đơn vị',
   'units.name': 'Tên đơn vị',
-  'units.namePlaceholder': 'Ví dụ: Khoa Công nghệ Thông tin',
+  'units.namePlaceholder': 'Ví dụ: Bộ phận vận hành',
   'units.nameRequired': 'Vui lòng nhập tên đơn vị',
   'units.parent': 'Đơn vị cha',
   'units.root': 'Đơn vị gốc (không có cha)',

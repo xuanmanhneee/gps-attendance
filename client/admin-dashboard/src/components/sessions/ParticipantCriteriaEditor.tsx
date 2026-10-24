@@ -44,7 +44,7 @@ type TabKey = 'units' | 'tags' | 'codes';
 /* ---------- Text (gom một chỗ để sau này chuyển sang i18n) ---------- */
 
 const TEXT = {
-  tabs: { units: 'Đơn vị', tags: 'Tag', codes: 'Mã sinh viên' } as Record<
+  tabs: { units: 'Đơn vị', tags: 'Tag', codes: 'Mã người tham gia' } as Record<
     TabKey,
     string
   >,
@@ -58,7 +58,7 @@ const TEXT = {
   clearAll: 'Xoá tất cả',
   none: 'Chưa có',
   emptySummary:
-    'Chưa có điều kiện. Chọn đơn vị, tag hoặc nhập mã sinh viên ở bên trái.',
+    'Chưa có điều kiện. Chọn đơn vị, tag hoặc nhập mã người tham gia ở bên trái.',
   unitsHint:
     'Bấm tên để bao gồm nhanh, bao gồm một đơn vị là bao gồm cả đơn vị con. Dùng "Loại trừ" để bỏ một đơn vị hoặc nhánh con.',
   tagsHint: 'Bấm tên để bao gồm nhanh, hoặc chọn "Loại trừ" để bỏ tag đó.',

@@ -1,6 +1,6 @@
-export type Role = 'admin' | 'lecturer' | 'student';
+export type Role = 'admin' | 'organizer' | 'participant';
 
-export const ROLES: readonly Role[] = ['admin', 'lecturer', 'student'] as const;
+export const ROLES: readonly Role[] = ['admin', 'organizer', 'participant'] as const;
 
 export interface LoginRequest {
   username: string;

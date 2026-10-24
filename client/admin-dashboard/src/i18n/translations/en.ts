@@ -15,7 +15,7 @@ export const en: Record<TranslationKey, string> = {
 
   // ---- Navigation ----
   'navigation.group.admin': 'Admin',
-  'navigation.group.lecturer': 'Lecturer',
+  'navigation.group.organizer': 'Organizer',
   'navigation.overview': 'Overview',
   'navigation.users': 'Users',
   'navigation.units': 'Units',
@@ -28,12 +28,12 @@ export const en: Record<TranslationKey, string> = {
   'roles.fieldLabel': 'Current role',
   'roles.statusAria': 'Authenticated role: {role}',
   'roles.admin': 'Administrator',
-  'roles.lecturer': 'Lecturer',
+  'roles.organizer': 'Organizer',
   'roles.pill.admin': 'Admin',
-  'roles.pill.lecturer': 'Lecturer',
-  'roles.student': 'Student',
+  'roles.pill.organizer': 'Organizer',
+  'roles.participant': 'Participant',
   'roles.adminProfile': 'System admin',
-  'roles.lecturerProfile': 'Course lecturer',
+  'roles.organizerProfile': 'Organizer',
 
   // ---- Shared states ----
   'common.loading': 'Loading data...',
@@ -64,7 +64,7 @@ export const en: Record<TranslationKey, string> = {
 
   // ---- Topbar ----
   'topbar.context.admin': 'Operations centre',
-  'topbar.context.lecturer': 'Lecturer centre',
+  'topbar.context.organizer': 'Organizer centre',
 
   // ---- Sidebar help card (mirrors the prototype `help-card`) ----
   'help.title': 'Need help?',
@@ -81,16 +81,16 @@ export const en: Record<TranslationKey, string> = {
   'dashboard.admin.eyebrow': 'System overview',
   'dashboard.admin.description':
     'Track attendance sessions and how the system is operating.',
-  'dashboard.lecturer.eyebrow': 'Attendance overview',
-  'dashboard.lecturer.description':
-    'Track attendance sessions and the attendance status of your classes.',
+  'dashboard.organizer.eyebrow': 'Attendance overview',
+  'dashboard.organizer.description':
+    'Track the attendance sessions you manage.',
   'dashboard.createSession': 'Create attendance session',
   'dashboard.sessionsByStatusTitle': 'Session status breakdown',
   'dashboard.sessionsByStatusSubtitle': 'Aggregated from existing sessions',
   'dashboard.recentSessionsTitle': 'Recent attendance sessions',
   'dashboard.recentSessionsSubtitle.admin':
     'The most recent sessions on the system',
-  'dashboard.recentSessionsSubtitle.lecturer':
+  'dashboard.recentSessionsSubtitle.organizer':
     'Your most recently created sessions',
   'dashboard.mySessionsTitle': 'My attendance sessions',
   'dashboard.attendanceRateTitle': 'Attendance rate',
@@ -115,10 +115,10 @@ export const en: Record<TranslationKey, string> = {
 
   // ---- Page descriptions ----
   'pages.users.description': 'Manage user accounts and roles.',
-  'pages.units.description': 'Faculties, departments and classes structure.',
+  'pages.units.description': 'Unit hierarchy across the system.',
   'pages.tags.description': 'Assign tags to filter and group users.',
   'pages.attendanceRecords.description':
-    'Look up individual student attendance records.',
+    'Look up individual participant attendance records.',
   'pages.statistics.description':
     'Attendance rate reports and trends over time.',
 
@@ -126,11 +126,11 @@ export const en: Record<TranslationKey, string> = {
   'sessions.page.description':
     'Manage the GPS attendance sessions you created and track their status.',
   'sessions.total': '{count} attendance sessions',
-  'sessions.filter.label': 'Filter by lecturer',
-  'sessions.filter.allLecturers': 'All lecturers',
-  'sessions.filter.loading': 'Loading the lecturer list...',
-  'sessions.filter.loadError': 'Unable to load the lecturer list.',
-  'sessions.filter.invalidLecturer': 'The selected lecturer is invalid.',
+  'sessions.filter.label': 'Filter by organizer',
+  'sessions.filter.allOrganizers': 'All organizers',
+  'sessions.filter.loading': 'Loading the organizer list...',
+  'sessions.filter.loadError': 'Unable to load the organizer list.',
+  'sessions.filter.invalidOrganizer': 'The selected organizer is invalid.',
   'sessions.filter.statusLabel': 'Status',
   'sessions.filter.allStatuses': 'All statuses',
   'sessions.emptyFiltered': 'No attendance sessions match the filter.',
@@ -184,14 +184,14 @@ export const en: Record<TranslationKey, string> = {
   'sessions.form.title': 'Session title',
   'sessions.form.heading': 'Create a new attendance session',
   'sessions.form.description':
-    'Configure GPS range, time and applicable students',
+    'Configure GPS range, time and applicable participants',
   'sessions.form.close': 'Close the create-session dialog',
   'sessions.form.locationSection': 'GPS coordinates & radius',
   'sessions.form.openDate': 'Open date',
   'sessions.form.openClock': 'Open time of day',
   'sessions.form.closeDate': 'Close date',
   'sessions.form.closeClock': 'Close time of day',
-  'sessions.form.titlePlaceholder': 'E.g. Morning class attendance',
+  'sessions.form.titlePlaceholder': 'E.g. Morning shift attendance',
   'sessions.form.titleRequired': 'Please enter a session title.',
   'sessions.form.latitude': 'Latitude',
   'sessions.form.latitudeRequired':
@@ -211,10 +211,10 @@ export const en: Record<TranslationKey, string> = {
   'sessions.form.closeTimeRequired': 'Please choose the close time.',
   'sessions.form.timeRangeInvalid':
     'The end time must be after the start time.',
-  'sessions.form.participantCodes': 'Allowed student codes',
+  'sessions.form.participantCodes': 'Allowed participant codes',
   'sessions.form.participantCodesHint': 'Separate codes with commas',
   'sessions.form.participantCodesRequired':
-    'Please enter at least one student code.',
+    'Please enter at least one participant code.',
   'sessions.form.participantCodesValid': '{count} valid codes',
   'sessions.form.useCurrentLocation': 'Use current location',
   'sessions.form.locationSuccess': 'Current coordinates captured successfully.',
@@ -234,7 +234,7 @@ export const en: Record<TranslationKey, string> = {
   'sessions.form.step.details.description': 'Title, location and time',
   'sessions.form.step.participants.title': 'Participants',
   'sessions.form.step.participants.description':
-    'Student codes allowed to check in',
+    'Participant codes allowed to check in',
   'sessions.form.next': 'Continue',
   'sessions.form.back': 'Back',
   'sessions.form.locationModeLabel': 'Location entry mode',
@@ -246,7 +246,7 @@ export const en: Record<TranslationKey, string> = {
   'sessions.form.mapHint':
     'Drag the blue dot to move the center, drag the dot on the circle edge to resize the radius.',
   'sessions.form.participantsStepNote':
-    'This step currently takes student codes by hand; class/unit selection will be added later.',
+    'This step currently takes participant codes by hand; unit selection will be added later.',
 
   'sessions.form.pickLocationTitle': 'Pick location on map',
   'sessions.form.confirmLocation': 'Confirm',
@@ -266,9 +266,9 @@ export const en: Record<TranslationKey, string> = {
   'sessions.form.tagIncludeHint': 'Nhập ID tag, cách nhau dấu phẩy',
   'sessions.form.tagExclude': 'Tag (loại trừ)',
   'sessions.form.tagExcludeHint': 'Nhập ID tag cần loại trừ',
-  'sessions.form.codeInclude': 'Mã sinh viên (bao gồm)',
+  'sessions.form.codeInclude': 'Mã người tham gia (bao gồm)',
   'sessions.form.codeIncludeHint': 'Mỗi dòng 1 mã, VD: 20210001, 20210002',
-  'sessions.form.codeExclude': 'Mã sinh viên (loại trừ)',
+  'sessions.form.codeExclude': 'Mã người tham gia (loại trừ)',
   'sessions.form.codeExcludeHint': 'Mỗi dòng 1 mã cần loại trừ',
 
   'sessions.card.edit': 'Edit',
@@ -293,7 +293,7 @@ export const en: Record<TranslationKey, string> = {
     'Unable to reload the participant list. Please try again.',
   'sessionDetail.emptyParticipants':
     'There is no participant in this attendance session yet.',
-  'sessionDetail.studentCode': 'Student code',
+  'sessionDetail.participantCode': 'Participant code',
   'sessionDetail.present': 'Checked in',
   'sessionDetail.absent': 'Not checked in',
   'sessionDetail.late': 'Late',
@@ -309,7 +309,7 @@ export const en: Record<TranslationKey, string> = {
   'units.create': 'Create unit',
   'units.edit': 'Edit unit',
   'units.name': 'Unit name',
-  'units.namePlaceholder': 'E.g. Faculty of Information Technology',
+  'units.namePlaceholder': 'E.g. Operations team',
   'units.nameRequired': 'Please enter a unit name',
   'units.parent': 'Parent unit',
   'units.root': 'Root unit (no parent)',

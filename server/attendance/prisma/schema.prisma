@@ -21,8 +21,8 @@ enum AccountStatus {
 
 enum UserRole {
   admin
-  lecturer
-  student
+  organizer
+  participant
 }
 
 enum SessionStatus {

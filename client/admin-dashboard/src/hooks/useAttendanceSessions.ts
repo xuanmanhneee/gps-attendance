@@ -16,16 +16,16 @@ import {
 
 /**
  * `all` — toàn bộ phiên (route admin, mặc định).
- * `created-by-me` — chỉ phiên do user hiện tại tạo; chỉ dùng ở page lecturer vì
- * endpoint phía sau yêu cầu role lecturer.
- * `created-by` — phiên do một lecturer cụ thể tạo; chỉ dùng khi UI admin cần
- * lọc theo lecturer vì endpoint phía sau yêu cầu role admin.
+ * `created-by-me` — chỉ phiên do user hiện tại tạo; chỉ dùng ở page organizer vì
+ * endpoint phía sau yêu cầu role organizer.
+ * `created-by` — phiên do một organizer cụ thể tạo; chỉ dùng khi UI admin cần
+ * lọc theo organizer vì endpoint phía sau yêu cầu role admin.
  */
 type AttendanceSessionScope = 'all' | 'created-by-me' | 'created-by';
 
 interface UseAttendanceSessionsOptions {
   scope?: AttendanceSessionScope;
-  /** Bắt buộc khi `scope` là `created-by`: id của lecturer cần lọc. */
+  /** Bắt buộc khi `scope` là `created-by`: id của organizer cần lọc. */
   createdByUserId?: number;
   /**
    * `false` khi bộ lọc chưa hợp lệ: hook không gọi API nào và trả `isLoading`
@@ -51,7 +51,7 @@ export const useAttendanceSessions = (
   const createInFlightRef = useRef<Promise<void> | null>(null);
   /** Chỉ request mới nhất được phép ghi state (chặn stale response). */
   const loadTrackerRef = useRef(createLoadTracker());
-  /** Nhận diện phạm vi hiện tại để xoá dữ liệu cũ khi đổi scope/lecturer. */
+  /** Nhận diện phạm vi hiện tại để xoá dữ liệu cũ khi đổi scope/organizer. */
   const scopeKeyRef = useRef(`${scope}:${createdByUserId ?? ''}`);
 
   const loadSessions = useCallback(async (): Promise<
@@ -76,7 +76,7 @@ export const useAttendanceSessions = (
         !Number.isInteger(createdByUserId) ||
         createdByUserId <= 0
       ) {
-        throw new Error('Missing lecturer user id for attendance session filter');
+        throw new Error('Missing organizer user id for attendance session filter');
       }
 
       const data: unknown =
@@ -108,8 +108,8 @@ export const useAttendanceSessions = (
     const tracker = loadTrackerRef.current;
     const requestId = tracker.begin();
 
-    // Đổi phạm vi (vd chọn lecturer khác): xoá dữ liệu phạm vi cũ ngay từ đầu
-    // để request mới thất bại không bị nhìn nhầm là dữ liệu của lecturer cũ.
+    // Đổi phạm vi (vd chọn organizer khác): xoá dữ liệu phạm vi cũ ngay từ đầu
+    // để request mới thất bại không bị nhìn nhầm là dữ liệu của organizer cũ.
     const scopeKey = `${scope}:${createdByUserId ?? ''}`;
 
     if (scopeKeyRef.current !== scopeKey) {

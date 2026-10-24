@@ -22,8 +22,8 @@ package — nơi ghi các quyết định gần nhất như wizard `/sessions/ne
 | Hạng mục | Nội dung |
 |---|---|
 | Package | `@gps-attendance/admin-dashboard` (pnpm workspace, private) |
-| Vai trò | Web dashboard cho hai vai trò `admin` và `lecturer` của hệ thống điểm danh GPS |
-| Người dùng | `admin`: quản lý đơn vị / tag (và user theo kế hoạch), xem toàn bộ phiên, lọc theo lecturer. `lecturer`: tạo phiên điểm danh, xem phiên của mình, xem chi tiết + participant |
+| Vai trò | Web dashboard cho hai vai trò `admin` và `organizer` của hệ thống điểm danh GPS |
+| Người dùng | `admin`: quản lý đơn vị / tag (và user theo kế hoạch), xem toàn bộ phiên, lọc theo organizer. `organizer`: tạo phiên điểm danh, xem phiên của mình, xem chi tiết + participant |
 | UI stack | React 19.1 + TypeScript ~6.0, Vite 8, `@vitejs/plugin-react` |
 | Styling | Tailwind CSS 4 qua `@tailwindcss/vite`; design token khai báo trong `src/index.css` bằng `@theme` |
 | Routing | `react-router-dom` 7 (`BrowserRouter` + `Routes`/`Route` lồng nhau) |
@@ -127,11 +127,11 @@ Chi tiết route (đường dẫn → element → guard):
 |---|---|---|
 | `/login` | `LoginPage` | công khai (không nằm trong layout) |
 | `/` | `LandingRedirect` | redirect `/dashboard` nếu đã login, ngược lại `/login` |
-| `/dashboard` | `DashboardPage` → `AdminOverview` / `LecturerOverview` | `ProtectedRoute` + layout |
+| `/dashboard` | `DashboardPage` → `AdminOverview` / `OrganizerOverview` | `ProtectedRoute` + layout |
 | `/users`, `/units`, `/tags` | `UsersPage` (placeholder), `UnitsPage`, `TagsPage` | `RoleGuard ['admin']` |
-| `/sessions`, `/attendance-records`, `/statistics` | `SessionsPage`, `AttendanceRecordsPage` (placeholder), `StatisticsPage` (placeholder) | `RoleGuard ['admin','lecturer']` |
-| `/sessions/new` | `SessionCreatePage` | `RoleGuard ['lecturer']` |
-| `/sessions/:id` | `SessionDetailPage` | `RoleGuard ['admin','lecturer']` |
+| `/sessions`, `/attendance-records`, `/statistics` | `SessionsPage`, `AttendanceRecordsPage` (placeholder), `StatisticsPage` (placeholder) | `RoleGuard ['admin','organizer']` |
+| `/sessions/new` | `SessionCreatePage` | `RoleGuard ['organizer']` |
+| `/sessions/:id` | `SessionDetailPage` | `RoleGuard ['admin','organizer']` |
 | `*` | `NotFoundPage` | trong layout |
 
 Ghi chú: `/sessions/new` khai báo trước `/sessions/:id` (react-router 7 vẫn ưu tiên route khớp cụ thể
@@ -175,7 +175,7 @@ Nhóm này là "hợp đồng hình thức" của dashboard: chỉ nhận props 
 
 | Thành phần | Vị trí | Mục đích |
 |---|---|---|
-| Bảng phiên | `components/SessionTable.tsx` | **Đặt ở `components/` gốc** (dùng chung cho `AdminOverview`, `LecturerOverview`, `SessionsPage`): quyết định state hiển thị qua `resolveSessionListState`, sort `openAt` giảm dần, nút "Chi tiết" điều hướng `buildSessionDetailPath`; khi còn dữ liệu cũ mà reload lỗi thì giữ bảng + banner cảnh báo (`shouldShowSessionStaleError`) thay vì xoá dữ liệu đang xem |
+| Bảng phiên | `components/SessionTable.tsx` | **Đặt ở `components/` gốc** (dùng chung cho `AdminOverview`, `OrganizerOverview`, `SessionsPage`): quyết định state hiển thị qua `resolveSessionListState`, sort `openAt` giảm dần, nút "Chi tiết" điều hướng `buildSessionDetailPath`; khi còn dữ liệu cũ mà reload lỗi thì giữ bảng + banner cảnh báo (`shouldShowSessionStaleError`) thay vì xoá dữ liệu đang xem |
 | Map lỗi phiên | `components/sessions/session-errors.ts` | `sessionErrorKeyByCode` (common code + `AttendanceSessionErrorCode`) và fallback theo `SessionErrorContext` (`list/detail/create`); `logSessionError` chỉ ghi console, không render message kỹ thuật |
 | Bản đồ chọn vị trí | `components/sessions/SessionLocationMap.tsx` | Leaflet + tile OSM: kéo marker đổi tâm, kéo điểm ở rìa vòng tròn đổi bán kính, `RecenterMap` bám toạ độ mới, marker vẽ bằng `divIcon` (không phụ thuộc file ảnh), vòng tròn giữ state nội bộ để phản hồi tức thì và chỉ ghi vào form ở `dragend` |
 | Chỉ báo bước | `components/sessions/SessionStepIndicator.tsx` | Thuần hiển thị wizard 2 bước (`aria-current="step"`), page quyết định bước hiện tại |
@@ -196,12 +196,12 @@ Nhóm này là "hợp đồng hình thức" của dashboard: chỉ nhận props 
 
 | Thành phần | Vị trí | Mục đích |
 |---|---|---|
-| Cổng dashboard | `pages/DashboardPage.tsx` | Route `/dashboard`: `role === 'lecturer'` → `LecturerOverview`, còn lại → `AdminOverview`. Thân page chỉ 3 dòng logic |
+| Cổng dashboard | `pages/DashboardPage.tsx` | Route `/dashboard`: `role === 'organizer'` → `OrganizerOverview`, còn lại → `AdminOverview`. Thân page chỉ 3 dòng logic |
 | Tổng quan admin | `pages/overview/AdminOverview.tsx` | 4 `SummaryCard` (tổng/đang mở/chờ/đã đóng từ `GET /v0/attendance-sessions`), panel "phiên gần đây" (5 phiên) dùng `SessionTable`, `StatusDistribution`, và `UnavailableMetricsPanel` cho user/unit/tag (chưa có API) |
-| Tổng quan lecturer | `pages/overview/LecturerOverview.tsx` | Cùng cấu trúc nhưng scope `created-by-me`, thêm chỉ số "phiên mở hôm nay" (`countSessionsOpenedOn`), CTA `PrimaryButton` sang `/sessions/new`, `UnavailableState` cho tỉ lệ điểm danh |
-| Danh sách phiên | `pages/SessionsPage.tsx` | Hai view nội bộ: `AdminSessionsView` (toàn bộ phiên + dropdown lọc theo lecturer, `enabled: false` khi lựa chọn không hợp lệ nên không gọi API) và `LecturerSessionsView` (phiên của mình + nút tạo). Page chọn view theo `useRole()` |
+| Tổng quan organizer | `pages/overview/OrganizerOverview.tsx` | Cùng cấu trúc nhưng scope `created-by-me`, thêm chỉ số "phiên mở hôm nay" (`countSessionsOpenedOn`), CTA `PrimaryButton` sang `/sessions/new`, `UnavailableState` cho tỉ lệ điểm danh |
+| Danh sách phiên | `pages/SessionsPage.tsx` | Hai view nội bộ: `AdminSessionsView` (toàn bộ phiên + dropdown lọc theo organizer, `enabled: false` khi lựa chọn không hợp lệ nên không gọi API) và `OrganizerSessionsView` (phiên của mình + nút tạo). Page chọn view theo `useRole()` |
 | Tạo phiên (wizard) | `pages/SessionCreatePage.tsx` | File lớn nhất package (**748 dòng**): wizard 2 bước trên một `useForm`, validate theo bước bằng `trigger(DETAILS_STEP_FIELDS)`, kiểm tra liên field `closeAt > openAt`, chọn vị trí bằng map hoặc nhập toạ độ (`LocationMode`), lấy vị trí hiện tại bằng `navigator.geolocation`, submit gọi `attendanceSessionsApi.create` trực tiếp rồi `toast.success` + `navigate('/sessions')`. Helper nội bộ: `NumberInput` (giữ buffer text để gõ được dấu thập phân), `CoordinateNumberInput`, `CoordinateReadout` |
-| Chi tiết phiên | `pages/SessionDetailPage.tsx` | Parse `:id` bằng `parseSessionId`, guard shape `isAttendanceSessionDetail`; phân biệt lỗi id sai (`errorKey = sessionDetail.invalidId`) với lỗi API; refresh danh sách participant riêng (`isRefreshing`/`hasRefreshError`) không phá dữ liệu đang xem; link Google Maps theo toạ độ; `backPath` phụ thuộc role (lecturer → `/sessions`, admin → `/dashboard` vì admin không có mục menu phiên) |
+| Chi tiết phiên | `pages/SessionDetailPage.tsx` | Parse `:id` bằng `parseSessionId`, guard shape `isAttendanceSessionDetail`; phân biệt lỗi id sai (`errorKey = sessionDetail.invalidId`) với lỗi API; refresh danh sách participant riêng (`isRefreshing`/`hasRefreshError`) không phá dữ liệu đang xem; link Google Maps theo toạ độ; `backPath` phụ thuộc role (organizer → `/sessions`, admin → `/dashboard` vì admin không có mục menu phiên) |
 | Đăng nhập | `pages/LoginPage.tsx` | `react-hook-form` + `toast`; map `AuthErrorCode` sang message tiếng Việt hard-code. Đây là page **lệch khỏi design system** (xem mức P1 ở mục 8) |
 | Page giữ chỗ | `pages/PlaceholderPage.tsx` | Đọc `findNavigationItem(pathname)` để lấy tiêu đề/mô tả nên label chỉ khai báo một chỗ; nội dung là `DataState` variant `unavailable` ("sắp có") — không giả lập dữ liệu backend |
 | Wrapper giữ chỗ | `pages/UsersPage.tsx`, `pages/AttendanceRecordsPage.tsx`, `pages/StatisticsPage.tsx` | Mỗi file 1 dòng `return <PlaceholderPage />`, chỉ để route + menu không trỏ vào chỗ chết |
@@ -221,7 +221,7 @@ Nhóm này là "hợp đồng hình thức" của dashboard: chỉ nhận props 
 | Tags | `hooks/useTags.ts` | `reload` (tải đầu/tải tay: lỗi ⇒ danh sách rỗng + `error`) tách khỏi `refresh` (sau mutation: lỗi ⇒ giữ danh sách cũ + `refreshError`), mutation qua `runTagMutation` |
 | Gán user cho tag | `hooks/useTagAssignment.ts` | `selectedTag`, `assignedUserIds`, `directory` + `directoryError`, `pendingUserIds`; race guard bằng `createRequestScope` (`isCurrent(token)` trước mọi commit), `normalizeDirectory` tự chuẩn hoá payload thừa field |
 | Đơn vị | `hooks/useUnits.ts` | Danh sách và cây có `isLoading`/`error` **riêng** để UI không báo "thành công giả" khi một trong hai nguồn còn tải/lỗi; `createUnit`/`updateUnit` chỉ success khi response có `id` hợp lệ rồi reload cả list + tree |
-| Directory lecturer | `hooks/useLecturers.ts` | `GET /v0/users` → `toLecturerOptions` (chỉ `role === 'lecturer'`, dedupe theo id); stale guard bằng `loadIdRef` |
+| Directory organizer | `hooks/useOrganizers.ts` | `GET /v0/users` → `toOrganizerOptions` (chỉ `role === 'organizer'`, dedupe theo id); stale guard bằng `loadIdRef` |
 
 ### 3.7 API client (`src/api/`)
 
@@ -229,8 +229,8 @@ Nhóm này là "hợp đồng hình thức" của dashboard: chỉ nhận props 
 |---|---|---|
 | HTTP client | `api/http.ts` | `createHttpClient(VITE_API_BASE_URL, () => localStorage.getItem('token'))`; đọc token trực tiếp từ storage để `api/` không phụ thuộc vòng vào `AuthProvider` |
 | Auth | `api/auth.api.ts` | `POST /v0/admin/auth/login` → `LoginResponse.accessToken` |
-| Users | `api/users.api.ts` | `GET /v0/users/me` (khôi phục phiên), `GET /v0/users` (directory cho dropdown lecturer + panel gán tag) |
-| Attendance sessions | `api/attendance-sessions.api.ts` | `create`, `getAll`, `getCreatedByMe` (backend yêu cầu role lecturer), `getCreatedBy(userId)` (backend yêu cầu role admin), `getDetail`; `assertSessionId` chặn id không hợp lệ trước khi ghép URL |
+| Users | `api/users.api.ts` | `GET /v0/users/me` (khôi phục phiên), `GET /v0/users` (directory cho dropdown organizer + panel gán tag) |
+| Attendance sessions | `api/attendance-sessions.api.ts` | `create`, `getAll`, `getCreatedByMe` (backend yêu cầu role organizer), `getCreatedBy(userId)` (backend yêu cầu role admin), `getDetail`; `assertSessionId` chặn id không hợp lệ trước khi ghép URL |
 | Tags | `api/tags.api.ts` | `getAll`/`create`/`remove` + `getAssignedUserIds`/`assignUser`/`unassignUser`; validate name (`validateTagName`) và id; **không có update** vì backend chưa expose `PATCH /tags/:id` |
 | Units | `api/units.api.ts` | `getAll`, `getTree`, `getById` (hiện chưa dùng), `create`, `update`. `update` dùng hàm `patchUnit` tự viết bằng `fetch` vì `httpClient` của shared chưa expose `patch` — có comment giải thích, và giữ nguyên shape `{ success, data }` + `ApiError` |
 
@@ -240,7 +240,7 @@ Types (`src/types/`):
 
 | Thành phần | Vị trí | Mục đích |
 |---|---|---|
-| Vai trò dashboard | `types/user-role.ts` | `UserRole = 'admin' \| 'lecturer'`, `DEFAULT_USER_ROLE = 'admin'` (lưới an toàn, backend đã chặn role khác ở login admin), `resolveUserRole` |
+| Vai trò dashboard | `types/user-role.ts` | `UserRole = 'admin' \| 'organizer'`, `DEFAULT_USER_ROLE = 'admin'` (lưới an toàn, backend đã chặn role khác ở login admin), `resolveUserRole` |
 | Phiên điểm danh | `types/attendance-session.ts` | `CreateSessionFormData` (= `CreateAttendanceSessionRequest` của shared nên không thể lệch field), `parseSessionId`, và các **shape guard**: `isAttendanceSession`, `parseAttendanceSessionList` (bỏ item lệch + `console.warn`, chỉ trả `null` khi payload không phải mảng), `isAttendanceSessionDetail`, `isAttendanceParticipant` |
 | Tag | `types/tag.ts` | `Tag`, `DirectoryUser`, `MAX_TAG_NAME_LENGTH = 100`, `validateTagName` (thuần), guard `isTag`/`isTagList`/`isUserIdList`/`isDirectoryUser`/`isDirectoryUserList`, `parseUserIdInput` |
 | Locale | `types/locale.ts` | `SupportedLocale`, `DEFAULT_LOCALE = 'vi'`, `isSupportedLocale` |
@@ -250,8 +250,8 @@ Utils (`src/utils/`) — toàn bộ là logic thuần, không import React:
 
 | Thành phần | Vị trí | Mục đích |
 |---|---|---|
-| Form tạo phiên | `utils/attendance-sessions/session-form.ts` | `createDefaultSessionFormValues`, `combineLocalDateTime`, `isCloseAfterOpen`, `parseStudentCodes`, `buildCreateSessionRequest`, `resolveGeolocationErrorKey` + hằng số miền hợp lệ (lat/long/radius) |
-| Bộ lọc phiên | `utils/attendance-sessions/session-filter.ts` | `resolveSessionListScope` (trả `null` khi lựa chọn sai ⇒ caller không gọi API), `isValidLecturerUserId`, `isLecturerUser`, `toLecturerOptions`, `createLoadTracker` (chặn stale response không dùng state React) |
+| Form tạo phiên | `utils/attendance-sessions/session-form.ts` | `createDefaultSessionFormValues`, `combineLocalDateTime`, `isCloseAfterOpen`, `parseParticipantCodes`, `buildCreateSessionRequest`, `resolveGeolocationErrorKey` + hằng số miền hợp lệ (lat/long/radius) |
+| Bộ lọc phiên | `utils/attendance-sessions/session-filter.ts` | `resolveSessionListScope` (trả `null` khi lựa chọn sai ⇒ caller không gọi API), `isValidOrganizerUserId`, `isOrganizerUser`, `toOrganizerOptions`, `createLoadTracker` (chặn stale response không dùng state React) |
 | Trạng thái danh sách phiên | `utils/attendance-sessions/session-list.ts` | `toError`, `applySessionCreated` (upsert lên đầu), `resolveSessionListState` (ưu tiên dữ liệu đã có), `shouldShowSessionStaleError` |
 | Danh sách tag | `utils/tags/tag-list.ts` | `applyTagCreated`/`applyTagDeleted` bất biến và `runTagMutation` tách "lỗi mutation" khỏi "lỗi refresh" |
 | Pending assignment | `utils/tags/tag-pending.ts` | `withPendingUser` (Set theo userId ⇒ nhiều row pending đồng thời), `canStartAssignmentMutation` (single-flight có chủ đích) |
@@ -298,28 +298,28 @@ Logout không gọi backend: `logout()` xoá token + `setUser(null)`, `Dashboard
 
 ### 4.2 Xem danh sách phiên
 
-- **lecturer** (`SessionsPage.LecturerSessionsView`, `LecturerOverview`): `useAttendanceSessions({ scope: 'created-by-me' })`
+- **organizer** (`SessionsPage.OrganizerSessionsView`, `OrganizerOverview`): `useAttendanceSessions({ scope: 'created-by-me' })`
   → `GET /v0/attendance-sessions/created-by-me`.
 - **admin** (`SessionsPage.AdminSessionsView`): mặc định `scope: 'all'` → `GET /v0/attendance-sessions`;
-  chọn một lecturer → `resolveSessionListScope` → `scope: 'created-by'` → `GET .../created-by?userId=...`.
+  chọn một organizer → `resolveSessionListScope` → `scope: 'created-by'` → `GET .../created-by?userId=...`.
   Lựa chọn sai → `scopeSelection === null` → `enabled: false` (không gọi API) + `ErrorState`
-  "lecturer không hợp lệ".
+  "organizer không hợp lệ".
 
 Hiển thị trong `SessionTable`: `resolveSessionListState` chọn `loading`/`error`/`empty`/`ready`; nếu đã
 có dữ liệu thì reload lỗi **không** xoá bảng mà chỉ thêm banner `sessions.staleDataWarning` + nút thử
 lại (`shouldShowSessionStaleError`).
 
-### 4.3 Tạo phiên (wizard 2 bước, chỉ lecturer)
+### 4.3 Tạo phiên (wizard 2 bước, chỉ organizer)
 
 ```
-/sessions/new (RoleGuard ['lecturer'])
+/sessions/new (RoleGuard ['organizer'])
   bước 1 (DETAILS_STEP_INDEX): title, vị trí, bán kính, thời gian
     - chọn vị trí: LocationMode 'map' (SessionLocationMap) | 'manual' (nhập toạ độ)
     - "Lấy vị trí hiện tại": navigator.geolocation.getCurrentPosition → ghi lat/long vào form;
       lỗi → toast qua resolveGeolocationErrorKey
     - bước 1 chưa có toạ độ ⇒ KHÔNG render map (không thể tạo phiên với vị trí sai)
   "Tiếp tục": trigger(DETAILS_STEP_FIELDS) + validateTimeRange (closeAt > openAt)
-  bước 2 (PARTICIPANTS_STEP_INDEX): studentCodesText → parseStudentCodes
+  bước 2 (PARTICIPANTS_STEP_INDEX): participantCodesText → parseParticipantCodes
   submit: buildCreateSessionRequest(values) → attendanceSessionsApi.create
     OK + isAttendanceSession(response) → toast.success + navigate('/sessions')
     lỗi → toast.error(resolveSessionErrorKey(error, 'create'))
@@ -335,7 +335,7 @@ parseSessionId(:id) → null ⇒ errorKey = 'sessionDetail.invalidId' (không g�
                    → id    ⇒ getDetail(id) → isAttendanceSessionDetail guard → render
 lỗi API ⇒ errorKey = resolveSessionErrorKey(error, 'detail'), chi tiết kỹ thuật chỉ vào console
 "Làm mới participant": getDetail lại → chỉ nhận nếu id khớp phiên hiện tại (chống ghi đè sai phiên)
-backPath: lecturer → /sessions | admin → /dashboard
+backPath: organizer → /sessions | admin → /dashboard
 ```
 
 ### 4.5 Tags và gán user (chỉ admin, `/tags`)
@@ -373,7 +373,7 @@ UnitsPage: useUnits() → UnitsPanel
 Ba lớp, theo thứ tự từ "quyết định thật" tới "chỉ để UX":
 
 1. **Backend (nguồn quyết định thật)** — mọi endpoint tự kiểm tra role; `api/*.api.ts` ghi rõ điều này
-   trong comment (`created-by-me` yêu cầu `lecturer`, `created-by` yêu cầu `admin`, tạo phiên chỉ `lecturer`).
+   trong comment (`created-by-me` yêu cầu `organizer`, `created-by` yêu cầu `admin`, tạo phiên chỉ `organizer`).
 2. **`ProtectedRoute`** — đã đăng nhập hay chưa; chưa có user → `/login`.
 3. **`RoleGuard`** — `allowedRoles`; role không hợp lệ → `DEFAULT_ROUTE_BY_ROLE[role]`. Nhờ vậy URL
    luôn khớp quyền thật kể cả khi vào bằng deep link hoặc F5, không hiện màn hình rỗng/403 khó hiểu.
@@ -386,15 +386,15 @@ state riêng, không lưu localStorage, nên không thể tồn tại "role gi�
 
 | Path | Menu (`NAVIGATION_ITEMS[].roles`) | Route (`RoleGuard`) | Hệ quả |
 |---|---|---|---|
-| `/dashboard` | `admin`, `lecturer` | chỉ `ProtectedRoute` | khớp |
+| `/dashboard` | `admin`, `organizer` | chỉ `ProtectedRoute` | khớp |
 | `/users` | `admin` | `['admin']` | khớp |
 | `/units` | `admin` | `['admin']` | khớp |
 | `/tags` | `admin` | `['admin']` | khớp |
-| `/sessions` | **`lecturer`** | `['admin','lecturer']` | admin vào được bằng URL nhưng **không có mục menu** ⇒ `AdminSessionsView` (bộ lọc theo lecturer) không thể mở từ UI |
-| `/attendance-records` | **`lecturer`** | `['admin','lecturer']` | admin vào được bằng URL nhưng không có mục menu |
-| `/statistics` | **`lecturer`** | `['admin','lecturer']` | như trên |
-| `/sessions/new` | không có mục menu (đi từ CTA "Tạo phiên") | `['lecturer']` | khớp |
-| `/sessions/:id` | không có mục menu (đi từ bảng phiên) | `['admin','lecturer']` | khớp |
+| `/sessions` | **`organizer`** | `['admin','organizer']` | admin vào được bằng URL nhưng **không có mục menu** ⇒ `AdminSessionsView` (bộ lọc theo organizer) không thể mở từ UI |
+| `/attendance-records` | **`organizer`** | `['admin','organizer']` | admin vào được bằng URL nhưng không có mục menu |
+| `/statistics` | **`organizer`** | `['admin','organizer']` | như trên |
+| `/sessions/new` | không có mục menu (đi từ CTA "Tạo phiên") | `['organizer']` | khớp |
+| `/sessions/:id` | không có mục menu (đi từ bảng phiên) | `['admin','organizer']` | khớp |
 
 Hai nguồn quyền này (`NAVIGATION_ITEMS[].roles` và `RoleGuard allowedRoles`) là hai khai báo độc lập,
 nên có thể lệch nhau — comment trong `config/navigation.ts` ("menu và route không thể lệch nhau") hiện
@@ -443,10 +443,10 @@ bảng và thêm banner lỗi + nút thử lại. `useTags.refresh` giữ danh s
 
 | Cơ chế | Dùng ở đâu | Chống điều gì |
 |---|---|---|
-| `createLoadTracker` | `useAttendanceSessions` | response của lecturer cũ ghi đè dữ liệu lecturer mới; request cũ tắt loading của request mới |
+| `createLoadTracker` | `useAttendanceSessions` | response của organizer cũ ghi đè dữ liệu organizer mới; request cũ tắt loading của request mới |
 | `scopeKeyRef` | `useAttendanceSessions` | đổi phạm vi thì xoá dữ liệu phạm vi cũ ngay, lỗi không bị nhìn nhầm là dữ liệu của phạm vi khác |
 | `createRequestScope` | `useTagAssignment` | đổi tag/đóng panel: mọi commit phải qua `isCurrent(token)` |
-| `loadIdRef` | `useLecturers` | dropdown lecturer hiện danh sách của lần chọn trước |
+| `loadIdRef` | `useOrganizers` | dropdown organizer hiện danh sách của lần chọn trước |
 | `pendingUserIds` + `canStartAssignmentMutation` | tag assignment | double-submit và hai refresh chồng nhau |
 
 ### 6.6 Design token, dark mode và a11y
@@ -516,9 +516,9 @@ bằng cách truyền state giả. `onToastSuccess` cũng là callback từ page
 
 Bằng chứng (đã kiểm tra bằng tìm kiếm trong `src/`):
 
-- `config/navigation.ts` khai `/sessions`, `/attendance-records`, `/statistics` là `['lecturer']`, trong khi
-  `AppRoutes.tsx` cho cả `admin` và `lecturer` vào ba route này.
-- Hệ quả 1: `SessionsPage.AdminSessionsView` (bộ lọc theo lecturer) **không thể mở từ menu** vì admin
+- `config/navigation.ts` khai `/sessions`, `/attendance-records`, `/statistics` là `['organizer']`, trong khi
+  `AppRoutes.tsx` cho cả `admin` và `organizer` vào ba route này.
+- Hệ quả 1: `SessionsPage.AdminSessionsView` (bộ lọc theo organizer) **không thể mở từ menu** vì admin
   không có mục "Phiên điểm danh"; muốn dùng phải gõ URL `/sessions`.
 - Hệ quả 2: `/attendance-records` và `/statistics` hiện `PlaceholderPage` cho admin qua URL, nhưng admin
   không biết là có trang đó.
@@ -551,7 +551,7 @@ Bằng chứng (đã kiểm tra bằng tìm kiếm trong `src/`):
   `React.lazy`/`Suspense` (0 kết quả) ⇒ một lỗi render ở bất kỳ page nào làm trắng toàn app, và
   **Leaflet + react-leaflet** (`SessionLocationMap`, dùng ở đúng một page) nằm trong bundle chính.
 - Đề xuất tối thiểu: thêm một `ErrorBoundary` bọc `<Outlet />` trong `DashboardLayout` (kèm nút "Tải
-  lại"), và `React.lazy` cho `SessionCreatePage` — vì route này đã có `RoleGuard ['lecturer']` nên
+  lại"), và `React.lazy` cho `SessionCreatePage` — vì route này đã có `RoleGuard ['organizer']` nên
   admin không bao giờ tải map, tách ra là lợi rõ ràng và chỉ tốn một `Suspense` với `LoadingState`.
 - Lưu ý: sau khi tách lazy, kiểm tra lại `build` để chắc chunk Leaflet không lọt vào entry.
 
@@ -559,7 +559,7 @@ Bằng chứng (đã kiểm tra bằng tìm kiếm trong `src/`):
 
 **P2.1 Bốn hook lặp lại cùng một khuôn load/error/reload/race-guard.**
 
-`useAttendanceSessions`, `useTags`, `useUnits`, `useLecturers` đều tự viết: state `isLoading`/`error`,
+`useAttendanceSessions`, `useTags`, `useUnits`, `useOrganizers` đều tự viết: state `isLoading`/`error`,
 `reload` trong `useCallback`, effect gọi lần đầu kèm `eslint-disable`, guard bỏ response cũ (mỗi hook
 một kiểu: `createLoadTracker`, `loadIdRef`, `scopeKeyRef`, `createRequestScope`).
 
@@ -603,7 +603,7 @@ một kiểu: `createLoadTracker`, `loadIdRef`, `scopeKeyRef`, `createRequestSco
 | Không có script `lint` | `eslint.config.js` đã có (tseslint + react-hooks + react-refresh) nhưng `package.json` chỉ có `dev/build/test/clean` | Thêm `"lint": "eslint ."` (và `"typecheck": "tsc -b"` nếu muốn tách khỏi `build`) |
 | Dependency có thể thừa | không có `import` nào của `xlsx` trong `src/`; `axios` chỉ dùng gián tiếp qua shared | Rà lại `package.json`, xoá nếu thật sự không dùng để giảm bề mặt cài đặt |
 | Asset không ai import | `src/assets/hero.png`, `src/assets/react.svg`, `src/assets/vite.svg` | Xoá cùng lúc với việc dọn asset thừa |
-| `DEFAULT_USER_ROLE = 'admin'` là lưới an toàn khá rộng | `types/user-role.ts`: role lạ (vd `student`) bị quy về `admin` ⇒ menu admin hiện ra nhưng API sẽ 403 | Cân nhắc trạng thái "role không hỗ trợ" (màn hình thông báo) thay vì mặc định admin |
+| `DEFAULT_USER_ROLE = 'admin'` là lưới an toàn khá rộng | `types/user-role.ts`: role lạ (vd `participant`) bị quy về `admin` ⇒ menu admin hiện ra nhưng API sẽ 403 | Cân nhắc trạng thái "role không hỗ trợ" (màn hình thông báo) thay vì mặc định admin |
 | Prefix API không nhất quán | `/v0/auth`, `/v0/users`, `/v0/attendance-sessions` có prefix; `/tags`, `/units` không có (đã ghi comment trong `api/*.api.ts`) | Là ràng buộc backend — chỉ thống nhất khi backend cho phép; hiện giữ comment là đủ |
 | A11y/perf nhỏ | map Leaflet không thao tác được bằng bàn phím (đã có fallback nhập toạ độ); `SessionTable` sort và `StatusDistribution` tính % lại mỗi render | Ghi nhận, chưa cần sửa: dữ liệu nhỏ, fallback đã có; nếu danh sách lớn thì `useMemo` |
 

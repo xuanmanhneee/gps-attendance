@@ -24,7 +24,7 @@ interface DashboardSidebarProps {
 
 const ROLE_PROFILE_KEYS: Record<UserRole, TranslationKey> = {
   admin: 'roles.adminProfile',
-  lecturer: 'roles.lecturerProfile',
+  organizer: 'roles.organizerProfile',
 };
 
 const DashboardSidebar = ({ user, onLogout }: DashboardSidebarProps) => {

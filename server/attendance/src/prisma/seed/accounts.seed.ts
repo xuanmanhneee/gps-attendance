@@ -20,117 +20,117 @@ export async function seedAccounts(
 
   await prisma.account.create({
     data: {
-      username: 'lecturer01',
-      passwordHash: await bcrypt.hash('lecturer01', 10),
-      userId: users.lecturers[0].id,
+      username: 'organizer01',
+      passwordHash: await bcrypt.hash('organizer01', 10),
+      userId: users.organizers[0].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'lecturer02',
-      passwordHash: await bcrypt.hash('lecturer02', 10),
-      userId: users.lecturers[1].id,
+      username: 'organizer02',
+      passwordHash: await bcrypt.hash('organizer02', 10),
+      userId: users.organizers[1].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'lecturer03',
-      passwordHash: await bcrypt.hash('lecturer03', 10),
-      userId: users.lecturers[2].id,
+      username: 'organizer03',
+      passwordHash: await bcrypt.hash('organizer03', 10),
+      userId: users.organizers[2].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'student01',
-      passwordHash: await bcrypt.hash('student01', 10),
-      userId: users.students[0].id,
+      username: 'participant01',
+      passwordHash: await bcrypt.hash('participant01', 10),
+      userId: users.participants[0].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'student02',
-      passwordHash: await bcrypt.hash('student02', 10),
-      userId: users.students[1].id,
+      username: 'participant02',
+      passwordHash: await bcrypt.hash('participant02', 10),
+      userId: users.participants[1].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'student03',
-      passwordHash: await bcrypt.hash('student03', 10),
-      userId: users.students[2].id,
+      username: 'participant03',
+      passwordHash: await bcrypt.hash('participant03', 10),
+      userId: users.participants[2].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'student04',
-      passwordHash: await bcrypt.hash('student04', 10),
-      userId: users.students[3].id,
+      username: 'participant04',
+      passwordHash: await bcrypt.hash('participant04', 10),
+      userId: users.participants[3].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'student05',
-      passwordHash: await bcrypt.hash('student05', 10),
-      userId: users.students[4].id,
+      username: 'participant05',
+      passwordHash: await bcrypt.hash('participant05', 10),
+      userId: users.participants[4].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'student06',
-      passwordHash: await bcrypt.hash('student06', 10),
-      userId: users.students[5].id,
+      username: 'participant06',
+      passwordHash: await bcrypt.hash('participant06', 10),
+      userId: users.participants[5].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'student07',
-      passwordHash: await bcrypt.hash('student07', 10),
-      userId: users.students[6].id,
+      username: 'participant07',
+      passwordHash: await bcrypt.hash('participant07', 10),
+      userId: users.participants[6].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'student08',
-      passwordHash: await bcrypt.hash('student08', 10),
-      userId: users.students[7].id,
+      username: 'participant08',
+      passwordHash: await bcrypt.hash('participant08', 10),
+      userId: users.participants[7].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'student09',
-      passwordHash: await bcrypt.hash('student09', 10),
-      userId: users.students[8].id,
+      username: 'participant09',
+      passwordHash: await bcrypt.hash('participant09', 10),
+      userId: users.participants[8].id,
       updatedAt,
     },
   });
 
   await prisma.account.create({
     data: {
-      username: 'student10',
-      passwordHash: await bcrypt.hash('student10', 10),
-      userId: users.students[9].id,
+      username: 'participant10',
+      passwordHash: await bcrypt.hash('participant10', 10),
+      userId: users.participants[9].id,
       updatedAt,
     },
   });

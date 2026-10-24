@@ -29,7 +29,7 @@ export class AdminAuthController {
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: LoginDto })
   async login(@CurrentUser() user: AuthenticatedUser): Promise<LoginResponse> {
-    if (user.role !== 'admin' && user.role !== 'lecturer') {
+    if (user.role !== 'admin' && user.role !== 'organizer') {
       throw new UnauthorizedException({
         code: 'AUTH_ROLE_NOT_ALLOWED',
         message: 'Tài khoản không được phép đăng nhập bằng admin endpoint',

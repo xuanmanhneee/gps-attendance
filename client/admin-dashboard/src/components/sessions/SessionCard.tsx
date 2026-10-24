@@ -25,7 +25,7 @@ const TOOLTIP_CLASS =
 
 type Props = {
   session: AttendanceSessionResponse;
-  /** true khi người xem là lecturer tạo phiên này */
+  /** true khi người xem là organizer tạo phiên này */
   canManage?: boolean;
   isCancelling?: boolean;
   onCancel?: (session: AttendanceSessionResponse) => void;

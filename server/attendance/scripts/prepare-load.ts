@@ -48,7 +48,7 @@ async function main(): Promise<void> {
     data: [
       {
         code: 'LOAD_LECTURER',
-        role: UserRole.lecturer,
+        role: UserRole.organizer,
         fullname: 'Performance Test Lecturer',
         unitId: unit.id,
       },
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
         const index = start + offset;
         return {
           code: codeFor(index),
-          role: UserRole.student,
+          role: UserRole.participant,
           fullname: `Performance Test Student ${index}`,
           unitId: unit.id,
         };
@@ -162,7 +162,7 @@ async function main(): Promise<void> {
       token: jwt.sign({
         sub: student.id,
         username: usernameFor(index + 1),
-        role: 'student',
+        role: 'participant',
       }),
     })),
   };

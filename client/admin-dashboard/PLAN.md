@@ -10,12 +10,12 @@ Ghi lại việc đã xong / còn lại / quyết định quan trọng để tas
 
 1. Thêm dependency: `leaflet@^1.9.4`, `react-leaflet@^5.0.0` (deps) và `@types/leaflet` (dev).
 2. `routes/paths.ts`: thêm `attendanceSessionCreate: '/sessions/new'`.
-3. `routes/AppRoutes.tsx`: route `/sessions/new` nằm **trước** `/sessions/:id`, guard `RoleGuard ['lecturer']`.
+3. `routes/AppRoutes.tsx`: route `/sessions/new` nằm **trước** `/sessions/:id`, guard `RoleGuard ['organizer']`.
 4. `pages/SessionCreatePage.tsx` (mới): wizard 2 bước, một `useForm` duy nhất.
 5. `components/sessions/SessionLocationMap.tsx` (mới): Leaflet + OSM tiles, kéo marker đổi tâm,
    kéo điểm ở rìa vòng tròn đổi bán kính.
 6. `components/sessions/SessionStepIndicator.tsx` (mới): chỉ báo tiến trình (thuần hiển thị).
-7. `pages/SessionsPage.tsx`, `pages/overview/LecturerOverview.tsx`: nút tạo phiên điều hướng sang
+7. `pages/SessionsPage.tsx`, `pages/overview/OrganizerOverview.tsx`: nút tạo phiên điều hướng sang
    `/sessions/new` (bỏ state `isCreateModalOpen`).
 8. Xoá `CreateSessionModal.tsx`, `CreateSessionModalActions.tsx`, `CreateSessionModalHeader.tsx`
    (đã kiểm tra không còn tham chiếu nào).
@@ -25,10 +25,10 @@ Ghi lại việc đã xong / còn lại / quyết định quan trọng để tas
 
 ### Quyết định quan trọng
 
-- **Vẫn nhập mã sinh viên bằng tay ở bước 2**: `participantCriteria` của DTO backend là bắt buộc và
+- **Vẫn nhập mã người tham gia bằng tay ở bước 2**: `participantCriteria` của DTO backend là bắt buộc và
   `isValidUserFilterCriteria` cần ≥1 điều kiện, nếu không sẽ 400 `INVALID_CRITERIA`.
 - **Dùng lại util thuần** (`utils/attendance-sessions/session-form.ts`) thay vì tự parse:
-  `createDefaultSessionFormValues`, `combineLocalDateTime`, `isCloseAfterOpen`, `parseStudentCodes`,
+  `createDefaultSessionFormValues`, `combineLocalDateTime`, `isCloseAfterOpen`, `parseParticipantCodes`,
   `buildCreateSessionRequest`, `resolveGeolocationErrorKey`; lỗi API qua
   `resolveSessionErrorKey`/`logSessionError` với context `'create'`.
 - **Validate**: rule per-field gắn qua `register`/`Controller.rules` để `trigger()` chạy được theo

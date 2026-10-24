@@ -5,18 +5,18 @@ import { vi } from '../../i18n/translations/vi.ts';
 import { en } from '../../i18n/translations/en.ts';
 import {
   createLoadTracker,
-  isLecturerUser,
-  isValidLecturerUserId,
+  isOrganizerUser,
+  isValidOrganizerUserId,
   resolveSessionListScope,
-  toLecturerOptions,
+  toOrganizerOptions,
 } from './session-filter.ts';
 
 describe('resolveSessionListScope', () => {
-  it('Tất cả lecturer (null) → dùng API danh sách toàn bộ', () => {
+  it('Tất cả organizer (null) → dùng API danh sách toàn bộ', () => {
     assert.deepEqual(resolveSessionListScope(null), { scope: 'all' });
   });
 
-  it('Chọn một lecturer hợp lệ → dùng created-by với userId đó', () => {
+  it('Chọn một organizer hợp lệ → dùng created-by với userId đó', () => {
     assert.deepEqual(resolveSessionListScope(12), {
       scope: 'created-by',
       createdByUserId: 12,
@@ -30,39 +30,39 @@ describe('resolveSessionListScope', () => {
   });
 
   it('id hợp lệ theo guard API client: số nguyên dương', () => {
-    assert.equal(isValidLecturerUserId(1), true);
-    assert.equal(isValidLecturerUserId('12'), false);
-    assert.equal(isValidLecturerUserId(null), false);
+    assert.equal(isValidOrganizerUserId(1), true);
+    assert.equal(isValidOrganizerUserId('12'), false);
+    assert.equal(isValidOrganizerUserId(null), false);
   });
 });
 
-describe('toLecturerOptions', () => {
+describe('toOrganizerOptions', () => {
   const USERS = [
-    { id: 3, code: 'GV003', role: 'lecturer', fullname: 'Lê Văn C' },
+    { id: 3, code: 'GV003', role: 'organizer', fullname: 'Lê Văn C' },
     { id: 1, code: 'AD001', role: 'admin', fullname: 'Nguyễn A' },
-    { id: 2, code: 'SV002', role: 'student', fullname: 'Trần B' },
-    { id: 5, code: 'GV005', role: 'lecturer', fullname: 'Phạm E' },
+    { id: 2, code: 'SV002', role: 'participant', fullname: 'Trần B' },
+    { id: 5, code: 'GV005', role: 'organizer', fullname: 'Phạm E' },
   ];
 
-  it('chỉ giữ user có role lecturer', () => {
+  it('chỉ giữ user có role organizer', () => {
     assert.deepEqual(
-      toLecturerOptions(USERS).map((option) => option.userId),
+      toOrganizerOptions(USERS).map((option) => option.userId),
       [3, 5],
     );
   });
 
   it('label gồm fullname và code', () => {
-    assert.deepEqual(toLecturerOptions(USERS)[0], {
+    assert.deepEqual(toOrganizerOptions(USERS)[0], {
       userId: 3,
       label: 'Lê Văn C (GV003)',
     });
   });
 
   it('dedupe theo id và không mutate mảng input', () => {
-    const input = [...USERS, { id: 3, code: 'GV003', role: 'lecturer', fullname: 'Lê Văn C' }];
+    const input = [...USERS, { id: 3, code: 'GV003', role: 'organizer', fullname: 'Lê Văn C' }];
     const before = JSON.stringify(input);
 
-    const options = toLecturerOptions(input);
+    const options = toOrganizerOptions(input);
 
     assert.equal(options.length, 2);
     assert.equal(JSON.stringify(input), before);
@@ -70,36 +70,36 @@ describe('toLecturerOptions', () => {
 
   it('bản ghi lỗi shape hoặc thiếu role bị bỏ qua, không throw', () => {
     assert.deepEqual(
-      toLecturerOptions([
+      toOrganizerOptions([
         null,
         { id: 9 },
-        { id: -2, code: 'X', role: 'lecturer', fullname: 'Y' },
-        { id: 7, code: 'GV007', role: 'lecturer', fullname: '  ' },
+        { id: -2, code: 'X', role: 'organizer', fullname: 'Y' },
+        { id: 7, code: 'GV007', role: 'organizer', fullname: '  ' },
       ]),
       [{ userId: 7, label: 'GV007' }],
     );
   });
 
   it('input không phải mảng → rỗng', () => {
-    assert.deepEqual(toLecturerOptions(undefined), []);
-    assert.deepEqual(toLecturerOptions({}), []);
+    assert.deepEqual(toOrganizerOptions(undefined), []);
+    assert.deepEqual(toOrganizerOptions({}), []);
   });
 
-  it('isLecturerUser yêu cầu role lecturer và id nguyên dương', () => {
-    assert.equal(isLecturerUser(USERS[0]), true);
-    assert.equal(isLecturerUser(USERS[1]), false);
-    assert.equal(isLecturerUser({ id: 1, code: 'C', role: 'lecturer' }), false);
+  it('isOrganizerUser yêu cầu role organizer và id nguyên dương', () => {
+    assert.equal(isOrganizerUser(USERS[0]), true);
+    assert.equal(isOrganizerUser(USERS[1]), false);
+    assert.equal(isOrganizerUser({ id: 1, code: 'C', role: 'organizer' }), false);
   });
 });
 
-describe('createLoadTracker (chặn stale response khi đổi lecturer)', () => {
+describe('createLoadTracker (chặn stale response khi đổi organizer)', () => {
   it('response của request cũ hoàn thành sau request mới bị bỏ qua', () => {
     const tracker = createLoadTracker();
 
     const first = tracker.begin();
     assert.equal(tracker.isActive(first), true);
 
-    // Admin đổi lecturer → request mới bắt đầu.
+    // Admin đổi organizer → request mới bắt đầu.
     const second = tracker.begin();
     assert.equal(tracker.isActive(first), false);
     assert.equal(tracker.isActive(second), true);
@@ -126,13 +126,13 @@ describe('createLoadTracker (chặn stale response khi đổi lecturer)', () => 
   });
 });
 
-describe('i18n bộ lọc lecturer có đủ key ở vi và en', () => {
+describe('i18n bộ lọc organizer có đủ key ở vi và en', () => {
   const KEYS = [
     'sessions.filter.label',
-    'sessions.filter.allLecturers',
+    'sessions.filter.allOrganizers',
     'sessions.filter.loading',
     'sessions.filter.loadError',
-    'sessions.filter.invalidLecturer',
+    'sessions.filter.invalidOrganizer',
   ] as const;
 
   for (const key of KEYS) {

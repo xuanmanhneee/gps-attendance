@@ -35,7 +35,7 @@ export const attendanceSessionsApi = {
     );
   },
 
-  /** Chỉ dùng cho page lecturer: endpoint backend yêu cầu role lecturer. */
+  /** Chỉ dùng cho page organizer: endpoint backend yêu cầu role organizer. */
   getCreatedByMe() {
     return httpClient.get<AttendanceSessionResponse[]>(
       '/v0/attendance-sessions/created-by-me',
@@ -43,14 +43,14 @@ export const attendanceSessionsApi = {
   },
 
   /**
-   * Lọc session theo lecturer cho admin.
+   * Lọc session theo organizer cho admin.
    *
-   * Chỉ dùng khi UI admin cần lọc theo lecturer vì endpoint backend yêu cầu
+   * Chỉ dùng khi UI admin cần lọc theo organizer vì endpoint backend yêu cầu
    * role admin (`GET /created-by?userId=...`).
    */
   getCreatedBy(userId: number) {
     if (!Number.isInteger(userId) || userId <= 0) {
-      throw new Error('Invalid lecturer user id');
+      throw new Error('Invalid organizer user id');
     }
 
     return httpClient.get<AttendanceSessionResponse[]>(

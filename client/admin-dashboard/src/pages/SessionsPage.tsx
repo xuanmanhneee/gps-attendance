@@ -25,7 +25,7 @@ import {
   resolveSessionErrorKey,
 } from '../components/sessions/session-errors';
 
-const LecturerSessionsView = () => {
+const OrganizerSessionsView = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -191,7 +191,7 @@ const SessionsPage = () => {
 
   return (
     <PageContainer>
-      {role === 'admin' ? <AdminSessionsView /> : <LecturerSessionsView />}
+      {role === 'admin' ? <AdminSessionsView /> : <OrganizerSessionsView />}
     </PageContainer>
   );
 };

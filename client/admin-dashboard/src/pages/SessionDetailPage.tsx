@@ -47,10 +47,10 @@ const SessionDetailPage = () => {
 
   /**
    * Admin không có route `/sessions` riêng nên quay về overview của mình;
-   * lecturer quay về danh sách phiên của mình. Cả hai route đều thuộc role.
+   * organizer quay về danh sách phiên của mình. Cả hai route đều thuộc role.
    */
   const backPath =
-    role === 'lecturer'
+    role === 'organizer'
       ? ROUTE_PATHS.attendanceSessions
       : ROUTE_PATHS.overview;
 
@@ -249,7 +249,7 @@ const SessionDetailPage = () => {
                   </p>
 
                   <p className="mt-0.5 text-[11px] text-muted">
-                    {t('sessionDetail.studentCode')}: {participant.user.code} ·{' '}
+                    {t('sessionDetail.participantCode')}: {participant.user.code} ·{' '}
                     {t(PARTICIPANT_ROLE_LABEL_KEYS[participant.user.role])}
                   </p>
                 </div>

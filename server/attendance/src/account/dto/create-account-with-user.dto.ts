@@ -19,8 +19,8 @@ export class CreateAccountWithUserDto {
   fullname!: string;
 
   // Tài khoản admin chỉ được cấp qua seed hoặc thao tác trực tiếp trên server.
-  @IsIn(['lecturer', 'student'])
-  role!: Role;
+  @IsIn(['organizer', 'participant'])
+  role!: Exclude<Role, 'admin'>;
 
   @IsInt()
   unitId!: number;

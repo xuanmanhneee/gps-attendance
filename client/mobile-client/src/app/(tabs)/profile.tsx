@@ -18,8 +18,8 @@ import { restoreDevMode, setDevMode } from '../../services/dev-mode';
 import { colors } from '../../../theme';
 
 const ROLE_LABELS: Record<Role, string> = {
-  student: 'Sinh viên',
-  lecturer: 'Giảng viên',
+  participant: 'Người tham gia',
+  organizer: 'Người tổ chức',
   admin: 'Quản trị viên',
 };
 

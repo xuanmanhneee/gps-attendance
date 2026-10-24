@@ -8,7 +8,7 @@ import {
   combineLocalDateTime,
   createDefaultSessionFormValues,
   isCloseAfterOpen,
-  parseStudentCodes,
+  parseParticipantCodes,
   resolveGeolocationErrorKey,
   validateSessionForm,
   type SessionFormValues,
@@ -50,9 +50,9 @@ describe('isCloseAfterOpen', () => {
   });
 });
 
-describe('parseStudentCodes', () => {
+describe('parseParticipantCodes', () => {
   it('trim, bá» pháº§n rá»—ng vÃ  dedup theo thá»© tá»± xuáº¥t hiá»‡n', () => {
-    assert.deepEqual(parseStudentCodes(VALID_VALUES.codeIncludeText), [
+    assert.deepEqual(parseParticipantCodes(VALID_VALUES.codeIncludeText), [
       'SV001',
       'SV002',
     ]);

@@ -22,7 +22,7 @@ export const buildSessionDetailPath = (sessionId: number): string =>
 
 /**
  * Trang đầu tiên của từng vai trò sau khi đăng nhập.
- * Lecturer không có trang tổng quan: vào thẳng danh sách phiên điểm danh.
+ * Organizer không có trang tổng quan: vào thẳng danh sách phiên điểm danh.
  */
 export const getHomePath = (role: string | undefined): string =>
-  role === 'lecturer' ? ROUTE_PATHS.attendanceSessions : ROUTE_PATHS.overview;
+  role === 'organizer' ? ROUTE_PATHS.attendanceSessions : ROUTE_PATHS.overview;

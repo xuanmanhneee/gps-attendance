@@ -1,6 +1,6 @@
 import { useRole } from '../hooks/useRole';
 import { AdminOverview } from './overview/AdminOverview';
-import { LecturerOverview } from './overview/LecturerOverview';
+import { OrganizerOverview } from './overview/OrganizerOverview';
 
 /**
  * Cổng vào `/dashboard`: render overview theo vai trò của tài khoản đã xác thực.
@@ -8,7 +8,7 @@ import { LecturerOverview } from './overview/LecturerOverview';
 const DashboardPage = () => {
   const role = useRole();
 
-  return role === 'lecturer' ? <LecturerOverview /> : <AdminOverview />;
+  return role === 'organizer' ? <OrganizerOverview /> : <AdminOverview />;
 };
 
 export default DashboardPage;

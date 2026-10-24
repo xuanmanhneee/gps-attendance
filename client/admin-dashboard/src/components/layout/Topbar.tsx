@@ -13,7 +13,7 @@ import { ThemeToggle } from './ThemeToggle';
 
 const CONTEXT_KEYS: Record<UserRole, TranslationKey> = {
   admin: 'topbar.context.admin',
-  lecturer: 'topbar.context.lecturer',
+  organizer: 'topbar.context.organizer',
 };
 
 export const Topbar = () => {

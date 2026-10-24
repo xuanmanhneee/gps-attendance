@@ -64,37 +64,37 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'navigation.attendanceSessions',
     descriptionKey: 'sessions.page.description',
     path: ROUTE_PATHS.attendanceSessions,
-    roles: ['lecturer'],
+    roles: ['organizer'],
   },
   {
     id: 'attendanceRecords',
     labelKey: 'navigation.attendanceRecords',
     descriptionKey: 'pages.attendanceRecords.description',
     path: ROUTE_PATHS.attendanceRecords,
-    roles: ['lecturer'],
+    roles: ['organizer'],
   },
   {
     id: 'statistics',
     labelKey: 'navigation.statistics',
     descriptionKey: 'pages.statistics.description',
     path: ROUTE_PATHS.statistics,
-    roles: ['lecturer'],
+    roles: ['organizer'],
   },
 ];
 
 export const NAVIGATION_GROUP_LABEL_KEYS: Record<UserRole, TranslationKey> = {
   admin: 'navigation.group.admin',
-  lecturer: 'navigation.group.lecturer',
+  organizer: 'navigation.group.organizer',
 };
 
 export const DEFAULT_ROUTE_BY_ROLE: Record<UserRole, string> = {
   admin: ROUTE_PATHS.overview,
-  lecturer: ROUTE_PATHS.attendanceSessions,
+  organizer: ROUTE_PATHS.attendanceSessions,
 };
 
 /**
  * Trang mặc định của vai trò. Nhận `string` vì vai trò từ API có thể nằm ngoài
- * `UserRole` (vd `student` không dùng dashboard này); vai trò lạ về trang login.
+ * `UserRole` (vd `participant` không dùng dashboard này); vai trò lạ về trang login.
  */
 export const getDefaultRoute = (role: string | undefined): string =>
   role !== undefined && role in DEFAULT_ROUTE_BY_ROLE

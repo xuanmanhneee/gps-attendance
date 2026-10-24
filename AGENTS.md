@@ -12,6 +12,7 @@ không chỉ file này — file này chỉ là mục lục.
 | `docs/conventions/module-structure.md` | Cấu trúc thư mục module NestJS, DI qua repository interface, thứ tự route |
 | `docs/conventions/auth-guards.md` | Cách `JwtAuthGuard` hoạt động, `User` vs `Account` id |
 | `docs/conventions/naming.md` | Quy ước đặt tên file/class/const, quy ước branch |
+| `docs/conventions/roles.md` | Role trung tính và ranh giới ánh xạ với hệ thống bên ngoài |
 
 ## Nguyên tắc chung
 

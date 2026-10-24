@@ -1,3 +1,4 @@
+import { ROLES } from '@gps-attendance/shared';
 import type {
   AttendanceParticipantResponse,
   AttendanceSessionDetailResponse,
@@ -29,8 +30,6 @@ const ATTENDANCE_STATUSES: readonly AttendanceStatus[] = [
   'late',
   'excused',
 ];
-
-const ROLES: readonly Role[] = ['admin', 'lecturer', 'student'];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;

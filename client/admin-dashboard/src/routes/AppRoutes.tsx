@@ -66,9 +66,9 @@ const AppRoutes = () => (
           <Route path={ROUTE_PATHS.tags} element={<TagsPage />} />
         </Route>
 
-        {/* Danh sách phiên: lecturer xem của mình, admin xem toàn bộ + lọc theo lecturer
+        {/* Danh sách phiên: organizer xem của mình, admin xem toàn bộ + lọc theo organizer
             (endpoint `created-by` phía sau yêu cầu role admin). */}
-        <Route element={<RoleGuard allowedRoles={['admin', 'lecturer']} />}>
+        <Route element={<RoleGuard allowedRoles={['admin', 'organizer']} />}>
           <Route
             path={ROUTE_PATHS.attendanceSessions}
             element={<SessionsPage />}
@@ -80,18 +80,18 @@ const AppRoutes = () => (
           <Route path={ROUTE_PATHS.statistics} element={<StatisticsPage />} />
         </Route>
 
-        {/* Tạo phiên: chỉ lecturer được tạo (backend trả 403 cho role khác).
+        {/* Tạo phiên: chỉ organizer được tạo (backend trả 403 cho role khác).
             Route tĩnh `/sessions/new` không phụ thuộc thứ tự khai báo vì
             react-router ưu tiên route khớp cụ thể hơn `/sessions/:id`. */}
-        <Route element={<RoleGuard allowedRoles={['lecturer']} />}>
+        <Route element={<RoleGuard allowedRoles={['organizer']} />}>
           <Route
             path={ROUTE_PATHS.attendanceSessionCreate}
             element={<SessionCreatePage />}
           />
         </Route>
 
-        {/* Chi tiết phiên: cả admin và lecturer đều được xem (backend chỉ yêu cầu đăng nhập). */}
-        <Route element={<RoleGuard allowedRoles={['admin', 'lecturer']} />}>
+        {/* Chi tiết phiên: cả admin và organizer đều được xem (backend chỉ yêu cầu đăng nhập). */}
+        <Route element={<RoleGuard allowedRoles={['admin', 'organizer']} />}>
           <Route
             path={ROUTE_PATHS.attendanceSessionDetail}
             element={<SessionDetailPage />}

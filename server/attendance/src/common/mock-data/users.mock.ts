@@ -13,7 +13,7 @@ export const mockUsers: User[] = [
   {
     id: 2,
     code: 'LEC0001',
-    role: 'lecturer',
+    role: 'organizer',
     unitId: 1,
     fullname: 'Giảng viên',
     createdAt: new Date('2026-01-02T08:00:00Z'),
@@ -22,7 +22,7 @@ export const mockUsers: User[] = [
   {
     id: 3,
     code: 'STU0001',
-    role: 'student',
+    role: 'participant',
     unitId: 3,
     fullname: 'Nguyen Van A',
     createdAt: new Date('2026-01-03T08:00:00Z'),
@@ -31,7 +31,7 @@ export const mockUsers: User[] = [
   {
     id: 4,
     code: 'STU0002',
-    role: 'student',
+    role: 'participant',
     unitId: 3,
     fullname: 'Tran Van B',
     createdAt: new Date('2026-01-04T08:00:00Z'),
@@ -40,7 +40,7 @@ export const mockUsers: User[] = [
   {
     id: 5,
     code: 'STU003',
-    role: 'student',
+    role: 'participant',
     unitId: 3,
     fullname: 'Le Thi C',
     createdAt: new Date('2026-01-05T08:00:00Z'),
