@@ -156,6 +156,11 @@ const SessionDetailPage = () => {
       value: `${session.latitude}, ${session.longitude}`,
     },
   ];
+  const isPlanned = session.plannedParticipants !== null;
+  const displayedParticipants =
+    session.plannedParticipants !== null
+      ? session.plannedParticipants.map((user) => ({ user, status: null }))
+      : session.participants;
 
   return (
     <>
@@ -208,7 +213,7 @@ const SessionDetailPage = () => {
             <div className="flex items-center gap-3">
               <span className="text-[12px] text-muted">
                 {t('sessionDetail.participantCount', {
-                  count: session.participants.length,
+                  count: displayedParticipants.length,
                 })}
               </span>
 
@@ -234,11 +239,23 @@ const SessionDetailPage = () => {
           </p>
         )}
 
-        {session.participants.length === 0 ? (
-          <EmptyState description={t('sessionDetail.emptyParticipants')} />
+        {isPlanned && (
+          <p className="px-5 pt-3 text-[12px] text-muted">
+            {t('sessionDetail.plannedParticipantsNote')}
+          </p>
+        )}
+
+        {displayedParticipants.length === 0 ? (
+          <EmptyState
+            description={t(
+              isPlanned
+                ? 'sessionDetail.emptyPlannedParticipants'
+                : 'sessionDetail.emptyParticipants',
+            )}
+          />
         ) : (
           <ul className="divide-y divide-line">
-            {session.participants.map((participant) => (
+            {displayedParticipants.map((participant) => (
               <li
                 key={participant.user.code}
                 className="flex items-center justify-between gap-4 px-5 py-3"
@@ -249,16 +266,19 @@ const SessionDetailPage = () => {
                   </p>
 
                   <p className="mt-0.5 text-[11px] text-muted">
-                    {t('sessionDetail.participantCode')}: {participant.user.code} ·{' '}
+                    {t('sessionDetail.participantCode')}:{' '}
+                    {participant.user.code} ·{' '}
                     {t(PARTICIPANT_ROLE_LABEL_KEYS[participant.user.role])}
                   </p>
                 </div>
 
-                <span
-                  className={`rounded-[5px] px-2 py-1 text-[10px] font-extrabold ${ATTENDANCE_STATUS_TONE_CLASS[participant.status]}`}
-                >
-                  {t(ATTENDANCE_STATUS_LABEL_KEYS[participant.status])}
-                </span>
+                {participant.status !== null && (
+                  <span
+                    className={`rounded-[5px] px-2 py-1 text-[10px] font-extrabold ${ATTENDANCE_STATUS_TONE_CLASS[participant.status]}`}
+                  >
+                    {t(ATTENDANCE_STATUS_LABEL_KEYS[participant.status])}
+                  </span>
+                )}
               </li>
             ))}
           </ul>

@@ -1,5 +1,5 @@
 // attendance-session.types.ts
-import type { UserFilterCriteria } from '../users';
+import type { UserFilterCriteria, UserResponse } from '../users';
 import type {
   AttendanceParticipantResponse,
   AttendanceStatus,
@@ -20,6 +20,8 @@ export interface AttendanceSessionResponse {
 
 export interface AttendanceSessionDetailResponse extends AttendanceSessionResponse {
   participants: AttendanceParticipantResponse[];
+  /** Danh sách tạm từ criteria; null sau khi roster đã khởi tạo. */
+  plannedParticipants: UserResponse[] | null;
 }
 
 export interface MyAttendanceSessionResponse extends AttendanceSessionResponse {

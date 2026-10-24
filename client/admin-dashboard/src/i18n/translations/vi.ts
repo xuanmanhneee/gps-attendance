@@ -286,6 +286,10 @@ export const vi = {
     'Không thể tải lại danh sách người tham gia. Vui lòng thử lại.',
   'sessionDetail.emptyParticipants':
     'Chưa có người tham gia trong phiên điểm danh này.',
+  'sessionDetail.plannedParticipantsNote':
+    'Danh sách dự kiến theo điều kiện hiện tại; có thể thay đổi trước khi roster được khởi tạo.',
+  'sessionDetail.emptyPlannedParticipants':
+    'Chưa có người tham gia phù hợp với điều kiện hiện tại.',
   'sessionDetail.participantCode': 'Mã người tham gia',
   'sessionDetail.present': 'Đã điểm danh',
   'sessionDetail.absent': 'Chưa điểm danh',

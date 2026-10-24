@@ -136,7 +136,8 @@ export class AttendanceSessionsController {
   // ---- ':id' luôn đặt CUỐI CÙNG trong nhóm GET ----
 
   @ApiOperation({ summary: 'Chi tiết 1 session' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'organizer')
   @Get(':id')
   async getDetail(
     @Param('id', ParseIntPipe) id: number,

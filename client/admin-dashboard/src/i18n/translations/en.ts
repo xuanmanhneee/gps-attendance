@@ -293,6 +293,10 @@ export const en: Record<TranslationKey, string> = {
     'Unable to reload the participant list. Please try again.',
   'sessionDetail.emptyParticipants':
     'There is no participant in this attendance session yet.',
+  'sessionDetail.plannedParticipantsNote':
+    'Planned participants based on the current criteria; this list may change before roster initialization.',
+  'sessionDetail.emptyPlannedParticipants':
+    'No participants match the current criteria.',
   'sessionDetail.participantCode': 'Participant code',
   'sessionDetail.present': 'Checked in',
   'sessionDetail.absent': 'Not checked in',

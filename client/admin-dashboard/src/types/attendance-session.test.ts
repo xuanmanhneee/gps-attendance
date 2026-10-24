@@ -98,9 +98,11 @@ describe('isAttendanceParticipant', () => {
   it('từ chối role cũ trong response', () => {
     for (const role of ['lecturer', 'student']) {
       assert.equal(
-        isAttendanceParticipant(buildParticipant({
-          user: { code: 'SV001', fullname: 'Nguyễn Văn A', role },
-        })),
+        isAttendanceParticipant(
+          buildParticipant({
+            user: { code: 'SV001', fullname: 'Nguyễn Văn A', role },
+          }),
+        ),
         false,
       );
     }
@@ -149,11 +151,26 @@ describe('isAttendanceSessionDetail', () => {
       isAttendanceSessionDetail({
         ...buildSession(),
         participants: [buildParticipant()],
+        plannedParticipants: null,
       }),
       true,
     );
     assert.equal(
-      isAttendanceSessionDetail({ ...buildSession(), participants: [] }),
+      isAttendanceSessionDetail({
+        ...buildSession(),
+        participants: [],
+        plannedParticipants: [],
+      }),
+      true,
+    );
+    assert.equal(
+      isAttendanceSessionDetail({
+        ...buildSession(),
+        participants: [],
+        plannedParticipants: [
+          { code: 'P003', role: 'participant', fullname: 'Người tham gia' },
+        ],
+      }),
       true,
     );
   });
@@ -164,6 +181,23 @@ describe('isAttendanceSessionDetail', () => {
       isAttendanceSessionDetail({
         ...buildSession(),
         participants: [buildParticipant({ status: 'unknown' })],
+        plannedParticipants: null,
+      }),
+      false,
+    );
+    assert.equal(
+      isAttendanceSessionDetail({
+        ...buildSession(),
+        participants: [],
+        plannedParticipants: undefined,
+      }),
+      false,
+    );
+    assert.equal(
+      isAttendanceSessionDetail({
+        ...buildSession(),
+        participants: [],
+        plannedParticipants: [{ code: 'P003', role: 'student' }],
       }),
       false,
     );
