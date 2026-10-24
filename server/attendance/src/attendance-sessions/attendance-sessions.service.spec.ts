@@ -10,10 +10,10 @@ import {
 } from '@gps-attendance/shared';
 
 import { AttendanceSessionsService } from './attendance-sessions.service';
+import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
 import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto';
 import { InMemoryAttendanceSessionRepository } from './infra/in-memory/in-memory-attendance-session.repository';
 // chỉnh path đúng theo project
-
 
 jest.mock('@gps-attendance/shared', () => ({
   ...jest.requireActual('@gps-attendance/shared'),
@@ -25,12 +25,16 @@ const OWNER = 1;
 const OTHER = 2;
 const min = (n: number) => new Date(NOW.getTime() + n * 60_000);
 
-describe('AttendanceSessionsService.update', () => {
+describe('AttendanceSessionsService', () => {
   let repo: InMemoryAttendanceSessionRepository;
   let service: AttendanceSessionsService;
   let redis: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
   let scheduler: { schedule: jest.Mock; cancel: jest.Mock; onJob: jest.Mock };
   let userFilter: { assertTagsOwnedBy: jest.Mock; resolveUserIds: jest.Mock };
+  let records: {
+    initializeForSession: jest.Mock;
+    clearSessionBuffer: jest.Mock;
+  };
 
   // seed session với trạng thái mong muốn
   const seed = (openAt: Date, closeAt: Date) =>
@@ -62,14 +66,27 @@ describe('AttendanceSessionsService.update', () => {
     jest.mocked(isValidUserFilterCriteria).mockReturnValue(true);
 
     repo = new InMemoryAttendanceSessionRepository();
-    redis = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
+    const values = new Map<string, string>();
+    redis = {
+      get: jest.fn(async (key: string) => values.get(key) ?? null),
+      set: jest.fn(async (key: string, value: string) => {
+        values.set(key, value);
+      }),
+      del: jest.fn(async (key: string) => {
+        values.delete(key);
+      }),
+    };
     scheduler = { schedule: jest.fn(), cancel: jest.fn(), onJob: jest.fn() };
     userFilter = { assertTagsOwnedBy: jest.fn(), resolveUserIds: jest.fn() };
+    records = {
+      initializeForSession: jest.fn(),
+      clearSessionBuffer: jest.fn(),
+    };
 
     service = new AttendanceSessionsService(
       repo,
       userFilter as never,
-      { clearSessionBuffer: jest.fn() } as never,
+      records as never,
       redis as never,
       scheduler as never,
       { create: () => ({ warn: jest.fn() }) } as never,
@@ -77,6 +94,81 @@ describe('AttendanceSessionsService.update', () => {
   });
 
   afterEach(() => jest.useRealTimers());
+
+  describe('create', () => {
+    const create = (openAt: Date, closeAt: Date) =>
+      service.create(
+        {
+          title: 'Buổi 1',
+          latitude: 10,
+          longitude: 106,
+          radius: 100,
+          openAt: openAt.toISOString(),
+          closeAt: closeAt.toISOString(),
+          participantCriteria: { codeFilter: { include: ['S1'] } },
+        } as CreateAttendanceSessionDto,
+        OWNER,
+      );
+
+    it('khởi tạo roster ngay khi giờ mở đã qua, không lên lịch init-roster', async () => {
+      userFilter.resolveUserIds.mockResolvedValue([3, 4]);
+
+      const session = await create(min(-2), min(60));
+
+      expect(session.status).toBe('open');
+      expect(records.initializeForSession).toHaveBeenCalledWith(
+        session.id,
+        [3, 4],
+      );
+      expect(redis.del).toHaveBeenCalledWith(
+        `attendance:session:${session.id}:criteria`,
+      );
+      expect(scheduler.schedule).toHaveBeenCalledTimes(1);
+      expect(scheduler.schedule).toHaveBeenCalledWith(
+        'attendance:flush',
+        min(60),
+        { sessionId: session.id },
+        `flush:${session.id}`,
+      );
+    });
+
+    it('khởi tạo roster ngay khi giờ mở còn dưới 5 phút', async () => {
+      userFilter.resolveUserIds.mockResolvedValue([3]);
+
+      const session = await create(min(2), min(60));
+
+      expect(session.status).toBe('pending');
+      expect(records.initializeForSession).toHaveBeenCalledWith(
+        session.id,
+        [3],
+      );
+      expect(scheduler.schedule).not.toHaveBeenCalledWith(
+        'attendance:init-roster',
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it('vẫn lên lịch init-roster cho giờ mở đủ xa', async () => {
+      const session = await create(min(60), min(120));
+
+      expect(records.initializeForSession).not.toHaveBeenCalled();
+      expect(scheduler.schedule).toHaveBeenCalledWith(
+        'attendance:init-roster',
+        min(55),
+        { sessionId: session.id },
+        `init-roster:${session.id}`,
+      );
+    });
+
+    it('từ chối khi giờ đóng đã qua', async () => {
+      await expect(create(min(-60), min(-1))).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(scheduler.schedule).not.toHaveBeenCalled();
+    });
+  });
 
   describe('quyền và trạng thái', () => {
     it('từ chối người không phải owner', async () => {
@@ -119,9 +211,7 @@ describe('AttendanceSessionsService.update', () => {
         { sessionId: s.id },
         `flush:${s.id}`,
       );
-      expect(scheduler.cancel).not.toHaveBeenCalledWith(
-        `init-roster:${s.id}`,
-      );
+      expect(scheduler.cancel).not.toHaveBeenCalledWith(`init-roster:${s.id}`);
     });
 
     it('chặn sửa trường khác closeAt', async () => {
@@ -225,22 +315,39 @@ describe('AttendanceSessionsService.update', () => {
     it('openAt >= closeAt', async () => {
       const s = await seed(min(60), min(180));
 
-      const code = await codeOf(patch(s.id, { openAt: min(200).toISOString() }));
+      const code = await codeOf(
+        patch(s.id, { openAt: min(200).toISOString() }),
+      );
       expect(code).toBe(AttendanceSessionErrorCode.INVALID_TIME_RANGE);
     });
 
-    it('openAt mới cách hiện tại dưới 5 phút (khi chưa khoá roster)', async () => {
+    it('đổi openAt đến gần hiện tại thì huỷ job cũ và khởi tạo roster ngay', async () => {
       const s = await seed(min(60), min(180));
+      const criteria = { codeFilter: { include: ['S1'] } };
+      await redis.set(
+        `attendance:session:${s.id}:criteria`,
+        JSON.stringify(criteria),
+      );
+      userFilter.resolveUserIds.mockResolvedValue([3]);
 
-      await expect(
-        patch(s.id, { openAt: min(2).toISOString() }),
-      ).rejects.toThrow(BadRequestException);
+      await patch(s.id, { openAt: min(2).toISOString() });
+
+      expect(scheduler.cancel).toHaveBeenCalledWith(`init-roster:${s.id}`);
+      expect(records.initializeForSession).toHaveBeenCalledWith(s.id, [3]);
+      expect(scheduler.schedule).not.toHaveBeenCalledWith(
+        'attendance:init-roster',
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+      );
     });
 
     it('closeAt mới nằm trong quá khứ', async () => {
       const s = await seed(min(-60), min(60));
 
-      const code = await codeOf(patch(s.id, { closeAt: min(-1).toISOString() }));
+      const code = await codeOf(
+        patch(s.id, { closeAt: min(-1).toISOString() }),
+      );
       expect(code).toBe(AttendanceSessionErrorCode.INVALID_TIME_RANGE);
     });
   });
