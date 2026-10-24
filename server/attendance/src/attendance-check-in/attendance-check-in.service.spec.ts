@@ -48,10 +48,10 @@ describe('AttendanceCheckInService concurrent requests', () => {
         getBySessionAndUser: (sessionId: number, userId: number) =>
           records.getRecord(sessionId, userId),
         markPresent: (
-          input: Parameters<InMemoryAttendanceRecordStore['markPresentIfEligible']>[0],
+          input: Parameters<InMemoryAttendanceRecordStore['tryMarkPresentAndClaimDevice']>[0],
           deviceId: string,
           ttl: number,
-        ) => records.markPresentIfEligible(input, deviceId, ttl),
+        ) => records.tryMarkPresentAndClaimDevice(input, deviceId, ttl),
       } as never,
       { evaluate: jest.fn().mockResolvedValue({ isTooMany: false }) } as never,
     );

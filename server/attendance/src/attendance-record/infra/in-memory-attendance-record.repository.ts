@@ -41,7 +41,15 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     sessionMap.set(record.userId, { ...record, updatedAt: new Date() });
   }
 
-  async markPresentIfEligible(
+  async insertRecordIfAbsent(
+    record: Omit<AttendanceRecord, 'updatedAt'>,
+  ): Promise<void> {
+    if (!(await this.getRecord(record.sessionId, record.userId))) {
+      await this.upsertRecord(record);
+    }
+  }
+
+  async tryMarkPresentAndClaimDevice(
     input: MarkPresentInput,
     deviceId: string,
     _deviceTtlSeconds: number,

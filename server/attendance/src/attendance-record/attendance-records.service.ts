@@ -21,6 +21,8 @@ import {
   IAttendanceRecordBuffer,
   MarkPresentResult,
 } from './attendance-record.buffer';
+import { RedisService } from '../redis/redis.service';
+import { rosterInitializedKeyFor } from '../attendance-sessions/attendance-session-keys';
 
 @Injectable()
 export class AttendanceRecordsService {
@@ -37,6 +39,7 @@ export class AttendanceRecordsService {
 
     @Inject(LOGGER_FACTORY)
     loggerFactory: ILoggerFactory,
+    private readonly redisService: RedisService,
   ) {
     this.logger = loggerFactory.create(AttendanceRecordsService.name);
   }
@@ -76,6 +79,7 @@ export class AttendanceRecordsService {
   // kế nếu job flush trót chạy trước khi bị cancel kịp.
   async clearSessionBuffer(sessionId: number): Promise<void> {
     await this.attendanceRecordBuffer.clearSession(sessionId);
+    await this.redisService.del(rosterInitializedKeyFor(sessionId));
     this.logger.warn(
       `Đã xoá buffer của session ${sessionId} do session bị huỷ`,
     );
@@ -90,7 +94,7 @@ export class AttendanceRecordsService {
     userIds: number[],
   ): Promise<void> {
     for (const userId of userIds) {
-      await this.attendanceRecordBuffer.upsertRecord({
+      await this.attendanceRecordBuffer.insertRecordIfAbsent({
         sessionId,
         userId,
         status: 'absent',
@@ -102,7 +106,7 @@ export class AttendanceRecordsService {
       });
 
       this.logger.log(
-        `Attendance record created: sessionId=${sessionId}, userId=${userId}, status=absent`,
+        `Attendance record ensured: sessionId=${sessionId}, userId=${userId}, status=absent`,
       );
     }
   }
@@ -112,7 +116,7 @@ export class AttendanceRecordsService {
     deviceId: string,
     deviceTtlSeconds: number,
   ): Promise<MarkPresentResult> {
-    return this.attendanceRecordBuffer.markPresentIfEligible(
+    return this.attendanceRecordBuffer.tryMarkPresentAndClaimDevice(
       input,
       deviceId,
       deviceTtlSeconds,

@@ -79,7 +79,18 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
     );
   }
 
-  async markPresentIfEligible(
+  async insertRecordIfAbsent(
+    record: Omit<AttendanceRecord, 'updatedAt'>,
+  ): Promise<void> {
+    const full: AttendanceRecord = { ...record, updatedAt: new Date() };
+    await this.redisService.hsetnx(
+      keyFor(record.sessionId),
+      String(record.userId),
+      JSON.stringify(full),
+    );
+  }
+
+  async tryMarkPresentAndClaimDevice(
     input: MarkPresentInput,
     deviceId: string,
     deviceTtlSeconds: number,

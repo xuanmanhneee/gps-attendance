@@ -60,6 +60,10 @@ export class RedisService implements OnModuleDestroy {
     return this.redis.hset(key, field, value);
   }
 
+  hsetnx(key: string, field: string, value: string): Promise<number> {
+    return this.redis.hsetnx(key, field, value);
+  }
+
   hdel(key: string, field: string): Promise<number> {
     return this.redis.hdel(key, field);
   }
