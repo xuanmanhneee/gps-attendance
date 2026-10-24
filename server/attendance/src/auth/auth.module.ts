@@ -8,6 +8,8 @@ import { UsersModule } from '../users/users.module';
 import { AccountModule } from '../account/account.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
+import { REFRESH_SESSION_REPOSITORY } from './refresh-session.repository.token';
+import { PrismaRefreshSessionRepository } from './infra/prisma/prisma-refresh-session.repository';
 
 @Module({
   imports: [
@@ -19,13 +21,21 @@ import { LocalStrategy } from './strategies/local.strategy';
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: '1h',
+          expiresIn: '15m',
         },
       }),
     }),
   ],
 
   controllers: [AdminAuthController, UserAuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    LocalStrategy,
+    {
+      provide: REFRESH_SESSION_REPOSITORY,
+      useClass: PrismaRefreshSessionRepository,
+    },
+  ],
 })
 export class AuthModule {}

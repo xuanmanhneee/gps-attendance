@@ -10,3 +10,11 @@ export interface LoginRequest {
 export interface LoginResponse {
   accessToken: string;
 }
+
+export interface RefreshRequest {
+  refreshToken: string;
+}
+
+export interface TokenPairResponse extends LoginResponse {
+  refreshToken: string;
+}
