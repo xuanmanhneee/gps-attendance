@@ -7,7 +7,7 @@ import {
   MinLength,
   MaxLength,
 } from 'class-validator';
-import { Role, ROLES } from '@gps-attendance/shared';
+import { Role } from '@gps-attendance/shared';
 
 export class CreateAccountWithUserDto {
   @IsString()
@@ -18,7 +18,8 @@ export class CreateAccountWithUserDto {
   @IsNotEmpty()
   fullname!: string;
 
-  @IsIn(ROLES)
+  // Tài khoản admin chỉ được cấp qua seed hoặc thao tác trực tiếp trên server.
+  @IsIn(['lecturer', 'student'])
   role!: Role;
 
   @IsInt()
