@@ -9,33 +9,33 @@ export class InMemoryAttendanceCheckInStore
     IAttendanceCheckInAttemptRepository,
     IAttendanceCheckInDeviceUsageRepository
 {
-  private readonly attemptsBySession = new Map<number, Map<number, number>>();
+  private readonly attemptTimestamps = new Map<string, number[]>();
 
   private readonly deviceUsageBySession = new Map<number, Set<string>>();
 
   // --- IAttendanceCheckInAttemptRepository ---
 
-  async incrementAttempt(sessionId: number, userId: number): Promise<number> {
-    let sessionMap = this.attemptsBySession.get(sessionId);
+  async tryRecordAttempt(
+    sessionId: number,
+    userId: number,
+    maxAttempts: number,
+    windowSeconds: number,
+  ): Promise<boolean> {
+    const key = `${sessionId}:${userId}`;
+    const now = Date.now();
+    const cutoff = now - windowSeconds * 1000;
+    const recentAttempts = (this.attemptTimestamps.get(key) ?? []).filter(
+      (timestamp) => timestamp > cutoff,
+    );
 
-    if (!sessionMap) {
-      sessionMap = new Map();
-      this.attemptsBySession.set(sessionId, sessionMap);
+    if (recentAttempts.length >= maxAttempts) {
+      this.attemptTimestamps.set(key, recentAttempts);
+      return false;
     }
 
-    const next = (sessionMap.get(userId) ?? 0) + 1;
-
-    sessionMap.set(userId, next);
-
-    return next;
-  }
-
-  async getAttemptCount(sessionId: number, userId: number): Promise<number> {
-    return this.attemptsBySession.get(sessionId)?.get(userId) ?? 0;
-  }
-
-  async resetAttempts(sessionId: number, userId: number): Promise<void> {
-    this.attemptsBySession.get(sessionId)?.delete(userId);
+    recentAttempts.push(now);
+    this.attemptTimestamps.set(key, recentAttempts);
+    return true;
   }
 
   // --- IAttendanceCheckInDeviceUsageRepository ---

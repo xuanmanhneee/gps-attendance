@@ -112,7 +112,7 @@ function getCheckInFailureMessage(reasons: AttendanceCheckInReason[]): string {
           return 'Độ tin cậy của vị trí quá thấp.';
 
         case 'TOO_MANY_ATTEMPTS':
-          return 'Bạn đã thử điểm danh quá nhiều lần.';
+          return 'Bạn đã thử quá nhiều lần. Vui lòng chờ tối đa 2 phút rồi thử lại.';
 
         case 'DUPLICATE_DEVICE':
           return 'Thiết bị này đã được sử dụng để điểm danh.';

@@ -5,27 +5,44 @@ import { IAttendanceCheckInAttemptRepository } from '../../repositories/attendan
 import { RedisService } from '#redis/redis.service'; // chỉnh path đúng theo project
 
 const keyFor = (sessionId: number, userId: number) =>
-  `attendance:attempt:${sessionId}:${userId}`;
+  `attendance:attempt-window:v2:${sessionId}:${userId}`;
 
-const SAFETY_TTL_SECONDS = 12 * 60 * 60;
+const TRY_RECORD_ATTEMPT_SCRIPT = `
+local time = redis.call('TIME')
+local nowMs = time[1] * 1000 + math.floor(time[2] / 1000)
+local windowMs = tonumber(ARGV[1])
+local maxAttempts = tonumber(ARGV[2])
+local cutoff = nowMs - windowMs
+
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', cutoff)
+
+local count = redis.call('ZCARD', KEYS[1])
+if count >= maxAttempts then
+  return 0
+end
+
+local member = time[1] .. ':' .. time[2] .. ':' .. count
+redis.call('ZADD', KEYS[1], nowMs, member)
+redis.call('PEXPIRE', KEYS[1], windowMs)
+return 1
+`;
 
 @Injectable()
 export class RedisAttendanceCheckInAttemptRepository implements IAttendanceCheckInAttemptRepository {
-  constructor(private readonly redisService: RedisService) {} // đổi từ Redis sang RedisService
+  constructor(private readonly redisService: RedisService) {}
 
-  async incrementAttempt(sessionId: number, userId: number): Promise<number> {
-    const key = keyFor(sessionId, userId);
-    const count = await this.redisService.incr(key);
-    if (count === 1) await this.redisService.expire(key, SAFETY_TTL_SECONDS);
-    return count;
-  }
+  async tryRecordAttempt(
+    sessionId: number,
+    userId: number,
+    maxAttempts: number,
+    windowSeconds: number,
+  ): Promise<boolean> {
+    const result = await this.redisService.eval(
+      TRY_RECORD_ATTEMPT_SCRIPT,
+      [keyFor(sessionId, userId)],
+      [String(windowSeconds * 1000), String(maxAttempts)],
+    );
 
-  async getAttemptCount(sessionId: number, userId: number): Promise<number> {
-    const raw = await this.redisService.get(keyFor(sessionId, userId));
-    return raw ? Number(raw) : 0;
-  }
-
-  async resetAttempts(sessionId: number, userId: number): Promise<void> {
-    await this.redisService.del(keyFor(sessionId, userId));
+    return Number(result) === 1;
   }
 }
