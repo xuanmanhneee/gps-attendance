@@ -12,6 +12,7 @@ import {
 import { IntegrityCheck } from './checks/integrity.check';
 import { LocationCheck } from './checks/location.check';
 import { MockLocationCheck } from './checks/mock-location.check';
+import { LocationTimestampCheck } from './checks/location-timestamp.check';
 
 @Injectable()
 export class AttendanceValidationService {
@@ -23,6 +24,7 @@ export class AttendanceValidationService {
     private readonly integrityCheck: IntegrityCheck,
     private readonly mockLocationCheck: MockLocationCheck,
     private readonly locationCheck: LocationCheck,
+    private readonly locationTimestampCheck: LocationTimestampCheck,
   ) {}
 
   validate(input: AttendanceValidationInput): AttendanceValidationResult {
@@ -30,6 +32,18 @@ export class AttendanceValidationService {
 
     if (mockLocationResult.coefficient === 0) {
       return { status: 'REJECTED', reasons: ['MOCK_LOCATION'] };
+    }
+
+    const locationTimestampResult = this.locationTimestampCheck.evaluate(
+      input.location,
+      input.checkedInAt,
+    );
+
+    if (!locationTimestampResult.isValid) {
+      return {
+        status: 'REJECTED',
+        reasons: ['INVALID_LOCATION_TIMESTAMP'],
+      };
     }
 
     let score = 0;

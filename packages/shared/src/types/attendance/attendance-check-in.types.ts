@@ -50,7 +50,10 @@ export interface DeviceIntegrity {
 export type AttendanceValidationStatus = 'VALID' | 'REVIEW' | 'REJECTED';
 
 export type AttendanceValidationReason =
-  'LOW_CONFIDENCE_SCORE' | 'MOCK_LOCATION' | 'OUT_OF_RANGE';
+  | 'LOW_CONFIDENCE_SCORE'
+  | 'MOCK_LOCATION'
+  | 'OUT_OF_RANGE'
+  | 'INVALID_LOCATION_TIMESTAMP';
 
 // -----------------------------------------------------------------------------
 // Attendance Check-in

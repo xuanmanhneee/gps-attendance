@@ -47,6 +47,11 @@ export interface LocationCheckResult {
   distance: number;
 }
 
+export interface LocationTimestampCheckResult {
+  isValid: boolean;
+  ageMs: number;
+}
+
 // -----------------------------------------------------------------------------
 // Validation result
 // -----------------------------------------------------------------------------

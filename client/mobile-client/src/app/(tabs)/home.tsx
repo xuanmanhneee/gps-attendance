@@ -111,6 +111,9 @@ function getCheckInFailureMessage(reasons: AttendanceCheckInReason[]): string {
         case 'LOW_CONFIDENCE_SCORE':
           return 'Độ tin cậy của vị trí quá thấp.';
 
+        case 'INVALID_LOCATION_TIMESTAMP':
+          return 'Dữ liệu vị trí không còn hợp lệ. Vui lòng thử lại.';
+
         case 'TOO_MANY_ATTEMPTS':
           return 'Bạn đã thử quá nhiều lần. Vui lòng chờ tối đa 2 phút rồi thử lại.';
 

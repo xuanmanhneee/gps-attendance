@@ -31,6 +31,10 @@ export class AttendanceCheckInService {
     dto: CheckInRequestDto,
     userId: number,
   ): Promise<CheckInResponse> {
+    // Chốt thời điểm server nhận request trước mọi I/O để thời gian chờ DB/Redis
+    // không bị tính nhầm vào độ tuổi của mẫu GPS.
+    const checkedInAt = new Date();
+
     // --- Guard layer ---
     const session = await this.attendanceSessionsService.findById(
       dto.sessionId,
@@ -83,8 +87,6 @@ export class AttendanceCheckInService {
     }
 
     // --- Validation layer ---
-    const checkedInAt = new Date();
-
     const validation = await this.attendanceValidationService.validate({
       session,
       userId,
