@@ -7,6 +7,8 @@ import {
   IsOptional,
   IsString,
   IsNotEmpty,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
@@ -28,6 +30,8 @@ export class LocationDto implements Location {
     example: 11.9404,
   })
   @IsNumber()
+  @Min(-90)
+  @Max(90)
   latitude!: number;
 
   @ApiProperty({
@@ -35,6 +39,8 @@ export class LocationDto implements Location {
     example: 108.4583,
   })
   @IsNumber()
+  @Min(-180)
+  @Max(180)
   longitude!: number;
 
   @ApiProperty({
@@ -42,6 +48,7 @@ export class LocationDto implements Location {
     example: 10,
   })
   @IsNumber()
+  @Min(0)
   accuracy!: number;
 
   @ApiProperty({
@@ -56,6 +63,7 @@ export class LocationDto implements Location {
     typeof value === 'number' ? Math.round(value) : value,
   )
   @IsInt()
+  @Min(0)
   timestamp!: number;
 
   @ApiProperty({
