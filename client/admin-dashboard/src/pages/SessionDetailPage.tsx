@@ -69,7 +69,10 @@ const SessionDetailPage = () => {
     setHasRefreshError(false);
 
     try {
-      const data: unknown = await attendanceSessionsApi.getDetail(session.id);
+      const data: unknown = await attendanceSessionsApi.getDetail(
+        session.id,
+        true,
+      );
 
       // Chỉ nhận payload đúng shape detail, tránh ghi đè state bằng dữ liệu lạ.
       if (!isAttendanceSessionDetail(data)) {

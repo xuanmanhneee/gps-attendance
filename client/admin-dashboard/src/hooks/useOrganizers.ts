@@ -13,12 +13,14 @@ import { toError } from '../utils/attendance-sessions/session-list';
  * giữ trong state để UI hiển thị rõ ràng kèm nút thử lại, không nuốt lỗi.
  */
 export const useOrganizers = () => {
-  const [organizerOptions, setOrganizerOptions] = useState<OrganizerOption[]>([]);
+  const [organizerOptions, setOrganizerOptions] = useState<OrganizerOption[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const loadIdRef = useRef(0);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (fresh = true) => {
     // Chặn stale response: chỉ request mới nhất được ghi state.
     const requestId = ++loadIdRef.current;
     const isActive = () => loadIdRef.current === requestId;
@@ -27,7 +29,7 @@ export const useOrganizers = () => {
     setError(null);
 
     try {
-      const data: unknown = await usersApi.getAll();
+      const data: unknown = await usersApi.getAll(fresh);
 
       if (!isActive()) return;
 
@@ -48,7 +50,7 @@ export const useOrganizers = () => {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void reload();
+    void reload(false);
   }, [reload]);
 
   return {

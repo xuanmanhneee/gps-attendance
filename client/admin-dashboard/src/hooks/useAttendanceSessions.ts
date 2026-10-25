@@ -38,11 +38,7 @@ interface UseAttendanceSessionsOptions {
 export const useAttendanceSessions = (
   options: UseAttendanceSessionsOptions = {},
 ) => {
-  const {
-    scope = 'all',
-    createdByUserId,
-    enabled = true,
-  } = options;
+  const { scope = 'all', createdByUserId, enabled = true } = options;
 
   const [sessions, setSessions] = useState<AttendanceSessionResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,11 +50,48 @@ export const useAttendanceSessions = (
   /** Nhận diện phạm vi hiện tại để xoá dữ liệu cũ khi đổi scope/organizer. */
   const scopeKeyRef = useRef(`${scope}:${createdByUserId ?? ''}`);
 
-  const loadSessions = useCallback(async (): Promise<
-    AttendanceSessionResponse[]
-  > => {
-    if (scope === 'created-by-me') {
-      const data: unknown = await attendanceSessionsApi.getCreatedByMe();
+  const loadSessions = useCallback(
+    async (fresh = false): Promise<AttendanceSessionResponse[]> => {
+      if (scope === 'created-by-me') {
+        const data: unknown = await attendanceSessionsApi.getCreatedByMe(fresh);
+
+        // Kiểm tra shape trước khi ghi state: không biến payload lạ thành thành công.
+        const list = parseAttendanceSessionList(data);
+
+        if (list === null) {
+          throw new Error('Unexpected attendance session list response');
+        }
+
+        return list;
+      }
+
+      if (scope === 'created-by') {
+        if (
+          createdByUserId === undefined ||
+          !Number.isInteger(createdByUserId) ||
+          createdByUserId <= 0
+        ) {
+          throw new Error(
+            'Missing organizer user id for attendance session filter',
+          );
+        }
+
+        const data: unknown = await attendanceSessionsApi.getCreatedBy(
+          createdByUserId,
+          fresh,
+        );
+
+        // Kiểm tra shape trước khi ghi state: không biến payload lạ thành thành công.
+        const list = parseAttendanceSessionList(data);
+
+        if (list === null) {
+          throw new Error('Unexpected attendance session list response');
+        }
+
+        return list;
+      }
+
+      const data: unknown = await attendanceSessionsApi.getAll(fresh);
 
       // Kiểm tra shape trước khi ghi state: không biến payload lạ thành thành công.
       const list = parseAttendanceSessionList(data);
@@ -68,81 +101,52 @@ export const useAttendanceSessions = (
       }
 
       return list;
-    }
+    },
+    [scope, createdByUserId],
+  );
 
-    if (scope === 'created-by') {
-      if (
-        createdByUserId === undefined ||
-        !Number.isInteger(createdByUserId) ||
-        createdByUserId <= 0
-      ) {
-        throw new Error('Missing organizer user id for attendance session filter');
+  const reload = useCallback(
+    async (fresh = true) => {
+      const tracker = loadTrackerRef.current;
+      const requestId = tracker.begin();
+
+      // Đổi phạm vi (vd chọn organizer khác): xoá dữ liệu phạm vi cũ ngay từ đầu
+      // để request mới thất bại không bị nhìn nhầm là dữ liệu của organizer cũ.
+      const scopeKey = `${scope}:${createdByUserId ?? ''}`;
+
+      if (scopeKeyRef.current !== scopeKey) {
+        scopeKeyRef.current = scopeKey;
+        setSessions([]);
       }
 
-      const data: unknown =
-        await attendanceSessionsApi.getCreatedBy(createdByUserId);
+      setIsLoading(true);
+      setError(null);
 
-      // Kiểm tra shape trước khi ghi state: không biến payload lạ thành thành công.
-      const list = parseAttendanceSessionList(data);
+      try {
+        const data = await loadSessions(fresh);
 
-      if (list === null) {
-        throw new Error('Unexpected attendance session list response');
+        // Request cũ hoàn thành sau khi đã đổi phạm vi: bỏ qua, không ghi state.
+        if (!tracker.isActive(requestId)) return;
+
+        setSessions(data);
+      } catch (unknownError) {
+        if (!tracker.isActive(requestId)) return;
+
+        // Giữ danh sách hiện có của phạm vi hiện tại; lỗi không được biến thành
+        // dữ liệu của phạm vi khác (đã xoá khi đổi phạm vi ở trên).
+        setError(
+          toError(
+            unknownError,
+            new Error('Unable to load attendance sessions'),
+          ),
+        );
+      } finally {
+        // Request cũ kết thúc muộn không được tắt loading của request mới.
+        if (tracker.isActive(requestId)) setIsLoading(false);
       }
-
-      return list;
-    }
-
-    const data: unknown = await attendanceSessionsApi.getAll();
-
-    // Kiểm tra shape trước khi ghi state: không biến payload lạ thành thành công.
-    const list = parseAttendanceSessionList(data);
-
-    if (list === null) {
-      throw new Error('Unexpected attendance session list response');
-    }
-
-    return list;
-  }, [scope, createdByUserId]);
-
-  const reload = useCallback(async () => {
-    const tracker = loadTrackerRef.current;
-    const requestId = tracker.begin();
-
-    // Đổi phạm vi (vd chọn organizer khác): xoá dữ liệu phạm vi cũ ngay từ đầu
-    // để request mới thất bại không bị nhìn nhầm là dữ liệu của organizer cũ.
-    const scopeKey = `${scope}:${createdByUserId ?? ''}`;
-
-    if (scopeKeyRef.current !== scopeKey) {
-      scopeKeyRef.current = scopeKey;
-      setSessions([]);
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const data = await loadSessions();
-
-      // Request cũ hoàn thành sau khi đã đổi phạm vi: bỏ qua, không ghi state.
-      if (!tracker.isActive(requestId)) return;
-
-      setSessions(data);
-    } catch (unknownError) {
-      if (!tracker.isActive(requestId)) return;
-
-      // Giữ danh sách hiện có của phạm vi hiện tại; lỗi không được biến thành
-      // dữ liệu của phạm vi khác (đã xoá khi đổi phạm vi ở trên).
-      setError(
-        toError(
-          unknownError,
-          new Error('Unable to load attendance sessions'),
-        ),
-      );
-    } finally {
-      // Request cũ kết thúc muộn không được tắt loading của request mới.
-      if (tracker.isActive(requestId)) setIsLoading(false);
-    }
-  }, [loadSessions, scope, createdByUserId]);
+    },
+    [loadSessions, scope, createdByUserId],
+  );
 
   useEffect(() => {
     // Bộ lọc chưa hợp lệ: không gọi API nào. Loading được suy ra từ `enabled`
@@ -153,7 +157,7 @@ export const useAttendanceSessions = (
     // `await`, nên rule báo cascading render — đây là chủ ý, giống các hook khác
     // trong repo, nên tắt rule cho đúng dòng gọi này.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void reload();
+    void reload(false);
   }, [reload, enabled]);
 
   const createSession = useCallback(

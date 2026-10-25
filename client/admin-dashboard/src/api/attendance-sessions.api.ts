@@ -29,17 +29,17 @@ export const attendanceSessionsApi = {
     );
   },
 
-  getAll() {
-    return httpClient.get<AttendanceSessionResponse[]>(
-      '/v0/attendance-sessions',
-    );
+  getAll(fresh = false) {
+    return (fresh ? httpClient.getFresh : httpClient.get)<
+      AttendanceSessionResponse[]
+    >('/v0/attendance-sessions');
   },
 
   /** Chỉ dùng cho page organizer: endpoint backend yêu cầu role organizer. */
-  getCreatedByMe() {
-    return httpClient.get<AttendanceSessionResponse[]>(
-      '/v0/attendance-sessions/created-by-me',
-    );
+  getCreatedByMe(fresh = false) {
+    return (fresh ? httpClient.getFresh : httpClient.get)<
+      AttendanceSessionResponse[]
+    >('/v0/attendance-sessions/created-by-me');
   },
 
   /**
@@ -48,18 +48,20 @@ export const attendanceSessionsApi = {
    * Chỉ dùng khi UI admin cần lọc theo organizer vì endpoint backend yêu cầu
    * role admin (`GET /created-by?userId=...`).
    */
-  getCreatedBy(userId: number) {
+  getCreatedBy(userId: number, fresh = false) {
     if (!Number.isInteger(userId) || userId <= 0) {
       throw new Error('Invalid organizer user id');
     }
 
-    return httpClient.get<AttendanceSessionResponse[]>(
-      `/v0/attendance-sessions/created-by?userId=${userId}`,
-    );
+    return (fresh ? httpClient.getFresh : httpClient.get)<
+      AttendanceSessionResponse[]
+    >(`/v0/attendance-sessions/created-by?userId=${userId}`);
   },
 
-  getDetail(id: number) {
-    return httpClient.get<AttendanceSessionDetailResponse>(
+  getDetail(id: number, fresh = false) {
+    return (
+      fresh ? httpClient.getFresh : httpClient.get
+    )<AttendanceSessionDetailResponse>(
       `/v0/attendance-sessions/${assertSessionId(id)}`,
     );
   },

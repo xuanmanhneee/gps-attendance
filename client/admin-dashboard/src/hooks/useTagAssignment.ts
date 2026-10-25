@@ -80,8 +80,11 @@ export const useTagAssignment = (): UseTagAssignmentResult => {
   }, []);
 
   const loadAssignment = useCallback(
-    async (tag: Tag, token: RequestScopeToken) => {
-      const assignment: unknown = await tagsApi.getAssignedUserIds(tag.id);
+    async (tag: Tag, token: RequestScopeToken, fresh: boolean) => {
+      const assignment: unknown = await tagsApi.getAssignedUserIds(
+        tag.id,
+        fresh,
+      );
 
       if (!scope.isCurrent(token)) return;
 
@@ -93,7 +96,7 @@ export const useTagAssignment = (): UseTagAssignmentResult => {
 
       // Directory chỉ dùng để hiển thị tên; lỗi ở đây không làm hỏng assignment.
       try {
-        const users: unknown = await usersApi.getAll();
+        const users: unknown = await usersApi.getAll(fresh);
 
         if (!scope.isCurrent(token)) return;
 
@@ -117,29 +120,32 @@ export const useTagAssignment = (): UseTagAssignmentResult => {
     [scope],
   );
 
-  const reload = useCallback(async () => {
-    const tag = selectedTag;
+  const reload = useCallback(
+    async (fresh = true) => {
+      const tag = selectedTag;
 
-    if (!tag) return;
+      if (!tag) return;
 
-    const token = scope.begin(tag.id);
+      const token = scope.begin(tag.id);
 
-    setIsLoading(true);
-    setError(null);
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      await loadAssignment(tag, token);
-    } catch (unknownError) {
-      if (scope.isCurrent(token)) {
-        setAssignedUserIds([]);
-        setError(
-          toError(unknownError, new Error('Unable to load assignments')),
-        );
+      try {
+        await loadAssignment(tag, token, fresh);
+      } catch (unknownError) {
+        if (scope.isCurrent(token)) {
+          setAssignedUserIds([]);
+          setError(
+            toError(unknownError, new Error('Unable to load assignments')),
+          );
+        }
+      } finally {
+        if (scope.isCurrent(token)) setIsLoading(false);
       }
-    } finally {
-      if (scope.isCurrent(token)) setIsLoading(false);
-    }
-  }, [loadAssignment, scope, selectedTag]);
+    },
+    [loadAssignment, scope, selectedTag],
+  );
 
   const openFor = useCallback(
     (tag: Tag) => {
@@ -172,7 +178,7 @@ export const useTagAssignment = (): UseTagAssignmentResult => {
 
     // Fetch khi đổi tag; setState nằm sau `await` nên không gây cascading render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void reload();
+    void reload(false);
   }, [selectedTag, reload]);
 
   const mutateAssignment = useCallback(
@@ -252,4 +258,3 @@ export const useTagAssignment = (): UseTagAssignmentResult => {
     unassign,
   };
 };
-

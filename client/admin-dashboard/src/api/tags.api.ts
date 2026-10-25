@@ -1,6 +1,4 @@
-import type {
-  TagResponse,
-} from '@gps-attendance/shared';
+import type { TagResponse } from '@gps-attendance/shared';
 
 import { httpClient } from './http';
 import { MAX_TAG_NAME_LENGTH, validateTagName } from '../types/tag';
@@ -19,8 +17,10 @@ const assertValidId = (id: number, label: string) => {
  * trực tiếp với kiểu dữ liệu API.
  */
 export const tagsApi = {
-  getAll() {
-    return httpClient.get<TagResponse[]>('/tags');
+  getAll(fresh = false) {
+    return (fresh ? httpClient.getFresh : httpClient.get)<TagResponse[]>(
+      '/tags',
+    );
   },
 
   create(name: string) {
@@ -47,27 +47,25 @@ export const tagsApi = {
     return httpClient.delete<void>(`/tags/${id}`);
   },
 
-  getAssignedUserIds(tagId: number) {
+  getAssignedUserIds(tagId: number, fresh = false) {
     assertValidId(tagId, 'tag id');
 
-    return httpClient.get<number[]>(`/tags/${tagId}/users`);
+    return (fresh ? httpClient.getFresh : httpClient.get)<number[]>(
+      `/tags/${tagId}/users`,
+    );
   },
 
   assignUser(tagId: number, userId: number) {
     assertValidId(tagId, 'tag id');
     assertValidId(userId, 'user id');
 
-    return httpClient.post<void>(
-      `/tags/${tagId}/users/${userId}`,
-    );
+    return httpClient.post<void>(`/tags/${tagId}/users/${userId}`);
   },
 
   unassignUser(tagId: number, userId: number) {
     assertValidId(tagId, 'tag id');
     assertValidId(userId, 'user id');
 
-    return httpClient.delete<void>(
-      `/tags/${tagId}/users/${userId}`,
-    );
+    return httpClient.delete<void>(`/tags/${tagId}/users/${userId}`);
   },
 };

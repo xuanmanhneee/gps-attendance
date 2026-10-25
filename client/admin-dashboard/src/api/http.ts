@@ -5,11 +5,36 @@ import {
   type LoginResponse,
 } from '@gps-attendance/shared';
 import { tokenService } from '../services/token.service';
+import { createGetCache } from './get-cache';
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL;
 const authenticatedClient = createHttpClient(baseUrl, () => tokenService.get());
 const anonymousClient = createHttpClient(baseUrl);
 let refreshPromise: Promise<void> | null = null;
+const getCache = createGetCache();
+const getTtlMs = (path: string) =>
+  path.startsWith('/v0/attendance-sessions') ? 10_000 : 60_000;
+
+export const clearGetCache = () => getCache.clear();
+
+const get = <T>(path: string, fresh = false): Promise<T> => {
+  getCache.setScope(tokenService.get());
+  return getCache.get(
+    path,
+    () => withRefresh(path, () => authenticatedClient.get<T>(path)),
+    getTtlMs(path),
+    fresh,
+  );
+};
+
+const mutate = async <T>(
+  path: string,
+  request: () => Promise<T>,
+): Promise<T> => {
+  const result = await withRefresh(path, request);
+  getCache.clear();
+  return result;
+};
 
 const refreshAccessToken = (): Promise<void> => {
   if (!refreshPromise) {
@@ -63,15 +88,15 @@ const withRefresh = async <T>(
   }
 };
 
-export const httpClient: HttpClient = {
-  get: <T>(path: string) =>
-    withRefresh(path, () => authenticatedClient.get<T>(path)),
+export const httpClient = {
+  get: <T>(path: string) => get<T>(path),
+  getFresh: <T>(path: string) => get<T>(path, true),
   post: <T>(path: string, body?: unknown) =>
-    withRefresh(path, () => authenticatedClient.post<T>(path, body)),
+    mutate(path, () => authenticatedClient.post<T>(path, body)),
   put: <T>(path: string, body?: unknown) =>
-    withRefresh(path, () => authenticatedClient.put<T>(path, body)),
+    mutate(path, () => authenticatedClient.put<T>(path, body)),
   patch: <T>(path: string, body?: unknown) =>
-    withRefresh(path, () => authenticatedClient.patch<T>(path, body)),
+    mutate(path, () => authenticatedClient.patch<T>(path, body)),
   delete: <T>(path: string) =>
-    withRefresh(path, () => authenticatedClient.delete<T>(path)),
-};
+    mutate(path, () => authenticatedClient.delete<T>(path)),
+} satisfies HttpClient & { getFresh: HttpClient['get'] };

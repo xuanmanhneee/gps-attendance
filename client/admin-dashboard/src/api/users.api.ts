@@ -14,8 +14,9 @@ export const usersApi = {
    * `DirectoryUser`). Hook kiểm tra shape và chỉ giữ `id/code/fullname`;
    * khi lỗi, panel assignment fallback hiển thị `ID {id}`.
    */
-  getAll() {
-    return httpClient.get<DirectoryUser[]>('/v0/users');
+  getAll(fresh = false) {
+    return (fresh ? httpClient.getFresh : httpClient.get)<DirectoryUser[]>(
+      '/v0/users',
+    );
   },
 };
-

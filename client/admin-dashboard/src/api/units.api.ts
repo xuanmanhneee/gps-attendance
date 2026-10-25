@@ -54,12 +54,16 @@ const patchUnit = async (
  * `UnitResponse`/`UnitTreeResponse` từ `@gps-attendance/shared`.
  */
 export const unitsApi = {
-  getAll() {
-    return httpClient.get<UnitResponse[]>('/units');
+  getAll(fresh = false) {
+    return (fresh ? httpClient.getFresh : httpClient.get)<UnitResponse[]>(
+      '/units',
+    );
   },
 
-  getTree() {
-    return httpClient.get<UnitTreeResponse[]>('/units/tree');
+  getTree(fresh = false) {
+    return (fresh ? httpClient.getFresh : httpClient.get)<UnitTreeResponse[]>(
+      '/units/tree',
+    );
   },
 
   async getById(id: number): Promise<UnitResponse | null> {
