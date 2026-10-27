@@ -38,6 +38,7 @@ export const vi = {
   'common.emptyTitle': 'Chưa có dữ liệu',
   'common.errorTitle': 'Không thể tải dữ liệu',
   'common.retry': 'Thử lại',
+  'common.refresh': 'Làm mới',
   'common.dataUnavailable': 'Chưa có nguồn dữ liệu',
   'common.dataUnavailableHint':
     'API cho chỉ số này chưa có trong dashboard nên hệ thống không hiển thị số liệu ước lượng.',
@@ -88,7 +89,8 @@ export const vi = {
   'dashboard.recentSessionsTitle': 'Phiên điểm danh gần đây',
   'dashboard.recentSessionsSubtitle.admin':
     'Các phiên mới nhất đang có trên hệ thống',
-  'dashboard.recentSessionsSubtitle.organizer': 'Các phiên bạn tạo gần đây nhất',
+  'dashboard.recentSessionsSubtitle.organizer':
+    'Các phiên bạn tạo gần đây nhất',
   'dashboard.mySessionsTitle': 'Phiên điểm danh của tôi',
   'dashboard.attendanceRateTitle': 'Tỷ lệ có mặt',
   'dashboard.attendanceRateSubtitle': '7 ngày gần nhất',
@@ -118,6 +120,29 @@ export const vi = {
     'Tra cứu chi tiết từng lượt điểm danh của người tham gia.',
   'pages.statistics.description':
     'Báo cáo tỷ lệ có mặt và xu hướng điểm danh theo thời gian.',
+  // ---- Bản ghi điểm danh ----
+  'attendanceRecords.title': 'Tra cứu bản ghi điểm danh',
+  'attendanceRecords.description':
+    'Chọn một phiên để xem trạng thái điểm danh của từng người tham gia.',
+  'attendanceRecords.selectedSession': 'Đang xem: {title}',
+  'attendanceRecords.loadingSessions': 'Đang tải danh sách phiên điểm danh...',
+  'attendanceRecords.emptySessions': 'Chưa có phiên điểm danh nào để tra cứu.',
+  'attendanceRecords.session': 'Phiên điểm danh',
+  'attendanceRecords.search': 'Tìm người tham gia',
+  'attendanceRecords.searchPlaceholder': 'Nhập tên hoặc mã người tham gia',
+  'attendanceRecords.status': 'Trạng thái',
+  'attendanceRecords.allStatuses': 'Tất cả trạng thái',
+  'attendanceRecords.loading': 'Đang tải bản ghi điểm danh...',
+  'attendanceRecords.rosterPending':
+    'Danh sách điểm danh chưa được khởi tạo. Dữ liệu sẽ xuất hiện khi phiên sắp mở.',
+  'attendanceRecords.total': 'Tổng số',
+  'attendanceRecords.empty': 'Phiên này chưa có bản ghi điểm danh.',
+  'attendanceRecords.noMatches':
+    'Không có bản ghi nào khớp với bộ lọc hiện tại.',
+  'attendanceRecords.code': 'Mã',
+  'attendanceRecords.participant': 'Người tham gia',
+  'attendanceRecords.checkedInAt': 'Thời gian điểm danh',
+  'attendanceRecords.updatedAt': 'Cập nhật gần nhất',
   // ---- Phiên điểm danh ----
   'sessions.page.description':
     'Quản lý các phiên điểm danh GPS do bạn tạo và theo dõi trạng thái.',

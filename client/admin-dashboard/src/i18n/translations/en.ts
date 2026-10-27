@@ -40,6 +40,7 @@ export const en: Record<TranslationKey, string> = {
   'common.emptyTitle': 'No data yet',
   'common.errorTitle': 'Unable to load data',
   'common.retry': 'Retry',
+  'common.refresh': 'Refresh',
   'common.dataUnavailable': 'No data source yet',
   'common.dataUnavailableHint':
     'The dashboard has no API for this metric yet, so no estimated value is displayed.',
@@ -121,6 +122,31 @@ export const en: Record<TranslationKey, string> = {
     'Look up individual participant attendance records.',
   'pages.statistics.description':
     'Attendance rate reports and trends over time.',
+
+  // ---- Attendance records ----
+  'attendanceRecords.title': 'Attendance record lookup',
+  'attendanceRecords.description':
+    'Select a session to view each participant attendance status.',
+  'attendanceRecords.selectedSession': 'Viewing: {title}',
+  'attendanceRecords.loadingSessions': 'Loading attendance sessions...',
+  'attendanceRecords.emptySessions':
+    'There are no attendance sessions to look up yet.',
+  'attendanceRecords.session': 'Attendance session',
+  'attendanceRecords.search': 'Find participant',
+  'attendanceRecords.searchPlaceholder': 'Enter participant name or code',
+  'attendanceRecords.status': 'Status',
+  'attendanceRecords.allStatuses': 'All statuses',
+  'attendanceRecords.loading': 'Loading attendance records...',
+  'attendanceRecords.rosterPending':
+    'The attendance roster has not been initialized yet. Records will appear shortly before the session opens.',
+  'attendanceRecords.total': 'Total',
+  'attendanceRecords.empty': 'This session has no attendance records.',
+  'attendanceRecords.noMatches':
+    'No attendance records match the current filters.',
+  'attendanceRecords.code': 'Code',
+  'attendanceRecords.participant': 'Participant',
+  'attendanceRecords.checkedInAt': 'Check-in time',
+  'attendanceRecords.updatedAt': 'Last updated',
 
   // ---- Attendance sessions ----
   'sessions.page.description':
