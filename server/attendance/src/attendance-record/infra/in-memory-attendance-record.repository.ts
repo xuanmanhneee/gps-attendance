@@ -9,6 +9,7 @@ import {
 export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
   private recordsBySession = new Map<number, Map<number, AttendanceRecord>>();
   private usedDevicesBySession = new Map<number, Set<string>>();
+  private flushingSessions = new Set<number>();
 
   async getRecord(
     sessionId: number,
@@ -54,6 +55,8 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     deviceId: string,
     _deviceTtlSeconds: number,
   ): Promise<MarkPresentResult> {
+    if (this.flushingSessions.has(input.sessionId)) return 'session-flushing';
+
     const sessionMap = this.recordsBySession.get(input.sessionId);
     const existing = sessionMap?.get(input.userId);
     if (!existing) return 'record-missing';
@@ -75,8 +78,18 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     return 'present';
   }
 
-  async clearSession(sessionId: number): Promise<void> {
+  async beginSessionFlush(sessionId: number): Promise<AttendanceRecord[]> {
+    this.flushingSessions.add(sessionId);
+    return this.findBySession(sessionId);
+  }
+
+  async completeSessionFlush(sessionId: number): Promise<void> {
     this.recordsBySession.delete(sessionId);
     this.usedDevicesBySession.delete(sessionId);
+    this.flushingSessions.delete(sessionId);
+  }
+
+  async clearSession(sessionId: number): Promise<void> {
+    await this.completeSessionFlush(sessionId);
   }
 }

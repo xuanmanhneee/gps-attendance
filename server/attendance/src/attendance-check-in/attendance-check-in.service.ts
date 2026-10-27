@@ -136,6 +136,12 @@ export class AttendanceCheckInService {
         message: 'User không thuộc session này',
       });
     }
+    if (commit === 'session-flushing') {
+      throw new BadRequestException({
+        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
+        message: 'Phiên điểm danh đã đóng',
+      });
+    }
 
     if (validation.status === 'VALID') {
       return {

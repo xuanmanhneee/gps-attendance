@@ -4,7 +4,8 @@ export type MarkPresentResult =
   | 'present'
   | 'already-present'
   | 'device-used'
-  | 'record-missing';
+  | 'record-missing'
+  | 'session-flushing';
 
 export interface IAttendanceRecordBuffer {
   getRecord(
@@ -23,5 +24,9 @@ export interface IAttendanceRecordBuffer {
     deviceId: string,
     deviceTtlSeconds: number,
   ): Promise<MarkPresentResult>;
+  // Đóng quyền ghi và lấy snapshot trong cùng một thao tác nguyên tử.
+  beginSessionFlush(sessionId: number): Promise<AttendanceRecord[]>;
+  // Chỉ xoá buffer sau khi snapshot đã được lưu bền vững.
+  completeSessionFlush(sessionId: number): Promise<void>;
   clearSession(sessionId: number): Promise<void>;
 }

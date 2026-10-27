@@ -53,13 +53,15 @@ export class AttendanceRecordsService {
 
   // Đẩy toàn bộ record của 1 session từ buffer (Redis) xuống Postgres,
   // rồi xoá buffer. Gọi bởi job 'attendance:flush' lúc session đóng.
-  // Thứ tự bulkUpsert-trước, clearSession-sau có chủ đích: nếu bulkUpsert
-  // lỗi (Postgres down chẳng hạn), buffer vẫn còn nguyên để job retry lần
-  // sau đọc đúng dữ liệu, không mất gì.
+  // beginSessionFlush chặn ghi mới và lấy snapshot nguyên tử: check-in hoặc
+  // được đưa vào snapshot, hoặc bị từ chối trước khi server trả VALID.
+  // Chỉ complete sau bulkUpsert để nếu Postgres lỗi, buffer vẫn còn cho job retry.
   async flushSessionToDb(sessionId: number): Promise<void> {
-    const records = await this.attendanceRecordBuffer.findBySession(sessionId);
+    const records =
+      await this.attendanceRecordBuffer.beginSessionFlush(sessionId);
 
     if (records.length === 0) {
+      await this.attendanceRecordBuffer.completeSessionFlush(sessionId);
       this.logger.warn(
         `Flush session ${sessionId}: không có record nào trong buffer`,
       );
@@ -67,7 +69,7 @@ export class AttendanceRecordsService {
     }
 
     await this.attendanceRecordRepository.bulkUpsert(records);
-    await this.attendanceRecordBuffer.clearSession(sessionId);
+    await this.attendanceRecordBuffer.completeSessionFlush(sessionId);
 
     this.logger.log(
       `Flushed ${records.length} record(s) xuống DB cho session ${sessionId}`,

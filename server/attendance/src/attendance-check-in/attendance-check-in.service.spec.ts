@@ -1,4 +1,5 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
+import { AttendanceSessionErrorCode } from '@gps-attendance/shared';
 
 import { AttendanceCheckInService } from './attendance-check-in.service';
 import { CheckInRequestDto } from './attendance-check-in.dto';
@@ -48,7 +49,9 @@ describe('AttendanceCheckInService concurrent requests', () => {
         getBySessionAndUser: (sessionId: number, userId: number) =>
           records.getRecord(sessionId, userId),
         markPresent: (
-          input: Parameters<InMemoryAttendanceRecordStore['tryMarkPresentAndClaimDevice']>[0],
+          input: Parameters<
+            InMemoryAttendanceRecordStore['tryMarkPresentAndClaimDevice']
+          >[0],
           deviceId: string,
           ttl: number,
         ) => records.tryMarkPresentAndClaimDevice(input, deviceId, ttl),
@@ -63,12 +66,16 @@ describe('AttendanceCheckInService concurrent requests', () => {
       service.checkIn(requestFor('shared-device'), 2),
     ]);
 
-    expect(results.filter((result) => result.status === 'VALID')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'VALID')).toHaveLength(
+      1,
+    );
     expect(results.filter((result) => result.status === 'REJECTED')).toEqual([
       { status: 'REJECTED', reasons: ['DUPLICATE_DEVICE'] },
     ]);
     const stored = await records.findBySession(1);
-    expect(stored.filter((record) => record.status === 'present')).toHaveLength(1);
+    expect(stored.filter((record) => record.status === 'present')).toHaveLength(
+      1,
+    );
   });
 
   it('does not accept two concurrent check-ins from one student', async () => {
@@ -77,9 +84,26 @@ describe('AttendanceCheckInService concurrent requests', () => {
       service.checkIn(requestFor('device-1'), 1),
     ]);
 
-    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
     const failed = results.find((result) => result.status === 'rejected');
     expect(failed).toMatchObject({ reason: expect.any(ConflictException) });
     expect((await records.getRecord(1, 1))?.status).toBe('present');
+  });
+
+  it('rejects a check-in that reaches the commit step after flush starts', async () => {
+    await records.beginSessionFlush(1);
+
+    await expect(
+      service.checkIn(requestFor('device-1'), 1),
+    ).rejects.toMatchObject({
+      response: {
+        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
+      },
+      constructor: BadRequestException,
+    });
+
+    expect((await records.getRecord(1, 1))?.status).toBe('absent');
   });
 });
