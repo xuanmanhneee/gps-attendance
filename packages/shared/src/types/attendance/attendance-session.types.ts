@@ -1,5 +1,5 @@
 // attendance-session.types.ts
-import type { UserFilterCriteria } from '../users';
+import type { UserFilterCriteria, UserResponse } from '../users';
 import type {
   AttendanceParticipantResponse,
   AttendanceStatus,
@@ -20,6 +20,8 @@ export interface AttendanceSessionResponse {
 
 export interface AttendanceSessionDetailResponse extends AttendanceSessionResponse {
   participants: AttendanceParticipantResponse[];
+  /** Danh sách tạm từ criteria; null sau khi roster đã khởi tạo. */
+  plannedParticipants: UserResponse[] | null;
 }
 
 export interface MyAttendanceSessionResponse extends AttendanceSessionResponse {
@@ -40,4 +42,24 @@ export interface CreateAttendanceSessionRequest {
   closeAt: string;
 
   participantCriteria: UserFilterCriteria;
+}
+
+/**
+ * Body của PATCH /v0/attendance-sessions/:id.
+ *
+ * Mọi field đều optional, chỉ gửi field cần đổi. Backend còn chặn theo trạng thái:
+ * - phiên `open`: chỉ được gửi `closeAt`
+ * - roster đã khởi tạo (trước giờ mở 5 phút): không được gửi `participantCriteria`
+ */
+export interface UpdateAttendanceSessionRequest {
+  title?: string;
+
+  latitude?: number;
+  longitude?: number;
+  radius?: number;
+
+  openAt?: string;
+  closeAt?: string;
+
+  participantCriteria?: UserFilterCriteria;
 }

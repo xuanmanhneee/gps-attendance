@@ -17,7 +17,12 @@ import {
   ATTENDANCE_RECORD_BUFFER,
   ATTENDANCE_RECORD_REPOSITORY,
 } from './attendance-record.token';
-import { IAttendanceRecordBuffer } from './attendance-record.buffer';
+import {
+  IAttendanceRecordBuffer,
+  MarkPresentResult,
+} from './attendance-record.buffer';
+import { RedisService } from '../redis/redis.service';
+import { rosterInitializedKeyFor } from '../attendance-sessions/attendance-session-keys';
 
 @Injectable()
 export class AttendanceRecordsService {
@@ -34,6 +39,7 @@ export class AttendanceRecordsService {
 
     @Inject(LOGGER_FACTORY)
     loggerFactory: ILoggerFactory,
+    private readonly redisService: RedisService,
   ) {
     this.logger = loggerFactory.create(AttendanceRecordsService.name);
   }
@@ -47,13 +53,15 @@ export class AttendanceRecordsService {
 
   // Đẩy toàn bộ record của 1 session từ buffer (Redis) xuống Postgres,
   // rồi xoá buffer. Gọi bởi job 'attendance:flush' lúc session đóng.
-  // Thứ tự bulkUpsert-trước, clearSession-sau có chủ đích: nếu bulkUpsert
-  // lỗi (Postgres down chẳng hạn), buffer vẫn còn nguyên để job retry lần
-  // sau đọc đúng dữ liệu, không mất gì.
+  // beginSessionFlush chặn ghi mới và lấy snapshot nguyên tử: check-in hoặc
+  // được đưa vào snapshot, hoặc bị từ chối trước khi server trả VALID.
+  // Chỉ complete sau bulkUpsert để nếu Postgres lỗi, buffer vẫn còn cho job retry.
   async flushSessionToDb(sessionId: number): Promise<void> {
-    const records = await this.attendanceRecordBuffer.findBySession(sessionId);
+    const records =
+      await this.attendanceRecordBuffer.beginSessionFlush(sessionId);
 
     if (records.length === 0) {
+      await this.attendanceRecordBuffer.completeSessionFlush(sessionId);
       this.logger.warn(
         `Flush session ${sessionId}: không có record nào trong buffer`,
       );
@@ -61,7 +69,7 @@ export class AttendanceRecordsService {
     }
 
     await this.attendanceRecordRepository.bulkUpsert(records);
-    await this.attendanceRecordBuffer.clearSession(sessionId);
+    await this.attendanceRecordBuffer.completeSessionFlush(sessionId);
 
     this.logger.log(
       `Flushed ${records.length} record(s) xuống DB cho session ${sessionId}`,
@@ -73,6 +81,7 @@ export class AttendanceRecordsService {
   // kế nếu job flush trót chạy trước khi bị cancel kịp.
   async clearSessionBuffer(sessionId: number): Promise<void> {
     await this.attendanceRecordBuffer.clearSession(sessionId);
+    await this.redisService.del(rosterInitializedKeyFor(sessionId));
     this.logger.warn(
       `Đã xoá buffer của session ${sessionId} do session bị huỷ`,
     );
@@ -87,7 +96,7 @@ export class AttendanceRecordsService {
     userIds: number[],
   ): Promise<void> {
     for (const userId of userIds) {
-      await this.attendanceRecordBuffer.upsertRecord({
+      await this.attendanceRecordBuffer.insertRecordIfAbsent({
         sessionId,
         userId,
         status: 'absent',
@@ -99,26 +108,21 @@ export class AttendanceRecordsService {
       });
 
       this.logger.log(
-        `Attendance record created: sessionId=${sessionId}, userId=${userId}, status=absent`,
+        `Attendance record ensured: sessionId=${sessionId}, userId=${userId}, status=absent`,
       );
     }
   }
 
-  async markPresent(input: MarkPresentInput): Promise<AttendanceRecord> {
-    const base = {
-      sessionId: input.sessionId,
-      userId: input.userId,
-      status: 'present' as const,
-      checkedInAt: input.checkedInAt,
-      latitude: input.latitude,
-      longitude: input.longitude,
-      accuracy: input.accuracy,
-      updateBy: input.updateBy,
-    };
-
-    await this.attendanceRecordBuffer.upsertRecord(base);
-
-    return { ...base, updatedAt: new Date() };
+  async markPresent(
+    input: MarkPresentInput,
+    deviceId: string,
+    deviceTtlSeconds: number,
+  ): Promise<MarkPresentResult> {
+    return this.attendanceRecordBuffer.tryMarkPresentAndClaimDevice(
+      input,
+      deviceId,
+      deviceTtlSeconds,
+    );
   }
 
   // Đọc buffer trước (dữ liệu mới nhất khi session đang mở), fallback sang

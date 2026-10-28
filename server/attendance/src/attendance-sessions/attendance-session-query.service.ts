@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AttendanceSessionsService } from './attendance-sessions.service';
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
 import { UsersService } from '../users/users.service';
+import { UserFilterService } from '../users/user-filter.service';
 import { AttendanceSession } from './attendance-session.model';
 import { AttendanceRecord } from '../attendance-record/attendance-record.model';
 import { User } from '../users/user.model';
@@ -17,10 +18,28 @@ export class AttendanceSessionQueryService {
     private readonly attendanceSessionsService: AttendanceSessionsService,
     private readonly attendanceRecordsService: AttendanceRecordsService,
     private readonly usersService: UsersService,
+    private readonly userFilterService: UserFilterService,
   ) {}
 
   async getDetail(sessionId: number): Promise<AttendanceSessionDetailResponse> {
     const session = await this.attendanceSessionsService.findById(sessionId);
+
+    const criteria =
+      await this.attendanceSessionsService.getPendingCriteria(sessionId);
+    if (criteria) {
+      const userIds = await this.userFilterService.resolveUserIds(criteria);
+      const users = await this.usersService.findByIds(userIds);
+
+      return {
+        ...this.toSessionBase(session),
+        participants: [],
+        plannedParticipants: users.map((user) => ({
+          code: user.code,
+          role: user.role,
+          fullname: user.fullname,
+        })),
+      };
+    }
 
     const records =
       await this.attendanceRecordsService.findBySessionId(sessionId);
@@ -41,6 +60,7 @@ export class AttendanceSessionQueryService {
 
     return {
       ...this.toSessionBase(session),
+      plannedParticipants: null,
 
       participants: records.map((record) => {
         const user = usersById.get(record.userId);

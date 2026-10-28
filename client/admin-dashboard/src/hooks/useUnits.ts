@@ -19,10 +19,7 @@ export type UseUnitsResult = {
   reload: () => Promise<void>;
   reloadTree: () => Promise<void>;
   createUnit: (request: CreateUnitRequest) => Promise<UnitResponse>;
-  updateUnit: (
-    id: number,
-    request: UpdateUnitRequest,
-  ) => Promise<UnitResponse>;
+  updateUnit: (id: number, request: UpdateUnitRequest) => Promise<UnitResponse>;
 };
 
 const toError = (unknownError: unknown): Error =>
@@ -44,11 +41,11 @@ export const useUnits = (): UseUnitsResult => {
   const [error, setError] = useState<Error | null>(null);
   const [treeError, setTreeError] = useState<Error | null>(null);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (fresh = true) => {
     setIsLoading(true);
 
     try {
-      const data = await unitsApi.getAll();
+      const data = await unitsApi.getAll(fresh);
 
       setUnits(Array.isArray(data) ? [...data] : []);
       setError(null);
@@ -60,11 +57,11 @@ export const useUnits = (): UseUnitsResult => {
     }
   }, []);
 
-  const reloadTree = useCallback(async () => {
+  const reloadTree = useCallback(async (fresh = true) => {
     setIsTreeLoading(true);
 
     try {
-      const data = await unitsApi.getTree();
+      const data = await unitsApi.getTree(fresh);
 
       setTree(Array.isArray(data) ? [...data] : []);
       setTreeError(null);
@@ -79,9 +76,9 @@ export const useUnits = (): UseUnitsResult => {
   useEffect(() => {
     // Fetch khi mount; setState nằm sau `await` nên không gây cascading render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    reload();
+    void reload(false);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    reloadTree();
+    void reloadTree(false);
   }, [reload, reloadTree]);
 
   const createUnit = useCallback(

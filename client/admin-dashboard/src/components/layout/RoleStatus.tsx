@@ -5,12 +5,12 @@ import type { UserRole } from '../../types/user-role';
 
 const ROLE_LABEL_KEYS: Record<UserRole, TranslationKey> = {
   admin: 'roles.admin',
-  lecturer: 'roles.lecturer',
+  organizer: 'roles.organizer',
 };
 
 const ROLE_PILL_KEYS: Record<UserRole, TranslationKey> = {
   admin: 'roles.pill.admin',
-  lecturer: 'roles.pill.lecturer',
+  organizer: 'roles.pill.organizer',
 };
 
 /**

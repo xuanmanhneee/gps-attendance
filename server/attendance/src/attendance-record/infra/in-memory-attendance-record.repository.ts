@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { AttendanceRecord } from '../attendance-record.model';
-import { IAttendanceRecordBuffer } from '#attendance-record/attendance-record.buffer';
+import { AttendanceRecord, MarkPresentInput } from '../attendance-record.model';
+import {
+  IAttendanceRecordBuffer,
+  MarkPresentResult,
+} from '#attendance-record/attendance-record.buffer';
 
 @Injectable()
 export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
   private recordsBySession = new Map<number, Map<number, AttendanceRecord>>();
+  private usedDevicesBySession = new Map<number, Set<string>>();
+  private flushingSessions = new Set<number>();
 
   async getRecord(
     sessionId: number,
@@ -37,7 +42,54 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     sessionMap.set(record.userId, { ...record, updatedAt: new Date() });
   }
 
-  async clearSession(sessionId: number): Promise<void> {
+  async insertRecordIfAbsent(
+    record: Omit<AttendanceRecord, 'updatedAt'>,
+  ): Promise<void> {
+    if (!(await this.getRecord(record.sessionId, record.userId))) {
+      await this.upsertRecord(record);
+    }
+  }
+
+  async tryMarkPresentAndClaimDevice(
+    input: MarkPresentInput,
+    deviceId: string,
+    _deviceTtlSeconds: number,
+  ): Promise<MarkPresentResult> {
+    if (this.flushingSessions.has(input.sessionId)) return 'session-flushing';
+
+    const sessionMap = this.recordsBySession.get(input.sessionId);
+    const existing = sessionMap?.get(input.userId);
+    if (!existing) return 'record-missing';
+    if (existing.status === 'present') return 'already-present';
+
+    let usedDevices = this.usedDevicesBySession.get(input.sessionId);
+    if (!usedDevices) {
+      usedDevices = new Set<string>();
+      this.usedDevicesBySession.set(input.sessionId, usedDevices);
+    }
+    if (usedDevices.has(deviceId)) return 'device-used';
+
+    sessionMap!.set(input.userId, {
+      ...input,
+      status: 'present',
+      updatedAt: new Date(),
+    });
+    usedDevices.add(deviceId);
+    return 'present';
+  }
+
+  async beginSessionFlush(sessionId: number): Promise<AttendanceRecord[]> {
+    this.flushingSessions.add(sessionId);
+    return this.findBySession(sessionId);
+  }
+
+  async completeSessionFlush(sessionId: number): Promise<void> {
     this.recordsBySession.delete(sessionId);
+    this.usedDevicesBySession.delete(sessionId);
+    this.flushingSessions.delete(sessionId);
+  }
+
+  async clearSession(sessionId: number): Promise<void> {
+    await this.completeSessionFlush(sessionId);
   }
 }

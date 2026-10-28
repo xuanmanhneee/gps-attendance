@@ -11,7 +11,8 @@ import type { LoginRequest } from '@gps-attendance/shared';
 import { useTheme } from '../hooks/useTheme';
 import { useAuth } from '../hooks/useAuth';
 import { ROUTE_PATHS } from '../routes/paths';
-import { toggleResolvedTheme } from '../types/theme';
+
+type LoginFormValues = LoginRequest & { rememberMe: boolean };
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -23,11 +24,11 @@ const LoginPage = () => {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginRequest>();
+  } = useForm<LoginFormValues>({ defaultValues: { rememberMe: false } });
 
   const { login, isLoading } = useAuth();
 
-  const handleLogin = async (data: LoginRequest) => {
+  const handleLogin = async (data: LoginFormValues) => {
     // Lấy lỗi từ backend theo error code thay vì hard-code cùng một chuỗi ở
     // nhiều component.
     const loginErrorMessages: Partial<Record<string, string>> = {
@@ -37,16 +38,17 @@ const LoginPage = () => {
     };
 
     try {
-      await login(data);
+      await login(
+        { username: data.username, password: data.password },
+        data.rememberMe,
+      );
 
       toast.success('Đăng nhập thành công!');
 
       navigate(ROUTE_PATHS.overview, { replace: true });
     } catch (error) {
       if (error instanceof ApiError) {
-        const message = error.code
-          ? loginErrorMessages[error.code]
-          : undefined;
+        const message = error.code ? loginErrorMessages[error.code] : undefined;
 
         toast.error(message ?? error.message);
         return;
@@ -127,132 +129,49 @@ const LoginPage = () => {
         >
           Hệ thống điểm danh GPS Trường Đại học Đà Lạt
         </h1>
-
-        <form
-          className={`w-full border border-black/[0.04] p-5 shadow-sm ${
-            isDark
-              ? 'bg-[#1d2932] text-slate-100'
-              : 'bg-[#eeeeee] text-[#5c6266]'
-          }`}
-          onSubmit={handleSubmit(handleLogin)}
-          noValidate
-          autoComplete="on"
-        >
-          <header className="mb-4 text-center">
-            <h2 className="text-[18px] font-bold leading-tight">
-              Đăng nhập tài khoản
-            </h2>
-            <p
-              className={`mt-1 text-[12px] ${
-                isDark ? 'text-slate-300' : 'text-[#73797d]'
-              }`}
-            >
-              Chào mừng bạn trở lại! Nhập thông tin để vào hệ thống.
-            </p>
-          </header>
-
-          <div className="mb-3.5">
-            <label
-              htmlFor="username"
-              className="mb-1.5 block text-[12px] font-semibold"
-            >
-              Tài khoản
-            </label>
-            <div className="relative flex items-center">
-              <RiAccountCircleFill
-                aria-hidden="true"
-                className="pointer-events-none absolute left-4 h-4 w-4 text-slate-500"
-              />
-              <input
-                id="username"
-                type="text"
-                placeholder="Nhập tên đăng nhập hoặc MSSV"
-                autoComplete="username"
-                aria-invalid={Boolean(errors.username)}
-                aria-describedby={
-                  errors.username ? 'username-error' : undefined
-                }
-                {...register('username', {
-                  required: 'Vui lòng nhập Username',
-                })}
-                className={`h-10 w-full border px-10 text-[13px] outline-none transition-colors placeholder:text-[#818991] focus:border-[#9ab5d8] focus:ring-1 focus:ring-[#c5d6ed] ${
-                  isDark
-                    ? 'border-slate-600 bg-[#27343e] text-slate-100'
-                    : 'border-[#d3dbe5] bg-[#f8f9fb] text-[#4d5963]'
-                }`}
-              />
-            </div>
-            {errors.username && (
-              <p
-                id="username-error"
-                className="mt-1 text-xs font-medium text-red-600"
-                role="alert"
-              >
-                {errors.username.message}
-              </p>
-            )}
+        <div className="w-full flex flex-col gap-3">
+          <div className="w-full flex items-center gap-2 bg-gray-800 p-2 rounded-xl">
+            <RiAccountCircleFill />
+            <input
+              type="text"
+              autoComplete="username"
+              placeholder="Username"
+              {...register('username', { required: 'Vui lòng nhập Username' })}
+              className="bg-transparent border-0 w-full outline-none text-sm md:text-base"
+            />
           </div>
 
-          <div className="mb-4">
-            <label
-              htmlFor="password"
-              className="mb-1.5 block text-[12px] font-semibold"
-            >
-              Mật khẩu
-            </label>
-            <div className="relative flex items-center">
-              <FaLock
-                aria-hidden="true"
-                className="pointer-events-none absolute left-4 h-3.5 w-3.5 text-slate-500"
-              />
-              <input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••••••"
-                autoComplete="current-password"
-                aria-invalid={Boolean(errors.password)}
-                aria-describedby={
-                  errors.password ? 'password-error' : undefined
-                }
-                {...register('password', {
-                  required: 'Vui lòng nhập Password',
-                })}
-                className={`h-10 w-full border py-2 pl-10 pr-12 text-[13px] outline-none transition-colors placeholder:text-[#818991] focus:border-[#9ab5d8] focus:ring-1 focus:ring-[#c5d6ed] ${
-                  isDark
-                    ? 'border-slate-600 bg-[#27343e] text-slate-100'
-                    : 'border-[#d3dbe5] bg-[#f8f9fb] text-[#4d5963]'
-                }`}
-              />
-              <button
-                type="button"
+          <div className="w-full flex items-center gap-2 bg-gray-800 p-2 rounded-xl relative">
+            <FaLock />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              placeholder="Password"
+              {...register('password', { required: 'Vui lòng nhập Password' })}
+              className="bg-transparent border-0 w-full outline-none text-sm md:text-base"
+            />
+            {showPassword ? (
+              <FaRegEye
+                className="absolute right-5 cursor-pointer"
                 onClick={togglePasswordView}
-                aria-label={
-                  showPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'
-                }
-                title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                className={`absolute right-2 flex h-8 w-8 items-center justify-center ${
-                  isDark
-                    ? 'text-slate-300 hover:text-white'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                {showPassword ? (
-                  <FaRegEye aria-hidden="true" />
-                ) : (
-                  <FaRegEyeSlash aria-hidden="true" />
-                )}
-              </button>
-            </div>
-            {errors.password && (
-              <p
-                id="password-error"
-                className="mt-1 text-xs font-medium text-red-600"
-                role="alert"
-              >
-                {errors.password.message}
-              </p>
+              />
+            ) : (
+              <FaRegEyeSlash
+                className="absolute right-5 cursor-pointer"
+                onClick={togglePasswordView}
+              />
             )}
           </div>
+          {errors.password && (
+            <span className="text-red-400 text-xs text-left w-full">
+              {errors.password.message}
+            </span>
+          )}
+          <label className="flex w-full cursor-pointer items-center gap-2 text-sm text-gray-200">
+            <input type="checkbox" {...register('rememberMe')} />
+            Ghi nhớ đăng nhập
+          </label>
+        </div>
 
           <button
             type="submit"

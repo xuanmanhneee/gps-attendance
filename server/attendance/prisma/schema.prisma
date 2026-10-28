@@ -21,8 +21,8 @@ enum AccountStatus {
 
 enum UserRole {
   admin
-  lecturer
-  student
+  organizer
+  participant
 }
 
 enum SessionStatus {
@@ -50,7 +50,24 @@ model Account {
   userId Int  @unique @map("user_id")
   user   User @relation(fields: [userId], references: [id])
 
+  refreshSessions RefreshSession[]
+
   @@map("accounts")
+}
+
+model RefreshSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  accountId Int       @map("account_id")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([expiresAt])
+  @@map("refresh_sessions")
 }
 
 model Tag {

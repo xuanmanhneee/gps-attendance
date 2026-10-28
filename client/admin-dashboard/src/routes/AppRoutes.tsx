@@ -6,18 +6,20 @@ import AttendanceRecordsPage from '../pages/AttendanceRecordsPage';
 import DashboardPage from '../pages/DashboardPage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
+import SessionCreatePage from '../pages/SessionCreatePage';
 import SessionDetailPage from '../pages/SessionDetailPage';
 import SessionsPage from '../pages/SessionsPage';
 import StatisticsPage from '../pages/StatisticsPage';
 import TagsPage from '../pages/TagsPage';
 import UnitsPage from '../pages/UnitsPage';
 import UsersPage from '../pages/UsersPage';
+import { getDefaultRoute } from '../config/navigation';
 import { useAuth } from '../hooks/useAuth';
 import ProtectedRoute from './ProtectedRoute';
 import { RoleGuard } from './RoleGuard';
 import { ROUTE_PATHS } from './paths';
 
-/** `/` đưa người dùng tới dashboard nếu đã đăng nhập, ngược lại về login. */
+/** `/` đưa người dùng tới trang chủ của vai trò nếu đã đăng nhập, ngược lại về login. */
 const LandingRedirect = () => {
   const { user, isLoading } = useAuth();
 
@@ -31,10 +33,23 @@ const LandingRedirect = () => {
 
   return (
     <Navigate
-      to={user ? ROUTE_PATHS.overview : ROUTE_PATHS.login}
+      to={user ? getDefaultRoute(user.role) : ROUTE_PATHS.login}
       replace
     />
   );
+};
+
+/**
+ * Chỉ admin có trang tổng quan (xem `NAVIGATION_ITEMS`). Vai trò khác gõ tay
+ * hoặc mở bookmark cũ `/dashboard` sẽ được chuyển về trang mặc định của họ.
+ */
+const OverviewRoute = () => {
+  const { user } = useAuth();
+
+  if (user && user.role !== 'admin') {
+    return <Navigate to={getDefaultRoute(user.role)} replace />;
+  }
+  return <DashboardPage />;
 };
 
 const AppRoutes = () => (
@@ -43,7 +58,7 @@ const AppRoutes = () => (
 
     <Route element={<ProtectedRoute />}>
       <Route element={<DashboardLayout />}>
-        <Route path={ROUTE_PATHS.overview} element={<DashboardPage />} />
+        <Route path={ROUTE_PATHS.overview} element={<OverviewRoute />} />
 
         <Route element={<RoleGuard allowedRoles={['admin']} />}>
           <Route path={ROUTE_PATHS.users} element={<UsersPage />} />
@@ -51,9 +66,9 @@ const AppRoutes = () => (
           <Route path={ROUTE_PATHS.tags} element={<TagsPage />} />
         </Route>
 
-        {/* Danh sách phiên: lecturer xem của mình, admin xem toàn bộ + lọc theo lecturer
+        {/* Danh sách phiên: organizer xem của mình, admin xem toàn bộ + lọc theo organizer
             (endpoint `created-by` phía sau yêu cầu role admin). */}
-        <Route element={<RoleGuard allowedRoles={['admin', 'lecturer']} />}>
+        <Route element={<RoleGuard allowedRoles={['admin', 'organizer']} />}>
           <Route
             path={ROUTE_PATHS.attendanceSessions}
             element={<SessionsPage />}
@@ -62,14 +77,21 @@ const AppRoutes = () => (
             path={ROUTE_PATHS.attendanceRecords}
             element={<AttendanceRecordsPage />}
           />
+          <Route path={ROUTE_PATHS.statistics} element={<StatisticsPage />} />
+        </Route>
+
+        {/* Tạo phiên: chỉ organizer được tạo (backend trả 403 cho role khác).
+            Route tĩnh `/sessions/new` không phụ thuộc thứ tự khai báo vì
+            react-router ưu tiên route khớp cụ thể hơn `/sessions/:id`. */}
+        <Route element={<RoleGuard allowedRoles={['organizer']} />}>
           <Route
-            path={ROUTE_PATHS.statistics}
-            element={<StatisticsPage />}
+            path={ROUTE_PATHS.attendanceSessionCreate}
+            element={<SessionCreatePage />}
           />
         </Route>
 
-        {/* Chi tiết phiên: cả admin và lecturer đều được xem (backend chỉ yêu cầu đăng nhập). */}
-        <Route element={<RoleGuard allowedRoles={['admin', 'lecturer']} />}>
+        {/* Chi tiết phiên: cả admin và organizer đều được xem (backend chỉ yêu cầu đăng nhập). */}
+        <Route element={<RoleGuard allowedRoles={['admin', 'organizer']} />}>
           <Route
             path={ROUTE_PATHS.attendanceSessionDetail}
             element={<SessionDetailPage />}

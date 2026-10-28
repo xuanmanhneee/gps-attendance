@@ -62,7 +62,7 @@ export function CampusFooter() {
           </Svg>
 
           <View style={styles.textWrapper}>
-            <Text style={styles.slogan}>Tri thức tạo giá trị</Text>
+            <Text style={styles.slogan}>Điểm danh thuận tiện ở mọi nơi</Text>
             <View style={styles.underline} />
           </View>
         </View>

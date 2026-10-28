@@ -1,3 +1,4 @@
+import { ROLES } from '@gps-attendance/shared';
 import type {
   AttendanceParticipantResponse,
   AttendanceSessionDetailResponse,
@@ -6,6 +7,7 @@ import type {
   CreateAttendanceSessionRequest,
   Role,
   SessionStatus,
+  UserResponse,
 } from '@gps-attendance/shared';
 
 /**
@@ -29,8 +31,6 @@ const ATTENDANCE_STATUSES: readonly AttendanceStatus[] = [
   'late',
   'excused',
 ];
-
-const ROLES: readonly Role[] = ['admin', 'lecturer', 'student'];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -115,19 +115,22 @@ export const parseAttendanceSessionList = (
  * Participant của phiên: cần `code`, `fullname`, `role` và trạng thái
  * `present`/`absent`/`late`/`excused` (xem `AttendanceParticipantResponse`).
  */
+const isParticipantUser = (user: unknown): user is UserResponse => {
+  if (!isRecord(user)) return false;
+  return (
+    typeof user.code === 'string' &&
+    typeof user.fullname === 'string' &&
+    isRole(user.role)
+  );
+};
+
 export const isAttendanceParticipant = (
   value: unknown,
 ): value is AttendanceParticipantResponse => {
   if (!isRecord(value)) return false;
 
-  const user = value.user;
-
-  if (!isRecord(user)) return false;
-
   return (
-    typeof user.code === 'string' &&
-    typeof user.fullname === 'string' &&
-    isRole(user.role) &&
+    isParticipantUser(value.user) &&
     isAttendanceStatus(value.status) &&
     (value.checkedInAt === null || typeof value.checkedInAt === 'string') &&
     typeof value.updatedAt === 'string'
@@ -141,7 +144,16 @@ export const isAttendanceSessionDetail = (
 
   // `value` đã là `AttendanceSessionResponse`; đọc `participants` qua record
   // để không phụ thuộc field chưa được narrow bởi type guard trước đó.
-  const participants = (value as unknown as Record<string, unknown>).participants;
+  const participants = (value as unknown as Record<string, unknown>)
+    .participants;
+  const plannedParticipants = (value as unknown as Record<string, unknown>)
+    .plannedParticipants;
 
-  return Array.isArray(participants) && participants.every(isAttendanceParticipant);
+  return (
+    Array.isArray(participants) &&
+    participants.every(isAttendanceParticipant) &&
+    (plannedParticipants === null ||
+      (Array.isArray(plannedParticipants) &&
+        plannedParticipants.every(isParticipantUser)))
+  );
 };

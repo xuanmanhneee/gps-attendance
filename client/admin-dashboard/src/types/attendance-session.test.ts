@@ -22,7 +22,7 @@ const buildSession = (overrides: Record<string, unknown> = {}) => ({
 });
 
 const buildParticipant = (overrides: Record<string, unknown> = {}) => ({
-  user: { code: 'SV001', fullname: 'Nguyễn Văn A', role: 'student' },
+  user: { code: 'SV001', fullname: 'Nguyễn Văn A', role: 'participant' },
   status: 'present',
   checkedInAt: '2026-09-20T08:05',
   updatedAt: '2026-09-20T08:05',
@@ -95,6 +95,19 @@ describe('parseAttendanceSessionList', () => {
 });
 
 describe('isAttendanceParticipant', () => {
+  it('từ chối role cũ trong response', () => {
+    for (const role of ['lecturer', 'student']) {
+      assert.equal(
+        isAttendanceParticipant(
+          buildParticipant({
+            user: { code: 'SV001', fullname: 'Nguyễn Văn A', role },
+          }),
+        ),
+        false,
+      );
+    }
+  });
+
   it('yêu cầu code, fullname, role và trạng thái điểm danh hợp lệ', () => {
     assert.equal(isAttendanceParticipant(buildParticipant()), true);
     assert.equal(
@@ -138,11 +151,26 @@ describe('isAttendanceSessionDetail', () => {
       isAttendanceSessionDetail({
         ...buildSession(),
         participants: [buildParticipant()],
+        plannedParticipants: null,
       }),
       true,
     );
     assert.equal(
-      isAttendanceSessionDetail({ ...buildSession(), participants: [] }),
+      isAttendanceSessionDetail({
+        ...buildSession(),
+        participants: [],
+        plannedParticipants: [],
+      }),
+      true,
+    );
+    assert.equal(
+      isAttendanceSessionDetail({
+        ...buildSession(),
+        participants: [],
+        plannedParticipants: [
+          { code: 'P003', role: 'participant', fullname: 'Người tham gia' },
+        ],
+      }),
       true,
     );
   });
@@ -153,6 +181,23 @@ describe('isAttendanceSessionDetail', () => {
       isAttendanceSessionDetail({
         ...buildSession(),
         participants: [buildParticipant({ status: 'unknown' })],
+        plannedParticipants: null,
+      }),
+      false,
+    );
+    assert.equal(
+      isAttendanceSessionDetail({
+        ...buildSession(),
+        participants: [],
+        plannedParticipants: undefined,
+      }),
+      false,
+    );
+    assert.equal(
+      isAttendanceSessionDetail({
+        ...buildSession(),
+        participants: [],
+        plannedParticipants: [{ code: 'P003', role: 'student' }],
       }),
       false,
     );

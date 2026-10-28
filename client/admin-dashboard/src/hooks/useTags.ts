@@ -41,8 +41,8 @@ export const useTags = (): UseTagsResult => {
   const [error, setError] = useState<Error | null>(null);
   const [refreshError, setRefreshError] = useState<Error | null>(null);
 
-  const loadTagList = useCallback(async (): Promise<Tag[]> => {
-    const data: unknown = await tagsApi.getAll();
+  const loadTagList = useCallback(async (fresh = false): Promise<Tag[]> => {
+    const data: unknown = await tagsApi.getAll(fresh);
 
     if (!isTagList(data)) {
       throw new Error('Unexpected tag list response');
@@ -51,34 +51,37 @@ export const useTags = (): UseTagsResult => {
     return [...data];
   }, []);
 
-  const reload = useCallback(async () => {
-    setIsLoading(true);
+  const reload = useCallback(
+    async (fresh = true) => {
+      setIsLoading(true);
 
-    try {
-      const data = await loadTagList();
+      try {
+        const data = await loadTagList(fresh);
 
-      setTags(data);
-      setError(null);
-      setRefreshError(null);
-    } catch (unknownError) {
-      setTags([]);
-      setError(toError(unknownError, new Error('Unable to load tags')));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loadTagList]);
+        setTags(data);
+        setError(null);
+        setRefreshError(null);
+      } catch (unknownError) {
+        setTags([]);
+        setError(toError(unknownError, new Error('Unable to load tags')));
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [loadTagList],
+  );
 
   useEffect(() => {
     // Fetch khi mount; setState nằm sau `await` nên không gây cascading render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void reload();
+    void reload(false);
   }, [reload]);
 
   const refresh = useCallback(async (): Promise<Error | null> => {
     setIsRefreshing(true);
 
     try {
-      const data = await loadTagList();
+      const data = await loadTagList(true);
 
       setTags(data);
       setError(null);
@@ -158,4 +161,3 @@ export const useTags = (): UseTagsResult => {
     deleteTag,
   };
 };
-

@@ -13,7 +13,7 @@ export const vi = {
 
   // ---- Navigation ----
   'navigation.group.admin': 'Admin',
-  'navigation.group.lecturer': 'Giảng viên',
+  'navigation.group.organizer': 'Người tổ chức',
   'navigation.overview': 'Tổng quan',
   'navigation.users': 'Người dùng',
   'navigation.units': 'Đơn vị',
@@ -26,12 +26,12 @@ export const vi = {
   'roles.fieldLabel': 'Vai trò hiện tại',
   'roles.statusAria': 'Vai trò xác thực: {role}',
   'roles.admin': 'Quản trị viên',
-  'roles.lecturer': 'Giảng viên',
+  'roles.organizer': 'Người tổ chức',
   'roles.pill.admin': 'Admin',
-  'roles.pill.lecturer': 'Lecturer',
-  'roles.student': 'Sinh viên',
+  'roles.pill.organizer': 'Người tổ chức',
+  'roles.participant': 'Người tham gia',
   'roles.adminProfile': 'Admin hệ thống',
-  'roles.lecturerProfile': 'Giảng viên phụ trách',
+  'roles.organizerProfile': 'Người tổ chức phụ trách',
 
   // ---- Trạng thái chung ----
   'common.loading': 'Đang tải dữ liệu...',
@@ -62,7 +62,7 @@ export const vi = {
 
   // ---- Topbar ----
   'topbar.context.admin': 'Trung tâm điều hành',
-  'topbar.context.lecturer': 'Trung tâm giảng viên',
+  'topbar.context.organizer': 'Quản lý phiên điểm danh',
 
   // ---- Thẻ trợ giúp trong sidebar (theo prototype `help-card`) ----
   'help.title': 'Cần hỗ trợ?',
@@ -79,16 +79,16 @@ export const vi = {
   'dashboard.admin.eyebrow': 'Tổng quan hệ thống',
   'dashboard.admin.description':
     'Theo dõi phiên điểm danh và tình hình vận hành của hệ thống.',
-  'dashboard.lecturer.eyebrow': 'Tổng quan điểm danh',
-  'dashboard.lecturer.description':
-    'Theo dõi các phiên điểm danh và tình hình lớp bạn phụ trách.',
+  'dashboard.organizer.eyebrow': 'Tổng quan điểm danh',
+  'dashboard.organizer.description':
+    'Theo dõi các phiên điểm danh bạn phụ trách.',
   'dashboard.createSession': 'Tạo phiên điểm danh',
   'dashboard.sessionsByStatusTitle': 'Phân bố trạng thái phiên',
   'dashboard.sessionsByStatusSubtitle': 'Tổng hợp từ các phiên hiện có',
   'dashboard.recentSessionsTitle': 'Phiên điểm danh gần đây',
   'dashboard.recentSessionsSubtitle.admin':
     'Các phiên mới nhất đang có trên hệ thống',
-  'dashboard.recentSessionsSubtitle.lecturer': 'Các phiên bạn tạo gần đây nhất',
+  'dashboard.recentSessionsSubtitle.organizer': 'Các phiên bạn tạo gần đây nhất',
   'dashboard.mySessionsTitle': 'Phiên điểm danh của tôi',
   'dashboard.attendanceRateTitle': 'Tỷ lệ có mặt',
   'dashboard.attendanceRateSubtitle': '7 ngày gần nhất',
@@ -112,20 +112,27 @@ export const vi = {
 
   // ---- Mô tả các page theo role ----
   'pages.users.description': 'Quản lý tài khoản và vai trò người dùng.',
-  'pages.units.description': 'Cấu trúc khoa, bộ môn và lớp trong hệ thống.',
+  'pages.units.description': 'Cấu trúc các đơn vị trong hệ thống.',
   'pages.tags.description': 'Gán thẻ tag để lọc và gom nhóm người dùng.',
   'pages.attendanceRecords.description':
-    'Tra cứu chi tiết từng lượt điểm danh của sinh viên.',
+    'Tra cứu chi tiết từng lượt điểm danh của người tham gia.',
   'pages.statistics.description':
     'Báo cáo tỷ lệ có mặt và xu hướng điểm danh theo thời gian.',
   // ---- Phiên điểm danh ----
   'sessions.page.description':
     'Quản lý các phiên điểm danh GPS do bạn tạo và theo dõi trạng thái.',
-  'sessions.filter.label': 'Lọc theo lecturer',
-  'sessions.filter.allLecturers': 'Tất cả lecturer',
-  'sessions.filter.loading': 'Đang tải danh sách lecturer...',
-  'sessions.filter.loadError': 'Không thể tải danh sách lecturer.',
-  'sessions.filter.invalidLecturer': 'Lecturer được chọn không hợp lệ.',
+  'sessions.total': '{count} phiên điểm danh',
+  'sessions.filter.label': 'Lọc theo người tổ chức',
+  'sessions.filter.allOrganizers': 'Tất cả người tổ chức',
+  'sessions.filter.loading': 'Đang tải danh sách người tổ chức...',
+  'sessions.filter.loadError': 'Không thể tải danh sách người tổ chức.',
+  'sessions.filter.invalidOrganizer': 'Người tổ chức được chọn không hợp lệ.',
+  'sessions.filter.statusLabel': 'Trạng thái',
+  'sessions.filter.allStatuses': 'Tất cả trạng thái',
+  'sessions.emptyFiltered': 'Không có phiên điểm danh nào khớp bộ lọc.',
+  'sessions.filter.includeCancelled': 'Hiện phiên đã huỷ',
+  'sessions.emptyMaybeHiddenCancelled':
+    'Không có phiên nào khớp bộ lọc. Có thể có phiên đã huỷ đang bị ẩn — bật "Hiện phiên đã huỷ" để xem.',
   'sessions.table.name': 'Phiên điểm danh',
   'sessions.table.time': 'Thời gian',
   'sessions.table.radius': 'Bán kính',
@@ -148,32 +155,53 @@ export const vi = {
   'sessions.error.forbidden': 'Bạn không có quyền thực hiện thao tác này.',
   'sessions.error.notFound': 'Không tìm thấy phiên điểm danh.',
   'sessions.error.conflict': 'Thao tác xung đột với dữ liệu hiện tại.',
-  'sessions.error.tooManyRequests': 'Bạn thao tác quá nhanh, vui lòng thử lại sau.',
+  'sessions.error.tooManyRequests':
+    'Bạn thao tác quá nhanh, vui lòng thử lại sau.',
   'sessions.error.internal': 'Máy chủ đang gặp sự cố, vui lòng thử lại sau.',
   'sessions.error.unknown': 'Đã có lỗi xảy ra, vui lòng thử lại.',
   'sessions.error.invalidTimeRange': 'Khoảng thời gian phiên không hợp lệ.',
   'sessions.error.invalidRadius': 'Bán kính điểm danh không hợp lệ.',
-  'sessions.error.creationForbidden':
-    'Bạn không có quyền tạo phiên điểm danh.',
+  'sessions.error.creationForbidden': 'Bạn không có quyền tạo phiên điểm danh.',
+  'sessions.error.invalidCriteria': 'Tiêu chí người tham gia không hợp lệ.',
+  'sessions.error.cancelInvalidStatus':
+    'Không thể huỷ phiên đã đóng hoặc đã huỷ.',
+  'sessions.error.updateInvalidStatus':
+    'Không thể sửa phiên đã đóng hoặc đã huỷ.',
+  'sessions.error.updateFieldLocked':
+    'Phiên đang mở chỉ được sửa thời gian đóng.',
+  'sessions.error.criteriaLocked':
+    'Danh sách người tham gia đã được khởi tạo, không thể sửa tiêu chí.',
+  'sessions.updateError': 'Không thể cập nhật phiên điểm danh.',
+  'sessions.cancelError': 'Không thể huỷ phiên điểm danh.',
+
+  'sessions.card.edit': 'Sửa',
+  'sessions.card.cancel': 'Huỷ phiên',
+  'sessions.card.cancelling': 'Đang huỷ...',
+  'sessions.card.cancelConfirm': 'Huỷ phiên này? Phiên sẽ không thể mở lại.',
+  'sessions.cancelSuccess': 'Đã huỷ phiên',
 
   // ---- Form tạo phiên ----
   'sessions.form.title': 'Tên phiên',
   'sessions.form.heading': 'Tạo phiên điểm danh mới',
-  'sessions.form.description': 'Cấu hình phạm vi GPS, thời gian và sinh viên áp dụng',
+  'sessions.form.description':
+    'Cấu hình phạm vi GPS, thời gian và danh sách người tham gia',
   'sessions.form.close': 'Đóng cửa sổ tạo phiên',
   'sessions.form.locationSection': 'Toạ độ GPS & bán kính',
   'sessions.form.openDate': 'Ngày mở',
   'sessions.form.openClock': 'Giờ mở',
   'sessions.form.closeDate': 'Ngày đóng',
   'sessions.form.closeClock': 'Giờ đóng',
-  'sessions.form.titlePlaceholder': 'Ví dụ: Điểm danh buổi học buổi sáng',
+  'sessions.form.titlePlaceholder': 'Ví dụ: Điểm danh ca sáng',
   'sessions.form.titleRequired': 'Vui lòng nhập tên phiên.',
   'sessions.form.latitude': 'Vĩ độ',
-  'sessions.form.latitudeRequired': 'Vui lòng nhập vĩ độ hoặc bấm lấy vị trí hiện tại.',
+  'sessions.form.latitudeRequired':
+    'Vui lòng nhập vĩ độ hoặc bấm lấy vị trí hiện tại.',
   'sessions.form.latitudeInvalid': 'Vĩ độ phải nằm trong khoảng -90 đến 90.',
   'sessions.form.longitude': 'Kinh độ',
-  'sessions.form.longitudeRequired': 'Vui lòng nhập kinh độ hoặc bấm lấy vị trí hiện tại.',
-  'sessions.form.longitudeInvalid': 'Kinh độ phải nằm trong khoảng -180 đến 180.',
+  'sessions.form.longitudeRequired':
+    'Vui lòng nhập kinh độ hoặc bấm lấy vị trí hiện tại.',
+  'sessions.form.longitudeInvalid':
+    'Kinh độ phải nằm trong khoảng -180 đến 180.',
   'sessions.form.radius': 'Bán kính (m)',
   'sessions.form.radiusRequired': 'Vui lòng nhập bán kính.',
   'sessions.form.radiusInvalid': 'Bán kính phải là số dương.',
@@ -182,21 +210,65 @@ export const vi = {
   'sessions.form.closeTime': 'Thời gian đóng phiên',
   'sessions.form.openTimeRequired': 'Vui lòng chọn thời gian mở phiên.',
   'sessions.form.closeTimeRequired': 'Vui lòng chọn thời gian đóng phiên.',
-  'sessions.form.timeRangeInvalid': 'Thời gian kết thúc phải sau thời gian bắt đầu.',
-  'sessions.form.participantCodes': 'Mã sinh viên được tham gia',
+  'sessions.form.timeRangeInvalid':
+    'Thời gian kết thúc phải sau thời gian bắt đầu.',
+  'sessions.form.participantCodes': 'Mã người được phép tham gia',
   'sessions.form.participantCodesHint': 'Phân cách các mã bằng dấu phẩy',
-  'sessions.form.participantCodesRequired': 'Vui lòng nhập ít nhất một mã sinh viên.',
+  'sessions.form.participantCodesRequired':
+    'Vui lòng nhập ít nhất một mã người tham gia.',
   'sessions.form.participantCodesValid': '{count} mã hợp lệ',
   'sessions.form.useCurrentLocation': 'Lấy vị trí hiện tại',
   'sessions.form.locationSuccess': 'Đã lấy toạ độ hiện tại thành công.',
   'sessions.form.locationError': 'Không thể lấy vị trí hiện tại.',
-  'sessions.form.locationPermissionDenied': 'Bạn chưa cho phép trình duyệt truy cập vị trí.',
-  'sessions.form.locationUnavailable': 'Thiết bị hiện không xác định được vị trí.',
-  'sessions.form.locationTimeout': 'Lấy vị trí mất quá nhiều thời gian, vui lòng thử lại.',
+  'sessions.form.locationPermissionDenied':
+    'Bạn chưa cho phép trình duyệt truy cập vị trí.',
+  'sessions.form.locationUnavailable':
+    'Thiết bị hiện không xác định được vị trí.',
+  'sessions.form.locationTimeout':
+    'Lấy vị trí mất quá nhiều thời gian, vui lòng thử lại.',
   'sessions.form.submit': 'Tạo phiên điểm danh',
   'sessions.form.submitting': 'Đang tạo...',
   'sessions.form.cancel': 'Hủy',
 
+  // ---- Wizard tạo phiên (trang `/sessions/new`) ----
+  'sessions.form.step.details.title': 'Thông tin phiên',
+  'sessions.form.step.details.description': 'Tên, vị trí và thời gian',
+  'sessions.form.step.participants.title': 'Người tham gia',
+  'sessions.form.step.participants.description':
+    'Danh sách mã người tham gia được điểm danh',
+  'sessions.form.next': 'Tiếp tục',
+  'sessions.form.back': 'Quay lại',
+  'sessions.form.locationModeLabel': 'Cách chọn vị trí',
+  'sessions.form.locationMode.map': 'Chọn trên bản đồ',
+  'sessions.form.locationMode.manual': 'Nhập toạ độ',
+  'sessions.form.locating': 'Đang xác định vị trí hiện tại...',
+  'sessions.form.mapNeedsCoordinates':
+    'Chưa có toạ độ nên chưa hiển thị được bản đồ. Bấm "Lấy vị trí hiện tại" hoặc chuyển sang nhập toạ độ.',
+  'sessions.form.mapHint':
+    'Kéo điểm xanh để đổi tâm, kéo điểm ở rìa vòng tròn để đổi bán kính.',
+  'sessions.form.participantsStepNote':
+    'Bước này tạm thời nhập mã người tham gia bằng tay; phần chọn theo đơn vị sẽ bổ sung sau.',
+
+  'sessions.form.pickLocationTitle': 'Chọn vị trí trên bản đồ',
+  'sessions.form.confirmLocation': 'Xác nhận',
+  'sessions.form.openMap': 'Chọn trên bản đồ',
+  'sessions.form.geolocationPermissionDenied':
+    'Bạn chưa cấp quyền truy cập vị trí',
+  'sessions.form.geolocationUnavailable': 'Không thể xác định vị trí hiện tại',
+  'sessions.form.geolocationTimeout': 'Hết thời gian chờ xác định vị trí',
+  'sessions.form.unitInclude': 'Đơn vị (bao gồm)',
+  'sessions.form.unitIncludeHint':
+    'Nhập ID đơn vị, cách nhau dấu phẩy. VD: 1, 2, 3',
+  'sessions.form.unitExclude': 'Đơn vị (loại trừ)',
+  'sessions.form.unitExcludeHint': 'Nhập ID đơn vị cần loại trừ',
+  'sessions.form.tagInclude': 'Tag (bao gồm)',
+  'sessions.form.tagIncludeHint': 'Nhập ID tag, cách nhau dấu phẩy',
+  'sessions.form.tagExclude': 'Tag (loại trừ)',
+  'sessions.form.tagExcludeHint': 'Nhập ID tag cần loại trừ',
+  'sessions.form.codeInclude': 'Mã người tham gia (bao gồm)',
+  'sessions.form.codeIncludeHint': 'Mỗi dòng 1 mã, VD: 20210001, 20210002',
+  'sessions.form.codeExclude': 'Mã người tham gia (loại trừ)',
+  'sessions.form.codeExcludeHint': 'Mỗi dòng 1 mã cần loại trừ',
   // ---- Chi tiết phiên ----
   'sessionDetail.loading': 'Đang tải thông tin phiên điểm danh...',
   'sessionDetail.invalidId': 'Mã phiên điểm danh không hợp lệ.',
@@ -214,14 +286,19 @@ export const vi = {
     'Không thể tải lại danh sách người tham gia. Vui lòng thử lại.',
   'sessionDetail.emptyParticipants':
     'Chưa có người tham gia trong phiên điểm danh này.',
-  'sessionDetail.studentCode': 'Mã sinh viên',
+  'sessionDetail.plannedParticipantsNote':
+    'Danh sách dự kiến theo điều kiện hiện tại; có thể thay đổi trước khi roster được khởi tạo.',
+  'sessionDetail.emptyPlannedParticipants':
+    'Chưa có người tham gia phù hợp với điều kiện hiện tại.',
+  'sessionDetail.participantCode': 'Mã người tham gia',
   'sessionDetail.present': 'Đã điểm danh',
   'sessionDetail.absent': 'Chưa điểm danh',
   'sessionDetail.late': 'Đi muộn',
   'sessionDetail.excused': 'Có phép',
   // ---- Units (vi) ----
   'units.title': 'Đơn vị',
-  'units.description': 'Quản lý cây đơn vị: xem danh sách, cây, tạo và cập nhật đơn vị.',
+  'units.description':
+    'Quản lý cây đơn vị: xem danh sách, cây, tạo và cập nhật đơn vị.',
   'units.treeTitle': 'Cây đơn vị',
   'units.treeSubtitle': 'Cấu trúc phân cấp từ API backend',
   'units.listTitle': 'Danh sách đơn vị',
@@ -229,7 +306,7 @@ export const vi = {
   'units.create': 'Tạo đơn vị',
   'units.edit': 'Sửa đơn vị',
   'units.name': 'Tên đơn vị',
-  'units.namePlaceholder': 'Ví dụ: Khoa Công nghệ Thông tin',
+  'units.namePlaceholder': 'Ví dụ: Bộ phận vận hành',
   'units.nameRequired': 'Vui lòng nhập tên đơn vị',
   'units.parent': 'Đơn vị cha',
   'units.root': 'Đơn vị gốc (không có cha)',
@@ -258,7 +335,8 @@ export const vi = {
   'units.error.notFound': 'Không tìm thấy đơn vị.',
   'units.error.parentNotFound': 'Đơn vị cha không tồn tại.',
   'units.error.selfReference': 'Đơn vị không thể là cha của chính nó.',
-  'units.error.cycleDetected': 'Không thể chuyển đơn vị xuống dưới đơn vị con của nó.',
+  'units.error.cycleDetected':
+    'Không thể chuyển đơn vị xuống dưới đơn vị con của nó.',
   'units.error.hierarchyCorrupted': 'Cây đơn vị hiện tại bị lỗi vòng lặp.',
   'units.error.hasChildren': 'Đơn vị còn đơn vị con nên chưa thể xử lý.',
   // ---- Tags (vi) ----
@@ -275,7 +353,8 @@ export const vi = {
   'tags.createSuccess': 'Tạo thẻ tag thành công.',
   'tags.delete': 'Xóa',
   'tags.deleteTitle': 'Xóa thẻ tag',
-  'tags.deleteConfirm': 'Xóa thẻ “{name}”? Các lượt gán của tag này sẽ bị xóa theo.',
+  'tags.deleteConfirm':
+    'Xóa thẻ “{name}”? Các lượt gán của tag này sẽ bị xóa theo.',
   'tags.deleteError': 'Không thể xóa thẻ tag.',
   'tags.deleteSuccess': 'Đã xóa thẻ tag.',
   'tags.manageUsers': 'Quản lý user',

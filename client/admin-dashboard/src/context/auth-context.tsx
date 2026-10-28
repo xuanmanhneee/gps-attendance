@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { LoginRequest } from '@gps-attendance/shared';
 
 import { authApi } from '../api/auth.api';
+import { clearGetCache } from '../api/http';
 import { usersApi } from '../api/users.api';
 import { tokenService } from '../services/token.service';
 import { AuthContext } from './auth-context-value';
@@ -22,7 +23,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const loadUser = async () => {
     const token = tokenService.get();
 
-    if (!token) {
+    if (!token && !tokenService.getRefresh()) {
       setIsLoading(false);
       return;
     }
@@ -31,6 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(await usersApi.getMe());
     } catch {
       tokenService.remove();
+      clearGetCache();
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -38,19 +40,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    const handleExpired = () => {
+      clearGetCache();
+      setUser(null);
+    };
+    window.addEventListener('auth:expired', handleExpired);
     // Tải user một lần khi mount. Mọi setState trong loadUser đều nằm sau
     // `await` nên không gây cascading render như rule suy đoán.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadUser();
+    return () => window.removeEventListener('auth:expired', handleExpired);
   }, []);
 
-  const login = async (request: LoginRequest) => {
+  const login = async (request: LoginRequest, rememberMe: boolean) => {
     setIsLoading(true);
 
     try {
       const response = await authApi.login(request);
-      tokenService.set(response.accessToken);
+      tokenService.set(
+        response.accessToken,
+        rememberMe ? response.refreshToken : undefined,
+      );
+      clearGetCache();
       setUser(await usersApi.getMe());
+    } catch (error) {
+      tokenService.remove();
+      clearGetCache();
+      setUser(null);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -58,6 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = () => {
     tokenService.remove();
+    clearGetCache();
     setUser(null);
   };
 

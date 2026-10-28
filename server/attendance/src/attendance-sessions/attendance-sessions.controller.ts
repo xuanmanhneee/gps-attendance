@@ -23,6 +23,8 @@ import {
   MyAttendanceSessionResponse,
 } from '@gps-attendance/shared';
 import { AttendanceSessionQueryService } from './attendance-session-query.service';
+import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto';
+import { UserFilterCriteria } from '@gps-attendance/shared'; // gộp vào import @gps-attendance/shared có sẵn
 
 @ApiTags('attendance-sessions')
 @ApiBearerAuth()
@@ -33,9 +35,9 @@ export class AttendanceSessionsController {
     private readonly attendanceSessionQueryService: AttendanceSessionQueryService,
   ) {}
 
-  @ApiOperation({ summary: 'Tạo session điểm danh mới (lecturer)' })
+  @ApiOperation({ summary: 'Tạo session điểm danh mới (organizer)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer')
+  @Roles('organizer')
   @Post()
   async create(
     @Body() dto: CreateAttendanceSessionDto,
@@ -49,10 +51,10 @@ export class AttendanceSessionsController {
   }
 
   @ApiOperation({
-    summary: 'Huỷ session điểm danh (chỉ lecturer tạo ra session đó)',
+    summary: 'Huỷ session điểm danh (chỉ organizer tạo ra session đó)',
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer')
+  @Roles('organizer')
   @Patch(':id/cancel')
   async cancel(
     @Param('id', ParseIntPipe) id: number,
@@ -63,6 +65,23 @@ export class AttendanceSessionsController {
       user.userId,
     );
     return toAttendanceSessionResponse(cancelled);
+  }
+
+  @ApiOperation({ summary: 'Sửa session (chỉ organizer tạo ra session đó)' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('organizer')
+  @Patch(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateAttendanceSessionDto,
+    @CurrentUser() user: { userId: number },
+  ): Promise<AttendanceSessionResponse> {
+    const updated = await this.attendanceSessionsService.update(
+      id,
+      dto,
+      user.userId,
+    );
+    return toAttendanceSessionResponse(updated);
   }
 
   // ---- Các route tĩnh (static path) PHẢI khai báo trước ':id' ----
@@ -77,9 +96,9 @@ export class AttendanceSessionsController {
     return sessions.map(toAttendanceSessionResponse);
   }
 
-  @ApiOperation({ summary: 'Danh sách session do chính tôi tạo (lecturer)' })
+  @ApiOperation({ summary: 'Danh sách session do chính tôi tạo (organizer)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer')
+  @Roles('organizer')
   @Get('created-by-me')
   async findMyCreated(
     @CurrentUser() user: { userId: number },
@@ -91,7 +110,7 @@ export class AttendanceSessionsController {
   }
 
   @ApiOperation({
-    summary: 'Danh sách session do 1 lecturer bất kỳ tạo (chỉ admin)',
+    summary: 'Danh sách session do 1 organizer bất kỳ tạo (chỉ admin)',
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
@@ -117,11 +136,30 @@ export class AttendanceSessionsController {
   // ---- ':id' luôn đặt CUỐI CÙNG trong nhóm GET ----
 
   @ApiOperation({ summary: 'Chi tiết 1 session' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'organizer')
   @Get(':id')
   async getDetail(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<AttendanceSessionDetailResponse> {
     return this.attendanceSessionQueryService.getDetail(id);
+  }
+
+  @ApiOperation({
+    summary:
+      'Lấy criteria người tham gia (chỉ organizer tạo, khi roster chưa khởi tạo)',
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('organizer')
+  @Get(':id/criteria')
+  async getCriteria(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number },
+  ): Promise<{ criteria: UserFilterCriteria | null }> {
+    const criteria = await this.attendanceSessionsService.getCriteria(
+      id,
+      user.userId,
+    );
+    return { criteria };
   }
 }

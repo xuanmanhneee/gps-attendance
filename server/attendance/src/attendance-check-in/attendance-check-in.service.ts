@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,30 +12,29 @@ import { AttendanceRecordsService } from '../attendance-record/attendance-record
 import { CheckInRequestDto } from './attendance-check-in.dto';
 
 import {
-  CheckInRequest,
   CheckInResponse,
   AttendanceSessionErrorCode,
 } from '@gps-attendance/shared';
 import { AttemptCheck } from './checks/attempt.check';
-import { DeviceCheck } from './checks/device.check';
 
 @Injectable()
 export class AttendanceCheckInService {
-  private readonly MAX_ATTEMPTS = 5;
-
   constructor(
     private readonly attendanceSessionsService: AttendanceSessionsService,
     private readonly attendanceValidationService: AttendanceValidationService,
     private readonly attendanceRecordsService: AttendanceRecordsService,
 
     private readonly attemptCheck: AttemptCheck,
-    private readonly deviceCheck: DeviceCheck,
   ) {}
 
   async checkIn(
     dto: CheckInRequestDto,
     userId: number,
   ): Promise<CheckInResponse> {
+    // Chốt thời điểm server nhận request trước mọi I/O để thời gian chờ DB/Redis
+    // không bị tính nhầm vào độ tuổi của mẫu GPS.
+    const checkedInAt = new Date();
+
     // --- Guard layer ---
     const session = await this.attendanceSessionsService.findById(
       dto.sessionId,
@@ -88,21 +86,7 @@ export class AttendanceCheckInService {
       };
     }
 
-    const device = await this.deviceCheck.evaluate({
-      sessionId: dto.sessionId,
-      deviceId: dto.device.deviceId,
-    });
-
-    if (device.isDuplicate) {
-      return {
-        status: 'REJECTED',
-        reasons: ['DUPLICATE_DEVICE'],
-      };
-    }
-
     // --- Validation layer ---
-    const checkedInAt = new Date();
-
     const validation = await this.attendanceValidationService.validate({
       session,
       userId,
@@ -119,15 +103,45 @@ export class AttendanceCheckInService {
       };
     }
 
-    await this.attendanceRecordsService.markPresent({
-      sessionId: dto.sessionId,
-      userId,
-      checkedInAt,
-      latitude: dto.location.latitude,
-      longitude: dto.location.longitude,
-      accuracy: dto.location.accuracy,
-      updateBy: userId,
-    });
+    const deviceTtlSeconds = Math.max(
+      3600,
+      Math.ceil((session.closeAt.getTime() - Date.now()) / 1000) + 3600,
+    );
+    const commit = await this.attendanceRecordsService.markPresent(
+      {
+        sessionId: dto.sessionId,
+        userId,
+        checkedInAt,
+        latitude: dto.location.latitude,
+        longitude: dto.location.longitude,
+        accuracy: dto.location.accuracy,
+        updateBy: userId,
+      },
+      dto.device.deviceId,
+      deviceTtlSeconds,
+    );
+
+    if (commit === 'device-used') {
+      return { status: 'REJECTED', reasons: ['DUPLICATE_DEVICE'] };
+    }
+    if (commit === 'already-present') {
+      throw new ConflictException({
+        code: 'ALREADY_CHECKED_IN',
+        message: 'Đã điểm danh rồi',
+      });
+    }
+    if (commit === 'record-missing') {
+      throw new BadRequestException({
+        code: 'USER_NOT_IN_SESSION',
+        message: 'User không thuộc session này',
+      });
+    }
+    if (commit === 'session-flushing') {
+      throw new BadRequestException({
+        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
+        message: 'Phiên điểm danh đã đóng',
+      });
+    }
 
     if (validation.status === 'VALID') {
       return {

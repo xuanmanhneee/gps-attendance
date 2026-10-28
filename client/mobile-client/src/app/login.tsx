@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   Alert,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   LayoutAnimation,
@@ -21,8 +20,6 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { CampusFooter } from '../components/campus-footer';
 import { colors } from '../../theme';
-
-const logoSource = require('../../assets/images/logo-dlu.png');
 
 // LayoutAnimation cần bật thủ công trên Android (old architecture)
 if (
@@ -65,7 +62,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!username.trim() || !password) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng nhập MSSV/email và mật khẩu.');
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập tên đăng nhập và mật khẩu.');
       return;
     }
 
@@ -73,7 +70,7 @@ export default function LoginScreen() {
       await login(username.trim(), password);
       router.replace('/home');
     } catch {
-      Alert.alert('Đăng nhập thất bại', 'MSSV/email hoặc mật khẩu không đúng.');
+      Alert.alert('Đăng nhập thất bại', 'Tên đăng nhập hoặc mật khẩu không đúng.');
     }
   };
 
@@ -100,18 +97,21 @@ export default function LoginScreen() {
             <View
               style={[styles.header, isKeyboardVisible && styles.headerCompact]}
             >
-              <Image
-                source={logoSource}
-                style={isKeyboardVisible ? styles.logoCompact : styles.logo}
-              />
+              <View style={isKeyboardVisible ? styles.logoCompact : styles.logo}>
+                <MaterialCommunityIcons
+                  name="map-marker-check"
+                  size={isKeyboardVisible ? 28 : 42}
+                  color={colors.primaryDark}
+                />
+              </View>
 
               <Text
                 style={[
-                  styles.university,
-                  isKeyboardVisible && styles.universityCompact,
+                  styles.brandName,
+                  isKeyboardVisible && styles.brandNameCompact,
                 ]}
               >
-                TRƯỜNG ĐẠI HỌC ĐÀ LẠT
+                GPS ATTENDANCE
               </Text>
 
               {!isKeyboardVisible && (
@@ -132,10 +132,10 @@ export default function LoginScreen() {
                 Vui lòng đăng nhập để tiếp tục
               </Text>
 
-              <Text style={styles.label}>Tài khoản (MSSV / Email)</Text>
+              <Text style={styles.label}>Tên đăng nhập</Text>
 
               <Input
-                placeholder="Nhập MSSV hoặc email"
+                placeholder="Nhập tên đăng nhập"
                 value={username}
                 onChangeText={setUsername}
                 editable={!isLoading}
@@ -291,6 +291,9 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EBF5EE',
   },
 
   logoCompact: {
@@ -298,9 +301,12 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     marginBottom: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EBF5EE',
   },
 
-  university: {
+  brandName: {
     color: colors.primaryDark,
     fontSize: 19,
     fontWeight: '800',
@@ -308,7 +314,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  universityCompact: {
+  brandNameCompact: {
     fontSize: 15,
   },
 

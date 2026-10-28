@@ -28,11 +28,9 @@ import { IAttendanceSessionRepository } from './attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
 import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
 import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto';
+import { criteriaKeyFor, rosterInitializedKeyFor } from './attendance-session-keys';
 
 const ROSTER_INIT_BUFFER_MS = 5 * 60 * 1000;
-
-const criteriaKeyFor = (sessionId: number) =>
-  `attendance:session:${sessionId}:criteria`;
 
 /** true nếu đã tới (hoặc qua) thời điểm khởi tạo roster */
 const isRosterInitDue = (session: AttendanceSession): boolean =>
@@ -70,36 +68,7 @@ export class AttendanceSessionsService {
   onModuleInit() {
     this.jobScheduler.onJob<{ sessionId: number }>(
       'attendance:init-roster',
-      async (payload) => {
-        const rawCriteria = await this.redisService.get(
-          criteriaKeyFor(payload.sessionId),
-        );
-
-        if (!rawCriteria) {
-          this.logger.warn(
-            `Init roster session ${payload.sessionId}: không tìm thấy criteria trong Redis`,
-          );
-          return;
-        }
-
-        const criteria: unknown = JSON.parse(rawCriteria);
-
-        if (!isValidUserFilterCriteria(criteria)) {
-          this.logger.warn(
-            `Init roster session ${payload.sessionId}: criteria trong Redis không hợp lệ`,
-          );
-          return;
-        }
-
-        const userIds = await this.userFilterService.resolveUserIds(criteria);
-
-        await this.attendanceRecordsService.initializeForSession(
-          payload.sessionId,
-          userIds,
-        );
-
-        await this.redisService.del(criteriaKeyFor(payload.sessionId));
-      },
+      async (payload) => this.initializeRoster(payload.sessionId),
     );
   }
 
@@ -113,16 +82,10 @@ export class AttendanceSessionsService {
     const initAt = new Date(openAt.getTime() - ROSTER_INIT_BUFFER_MS);
 
     // 2. Guards (rẻ trước, tốn I/O sau)
-    if (openAt >= closeAt) {
+    if (openAt >= closeAt || closeAt.getTime() <= Date.now()) {
       throw new BadRequestException({
         code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
         message: 'Khoảng thời gian không hợp lệ.',
-      });
-    }
-    if (initAt.getTime() <= Date.now()) {
-      throw new BadRequestException({
-        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
-        message: 'openAt phải cách hiện tại ít nhất 5 phút.',
       });
     }
     if (!isValidUserFilterCriteria(dto.participantCriteria)) {
@@ -152,12 +115,16 @@ export class AttendanceSessionsService {
       JSON.stringify(dto.participantCriteria),
     );
 
-    await this.jobScheduler.schedule(
-      'attendance:init-roster',
-      initAt,
-      { sessionId: session.id },
-      `init-roster:${session.id}`,
-    );
+    if (initAt.getTime() <= Date.now()) {
+      await this.initializeRoster(session.id);
+    } else {
+      await this.jobScheduler.schedule(
+        'attendance:init-roster',
+        initAt,
+        { sessionId: session.id },
+        `init-roster:${session.id}`,
+      );
+    }
     await this.jobScheduler.schedule(
       'attendance:flush',
       session.closeAt,
@@ -223,12 +190,6 @@ export class AttendanceSessionsService {
         message: 'Khoảng thời gian không hợp lệ.',
       });
     }
-    if (dto.openAt && !rosterLocked && initAt <= Date.now()) {
-      throw new BadRequestException({
-        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
-        message: 'openAt phải cách hiện tại ít nhất 5 phút.',
-      });
-    }
     if (dto.participantCriteria) {
       await this.userFilterService.assertTagsOwnedBy(
         dto.participantCriteria,
@@ -253,7 +214,12 @@ export class AttendanceSessionsService {
       );
     }
     if (dto.openAt && !rosterLocked) {
-      await this.reschedule('init-roster', sessionId, new Date(initAt));
+      if (initAt <= Date.now()) {
+        await this.jobScheduler.cancel(`init-roster:${sessionId}`);
+        await this.initializeRoster(sessionId);
+      } else {
+        await this.reschedule('init-roster', sessionId, new Date(initAt));
+      }
     }
     if (dto.closeAt) {
       await this.reschedule('flush', sessionId, closeAt);
@@ -307,6 +273,16 @@ export class AttendanceSessionsService {
 
     if (!isOwner(session, userId)) throw notOwnerError();
 
+    return this.getPendingCriteria(sessionId);
+  }
+
+  // Criteria chỉ tồn tại trước khi roster được khởi tạo xong.
+  async getPendingCriteria(
+    sessionId: number,
+  ): Promise<UserFilterCriteria | null> {
+    if ((await this.redisService.get(rosterInitializedKeyFor(sessionId))) === '1') {
+      return null;
+    }
     const raw = await this.redisService.get(criteriaKeyFor(sessionId));
     return raw ? (JSON.parse(raw) as UserFilterCriteria) : null;
   }
@@ -367,6 +343,47 @@ export class AttendanceSessionsService {
       { sessionId },
       jobId,
     );
+  }
+
+  private async initializeRoster(sessionId: number): Promise<void> {
+    if ((await this.redisService.get(rosterInitializedKeyFor(sessionId))) === '1') {
+      await this.redisService.del(criteriaKeyFor(sessionId));
+      await this.scheduleFlushIfClosed(sessionId);
+      return;
+    }
+    const rawCriteria = await this.redisService.get(criteriaKeyFor(sessionId));
+
+    if (!rawCriteria) {
+      throw new Error(`Init roster session ${sessionId}: không tìm thấy criteria trong Redis`);
+    }
+
+    const criteria: unknown = JSON.parse(rawCriteria);
+
+    if (!isValidUserFilterCriteria(criteria)) {
+      throw new Error(`Init roster session ${sessionId}: criteria trong Redis không hợp lệ`);
+    }
+
+    const userIds = await this.userFilterService.resolveUserIds(criteria);
+
+    await this.attendanceRecordsService.initializeForSession(
+      sessionId,
+      userIds,
+    );
+    await this.redisService.set(rosterInitializedKeyFor(sessionId), '1');
+    await this.redisService.del(criteriaKeyFor(sessionId));
+    await this.scheduleFlushIfClosed(sessionId);
+  }
+
+  private async scheduleFlushIfClosed(sessionId: number): Promise<void> {
+    const session = await this.findById(sessionId);
+    if (session.status === 'closed') {
+      await this.jobScheduler.schedule(
+        'attendance:flush',
+        new Date(),
+        { sessionId },
+        `flush:${sessionId}`,
+      );
+    }
   }
 
   private withComputedStatus(session: AttendanceSession): AttendanceSession {

@@ -12,7 +12,7 @@ import type { LoginRequest, UserProfileResponse } from '@gps-attendance/shared';
 export interface AuthContextValue {
   user: UserProfileResponse | null;
   isLoading: boolean;
-  login: (request: LoginRequest) => Promise<void>;
+  login: (request: LoginRequest, rememberMe: boolean) => Promise<void>;
   logout: () => void;
 }
 

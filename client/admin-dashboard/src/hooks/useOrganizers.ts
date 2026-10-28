@@ -1,24 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { usersApi } from '../api/users.api';
-import { toLecturerOptions } from '../utils/attendance-sessions/session-filter';
-import type { LecturerOption } from '../utils/attendance-sessions/session-filter';
+import { toOrganizerOptions } from '../utils/attendance-sessions/session-filter';
+import type { OrganizerOption } from '../utils/attendance-sessions/session-filter';
 import { toError } from '../utils/attendance-sessions/session-list';
 
 /**
- * Danh sách lecturer cho bộ lọc phiên điểm danh của admin.
+ * Danh sách organizer cho bộ lọc phiên điểm danh của admin.
  *
  * Chỉ dùng ở route admin: `GET /v0/users` do backend kiểm soát quyền; hook
- * chỉ lọc role `lecturer` phía client để đổ dropdown. Lỗi tải directory được
+ * chỉ lọc role `organizer` phía client để đổ dropdown. Lỗi tải directory được
  * giữ trong state để UI hiển thị rõ ràng kèm nút thử lại, không nuốt lỗi.
  */
-export const useLecturers = () => {
-  const [lecturerOptions, setLecturerOptions] = useState<LecturerOption[]>([]);
+export const useOrganizers = () => {
+  const [organizerOptions, setOrganizerOptions] = useState<OrganizerOption[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const loadIdRef = useRef(0);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (fresh = true) => {
     // Chặn stale response: chỉ request mới nhất được ghi state.
     const requestId = ++loadIdRef.current;
     const isActive = () => loadIdRef.current === requestId;
@@ -27,18 +29,18 @@ export const useLecturers = () => {
     setError(null);
 
     try {
-      const data: unknown = await usersApi.getAll();
+      const data: unknown = await usersApi.getAll(fresh);
 
       if (!isActive()) return;
 
-      setLecturerOptions(toLecturerOptions(data));
+      setOrganizerOptions(toOrganizerOptions(data));
     } catch (unknownError) {
       if (!isActive()) return;
 
       setError(
         toError(
           unknownError,
-          new Error('Unable to load the lecturer directory'),
+          new Error('Unable to load the organizer directory'),
         ),
       );
     } finally {
@@ -48,11 +50,11 @@ export const useLecturers = () => {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void reload();
+    void reload(false);
   }, [reload]);
 
   return {
-    lecturerOptions,
+    organizerOptions,
     isLoading,
     error,
     reload,

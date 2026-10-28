@@ -28,6 +28,6 @@ export const ATTENDANCE_STATUS_TONE_CLASS: Record<AttendanceStatus, string> = {
 /** Nhãn vai trò của participant, dùng chung key `roles.*` với profile. */
 export const PARTICIPANT_ROLE_LABEL_KEYS: Record<Role, TranslationKey> = {
   admin: 'roles.admin',
-  lecturer: 'roles.lecturer',
-  student: 'roles.student',
+  organizer: 'roles.organizer',
+  participant: 'roles.participant',
 };

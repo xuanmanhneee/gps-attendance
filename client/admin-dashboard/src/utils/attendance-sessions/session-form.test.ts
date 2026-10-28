@@ -8,7 +8,7 @@ import {
   combineLocalDateTime,
   createDefaultSessionFormValues,
   isCloseAfterOpen,
-  parseStudentCodes,
+  parseParticipantCodes,
   resolveGeolocationErrorKey,
   validateSessionForm,
   type SessionFormValues,
@@ -23,7 +23,12 @@ const VALID_VALUES: SessionFormValues = {
   openTime: '08:00',
   closeDate: '2026-09-20',
   closeTime: '10:00',
-  studentCodesText: ' SV001, SV002, SV001 , ',
+  unitInclude: [],
+  unitExclude: [],
+  tagInclude: [],
+  tagExclude: [],
+  codeIncludeText: ' SV001, SV002, SV001 , ',
+  codeExcludeText: '',
 };
 
 describe('isCloseAfterOpen', () => {
@@ -45,9 +50,9 @@ describe('isCloseAfterOpen', () => {
   });
 });
 
-describe('parseStudentCodes', () => {
+describe('parseParticipantCodes', () => {
   it('trim, bá» pháº§n rá»—ng vÃ  dedup theo thá»© tá»± xuáº¥t hiá»‡n', () => {
-    assert.deepEqual(parseStudentCodes(VALID_VALUES.studentCodesText), [
+    assert.deepEqual(parseParticipantCodes(VALID_VALUES.codeIncludeText), [
       'SV001',
       'SV002',
     ]);
@@ -65,14 +70,14 @@ describe('validateSessionForm', () => {
       title: '   ',
       latitude: Number.NaN,
       longitude: Number.NaN,
-      studentCodesText: '',
+      codeIncludeText: '',
     });
 
     assert.equal(errors.title, 'sessions.form.titleRequired');
     assert.equal(errors.latitude, 'sessions.form.latitudeRequired');
     assert.equal(errors.longitude, 'sessions.form.longitudeRequired');
     assert.equal(
-      errors.studentCodesText,
+      errors.codeIncludeText,
       'sessions.form.participantCodesRequired',
     );
   });
@@ -106,6 +111,7 @@ describe('validateSessionForm', () => {
   it('má»i error key tráº£ vá» Ä‘á»u tá»“n táº¡i trong dictionary vi vÃ  en', () => {
     const samples: SessionFormValues[] = [
       {
+        ...VALID_VALUES,
         title: '',
         latitude: Number.NaN,
         longitude: Number.NaN,
@@ -114,7 +120,7 @@ describe('validateSessionForm', () => {
         openTime: '',
         closeDate: '',
         closeTime: '',
-        studentCodesText: '',
+        codeIncludeText: '',
       },
       { ...VALID_VALUES, latitude: 91, longitude: 181, radius: 0 },
       { ...VALID_VALUES, closeTime: '07:00' },
@@ -161,22 +167,25 @@ describe('createDefaultSessionFormValues', () => {
 });
 
 describe('resolveGeolocationErrorKey', () => {
+  const geolocationError = (code: number): GeolocationPositionError =>
+    ({ code, PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }) as GeolocationPositionError;
+
   it('map mÃ£ lá»—i GeolocationPositionError sang key i18n', () => {
     assert.equal(
-      resolveGeolocationErrorKey({ code: 1 }),
-      'sessions.form.locationPermissionDenied',
+      resolveGeolocationErrorKey(geolocationError(1)),
+      'sessions.form.geolocationPermissionDenied',
     );
     assert.equal(
-      resolveGeolocationErrorKey({ code: 2 }),
-      'sessions.form.locationUnavailable',
+      resolveGeolocationErrorKey(geolocationError(2)),
+      'sessions.form.geolocationUnavailable',
     );
     assert.equal(
-      resolveGeolocationErrorKey({ code: 3 }),
-      'sessions.form.locationTimeout',
+      resolveGeolocationErrorKey(geolocationError(3)),
+      'sessions.form.geolocationTimeout',
     );
     assert.equal(
-      resolveGeolocationErrorKey(new Error('boom')),
-      'sessions.form.locationError',
+      resolveGeolocationErrorKey(geolocationError(99)),
+      'sessions.form.geolocationUnavailable',
     );
   });
 });

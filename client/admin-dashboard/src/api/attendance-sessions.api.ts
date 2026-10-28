@@ -2,6 +2,8 @@ import type {
   AttendanceSessionDetailResponse,
   AttendanceSessionResponse,
   CreateAttendanceSessionRequest,
+  UpdateAttendanceSessionRequest,
+  UserFilterCriteria,
 } from '@gps-attendance/shared';
 
 import { httpClient } from './http';
@@ -27,38 +29,59 @@ export const attendanceSessionsApi = {
     );
   },
 
-  getAll() {
-    return httpClient.get<AttendanceSessionResponse[]>(
-      '/v0/attendance-sessions',
-    );
+  getAll(fresh = false) {
+    return (fresh ? httpClient.getFresh : httpClient.get)<
+      AttendanceSessionResponse[]
+    >('/v0/attendance-sessions');
   },
 
-  /** Chỉ dùng cho page lecturer: endpoint backend yêu cầu role lecturer. */
-  getCreatedByMe() {
-    return httpClient.get<AttendanceSessionResponse[]>(
-      '/v0/attendance-sessions/created-by-me',
-    );
+  /** Chỉ dùng cho page organizer: endpoint backend yêu cầu role organizer. */
+  getCreatedByMe(fresh = false) {
+    return (fresh ? httpClient.getFresh : httpClient.get)<
+      AttendanceSessionResponse[]
+    >('/v0/attendance-sessions/created-by-me');
   },
 
   /**
-   * Lọc session theo lecturer cho admin.
+   * Lọc session theo organizer cho admin.
    *
-   * Chỉ dùng khi UI admin cần lọc theo lecturer vì endpoint backend yêu cầu
+   * Chỉ dùng khi UI admin cần lọc theo organizer vì endpoint backend yêu cầu
    * role admin (`GET /created-by?userId=...`).
    */
-  getCreatedBy(userId: number) {
+  getCreatedBy(userId: number, fresh = false) {
     if (!Number.isInteger(userId) || userId <= 0) {
-      throw new Error('Invalid lecturer user id');
+      throw new Error('Invalid organizer user id');
     }
 
-    return httpClient.get<AttendanceSessionResponse[]>(
-      `/v0/attendance-sessions/created-by?userId=${userId}`,
+    return (fresh ? httpClient.getFresh : httpClient.get)<
+      AttendanceSessionResponse[]
+    >(`/v0/attendance-sessions/created-by?userId=${userId}`);
+  },
+
+  getDetail(id: number, fresh = false) {
+    return (
+      fresh ? httpClient.getFresh : httpClient.get
+    )<AttendanceSessionDetailResponse>(
+      `/v0/attendance-sessions/${assertSessionId(id)}`,
     );
   },
 
-  getDetail(id: number) {
-    return httpClient.get<AttendanceSessionDetailResponse>(
+  update(id: number, request: UpdateAttendanceSessionRequest) {
+    return httpClient.patch<AttendanceSessionResponse>(
       `/v0/attendance-sessions/${assertSessionId(id)}`,
+      request,
+    );
+  },
+
+  cancel(id: number) {
+    return httpClient.patch<AttendanceSessionResponse>(
+      `/v0/attendance-sessions/${assertSessionId(id)}/cancel`,
+    );
+  },
+
+  getCriteria(id: number) {
+    return httpClient.get<{ criteria: UserFilterCriteria | null }>(
+      `/v0/attendance-sessions/${assertSessionId(id)}/criteria`,
     );
   },
 };

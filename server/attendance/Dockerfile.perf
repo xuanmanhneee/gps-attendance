@@ -1,0 +1,22 @@
+FROM node:24-bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.json ./
+COPY packages/shared ./packages/shared
+COPY server/attendance ./server/attendance
+
+RUN DATABASE_URL=postgresql://perf:perf@localhost:5432/perf \
+    pnpm install --frozen-lockfile --filter @gps-attendance/attendance...
+RUN pnpm build:attendance
+
+WORKDIR /app/server/attendance
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["node", "dist/main.js"]

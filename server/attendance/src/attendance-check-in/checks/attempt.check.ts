@@ -5,7 +5,8 @@ import { IAttendanceCheckInAttemptRepository } from '../repositories/attendance-
 
 @Injectable()
 export class AttemptCheck {
-  private readonly MAX_ATTEMPTS = 3;
+  private readonly MAX_ATTEMPTS_PER_WINDOW = 3;
+  private readonly ATTEMPT_WINDOW_SECONDS = 2 * 60;
 
   constructor(
     @Inject(ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY)
@@ -16,13 +17,15 @@ export class AttemptCheck {
     sessionId: number;
     userId: number;
   }): Promise<{ isTooMany: boolean }> {
-    const count = await this.attemptRepository.incrementAttempt(
+    const accepted = await this.attemptRepository.tryRecordAttempt(
       input.sessionId,
       input.userId,
+      this.MAX_ATTEMPTS_PER_WINDOW,
+      this.ATTEMPT_WINDOW_SECONDS,
     );
 
     return {
-      isTooMany: count > this.MAX_ATTEMPTS,
+      isTooMany: !accepted,
     };
   }
 }
