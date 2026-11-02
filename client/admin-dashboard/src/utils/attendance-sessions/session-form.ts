@@ -91,7 +91,7 @@ export const createDefaultSessionFormValues = (
 export const parseParticipantCodes = (raw: string): string[] => {
   const seen = new Set<string>();
 
-  for (const part of raw.split(/[,\n\r]+/)) {
+  for (const part of raw.split(/[,;\s]+/)) {
     const code = part.trim();
     if (code) seen.add(code);
   }

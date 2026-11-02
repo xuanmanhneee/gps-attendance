@@ -213,6 +213,9 @@ export const en: Record<TranslationKey, string> = {
     'Configure GPS range, time and applicable participants',
   'sessions.form.close': 'Close the create-session dialog',
   'sessions.form.locationSection': 'GPS coordinates & radius',
+  'sessions.form.locationHelp':
+    'Enter coordinates directly or use your current location, then fine-tune them on the map.',
+  'sessions.form.locationReady': 'Location ready',
   'sessions.form.openDate': 'Open date',
   'sessions.form.openClock': 'Open time of day',
   'sessions.form.closeDate': 'Close date',
@@ -240,7 +243,7 @@ export const en: Record<TranslationKey, string> = {
   'sessions.form.participantCodes': 'Allowed participant codes',
   'sessions.form.participantCodesHint': 'Separate codes with commas',
   'sessions.form.participantCodesRequired':
-    'Please enter at least one participant code.',
+    'Please select at least one participant criterion.',
   'sessions.form.participantCodesValid': '{count} valid codes',
   'sessions.form.useCurrentLocation': 'Use current location',
   'sessions.form.locationSuccess': 'Current coordinates captured successfully.',
@@ -268,11 +271,19 @@ export const en: Record<TranslationKey, string> = {
   'sessions.form.locationMode.manual': 'Enter coordinates',
   'sessions.form.locating': 'Locating your current position...',
   'sessions.form.mapNeedsCoordinates':
-    'No coordinates yet so the map cannot be shown. Use "Use current location" or switch to manual entry.',
+    'Enter valid coordinates and a radius, or use your current location before opening the map.',
   'sessions.form.mapHint':
     'Drag the blue dot to move the center, drag the dot on the circle edge to resize the radius.',
   'sessions.form.participantsStepNote':
-    'This step currently takes participant codes by hand; unit selection will be added later.',
+    'Select by unit, tag or code. Include and exclude rules can be combined.',
+  'sessions.form.participantHeading': 'Who can check in?',
+  'sessions.form.editDetails': 'Edit session details',
+  'sessions.form.draftSummary': 'Session summary',
+  'sessions.form.draftSummaryHint': 'Updates as you type',
+  'sessions.form.participantsNextHint':
+    'Next, choose participants by unit, tag or individual code.',
+  'sessions.form.notSet': 'Not set',
+  'sessions.form.untitled': 'Untitled session',
 
   'sessions.form.pickLocationTitle': 'Pick location on map',
   'sessions.form.confirmLocation': 'Confirm',
