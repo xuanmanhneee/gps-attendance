@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { AttendanceSessionsService } from './attendance-sessions.service';
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
 import { UsersService } from '../users/users.service';
@@ -9,8 +9,10 @@ import { User } from '../users/user.model';
 import {
   AttendanceSessionResponse,
   AttendanceSessionDetailResponse,
+  AttendanceSessionErrorCode,
   MyAttendanceSessionResponse,
 } from '@gps-attendance/shared';
+import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 
 @Injectable()
 export class AttendanceSessionQueryService {
@@ -21,8 +23,18 @@ export class AttendanceSessionQueryService {
     private readonly userFilterService: UserFilterService,
   ) {}
 
-  async getDetail(sessionId: number): Promise<AttendanceSessionDetailResponse> {
+  async getDetail(
+    sessionId: number,
+    viewer: AuthenticatedUser,
+  ): Promise<AttendanceSessionDetailResponse> {
     const session = await this.attendanceSessionsService.findById(sessionId);
+
+    if (viewer.role === 'organizer' && session.createdBy !== viewer.userId) {
+      throw new ForbiddenException({
+        code: AttendanceSessionErrorCode.FORBIDDEN,
+        message: 'Organizer không có quyền xem phiên của người khác',
+      });
+    }
 
     const criteria =
       await this.attendanceSessionsService.getPendingCriteria(sessionId);

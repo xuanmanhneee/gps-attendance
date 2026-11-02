@@ -71,7 +71,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'navigation.attendanceRecords',
     descriptionKey: 'pages.attendanceRecords.description',
     path: ROUTE_PATHS.attendanceRecords,
-    roles: ['organizer'],
+    roles: ['admin', 'organizer'],
   },
   {
     id: 'statistics',

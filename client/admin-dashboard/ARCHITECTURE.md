@@ -33,7 +33,7 @@ package — nơi ghi các quyết định gần nhất như wizard `/sessions/ne
 | Icon | `react-icons` (Material `md`, `io5`, `ri`, `fa6`) |
 | HTTP | `createHttpClient` từ `@gps-attendance/shared`; Vite alias `@gps-attendance/shared` → `packages/shared/src` (dùng source trực tiếp, không build package) |
 | i18n | Tự viết trong `src/i18n`: 2 locale `vi`/`en`, mỗi dictionary 276 key; `TranslationKey` suy ra từ dictionary `vi` nên sai key bị bắt lúc compile |
-| Test | `node --test --experimental-strip-types "src/**/*.test.ts"`: 13 file, 105 test case, 39 suite, không cần thư viện test nào thêm |
+| Test | `node --test --experimental-strip-types "src/**/*.test.ts"`: 16 file, 115 test case, 42 suite, không cần thư viện test nào thêm |
 | Biến môi trường | `VITE_API_BASE_URL` (ví dụ: `http://localhost:3000`) — không có proxy dev, không có biến khác |
 | Script | `dev`, `build` (`tsc -b && vite build`), `test`, `clean` |
 | HTML shell | `index.html` — `lang="vi"`, title "GPS Attendance — Dashboard", favicon `/favicon.svg` |
@@ -129,7 +129,7 @@ Chi tiết route (đường dẫn → element → guard):
 | `/` | `LandingRedirect` | redirect `/dashboard` nếu đã login, ngược lại `/login` |
 | `/dashboard` | `DashboardPage` → `AdminOverview` / `OrganizerOverview` | `ProtectedRoute` + layout |
 | `/users`, `/units`, `/tags` | `UsersPage` (placeholder), `UnitsPage`, `TagsPage` | `RoleGuard ['admin']` |
-| `/sessions`, `/attendance-records`, `/statistics` | `SessionsPage`, `AttendanceRecordsPage` (placeholder), `StatisticsPage` (placeholder) | `RoleGuard ['admin','organizer']` |
+| `/sessions`, `/attendance-records`, `/statistics` | `SessionsPage`, `AttendanceRecordsPage`, `StatisticsPage` (placeholder) | `RoleGuard ['admin','organizer']` |
 | `/sessions/new` | `SessionCreatePage` | `RoleGuard ['organizer']` |
 | `/sessions/:id` | `SessionDetailPage` | `RoleGuard ['admin','organizer']` |
 | `*` | `NotFoundPage` | trong layout |
@@ -204,7 +204,8 @@ Nhóm này là "hợp đồng hình thức" của dashboard: chỉ nhận props 
 | Chi tiết phiên | `pages/SessionDetailPage.tsx` | Parse `:id` bằng `parseSessionId`, guard shape `isAttendanceSessionDetail`; phân biệt lỗi id sai (`errorKey = sessionDetail.invalidId`) với lỗi API; refresh danh sách participant riêng (`isRefreshing`/`hasRefreshError`) không phá dữ liệu đang xem; link Google Maps theo toạ độ; `backPath` phụ thuộc role (organizer → `/sessions`, admin → `/dashboard` vì admin không có mục menu phiên) |
 | Đăng nhập | `pages/LoginPage.tsx` | `react-hook-form` + `toast`; map `AuthErrorCode` sang message tiếng Việt hard-code. Đây là page **lệch khỏi design system** (xem mức P1 ở mục 8) |
 | Page giữ chỗ | `pages/PlaceholderPage.tsx` | Đọc `findNavigationItem(pathname)` để lấy tiêu đề/mô tả nên label chỉ khai báo một chỗ; nội dung là `DataState` variant `unavailable` ("sắp có") — không giả lập dữ liệu backend |
-| Wrapper giữ chỗ | `pages/UsersPage.tsx`, `pages/AttendanceRecordsPage.tsx`, `pages/StatisticsPage.tsx` | Mỗi file 1 dòng `return <PlaceholderPage />`, chỉ để route + menu không trỏ vào chỗ chết |
+| Wrapper giữ chỗ | `pages/UsersPage.tsx`, `pages/StatisticsPage.tsx` | Mỗi file 1 dòng `return <PlaceholderPage />`, chỉ để route + menu không trỏ vào chỗ chết |
+| Bản ghi điểm danh | `pages/AttendanceRecordsPage.tsx` | Chọn phiên theo role, tải detail có race guard, tổng hợp trạng thái, tìm theo tên/mã và lọc trạng thái; bảng nằm ở `components/attendance-records/AttendanceRecordsTable.tsx` |
 | Nối Units | `pages/UnitsPage.tsx` | `useUnits()` → `<UnitsPanel unitsState={...} />` |
 | Nối Tags | `pages/TagsPage.tsx` | `useTags()` + `useTagAssignment()` → `<TagsPanel ... onToastSuccess={(m) => toast.success(m)} />` (page là nơi duy nhất biết tới toast) |
 | Trang thông báo | `pages/MessagePage.tsx` | Một thông báo (empty/error/unavailable) + một hành động thoát ra; tái sử dụng `DataState` |
@@ -391,7 +392,7 @@ state riêng, không lưu localStorage, nên không thể tồn tại "role gi�
 | `/units` | `admin` | `['admin']` | khớp |
 | `/tags` | `admin` | `['admin']` | khớp |
 | `/sessions` | **`organizer`** | `['admin','organizer']` | admin vào được bằng URL nhưng **không có mục menu** ⇒ `AdminSessionsView` (bộ lọc theo organizer) không thể mở từ UI |
-| `/attendance-records` | **`organizer`** | `['admin','organizer']` | admin vào được bằng URL nhưng không có mục menu |
+| `/attendance-records` | `admin`, `organizer` | `['admin','organizer']` | khớp; organizer chỉ đọc phiên do mình tạo (backend kiểm tra ownership) |
 | `/statistics` | **`organizer`** | `['admin','organizer']` | như trên |
 | `/sessions/new` | không có mục menu (đi từ CTA "Tạo phiên") | `['organizer']` | khớp |
 | `/sessions/:id` | không có mục menu (đi từ bảng phiên) | `['admin','organizer']` | khớp |
@@ -406,8 +407,8 @@ không còn đúng. Chi tiết và đề xuất ở mục 8 (P1).
 
 Mọi quy tắc nghiệp vụ phức tạp nằm trong `utils/` hoặc file `*.utils.ts`, không import React, nên test
 được bằng `node:test` + `--experimental-strip-types` (không cần jsdom, không cần thư viện test).
-13 file test / 105 test case hiện có phủ: form tạo phiên, bộ lọc phiên, trạng thái danh sách, tag,
-pending assignment, request scope, focus trap, shape guard của type, config trạng thái.
+16 file test / 115 test case hiện có phủ: form tạo phiên, bộ lọc phiên, trạng thái danh sách, bản ghi
+điểm danh, tag, pending assignment, request scope, focus trap, shape guard của type, config trạng thái.
 
 Ví dụ điển hình: `resolveTabTrapIndex` (focus trap) và `resolveSessionListState` (chọn state hiển thị)
 đều là hàm thuần — component chỉ gọi, không tự suy luận.
@@ -470,7 +471,7 @@ bằng cách truyền state giả. `onToastSuccess` cũng là callback từ page
 1. **Ranh giới tầng rõ và nhất quán.** Luồng phụ thuộc một chiều `pages → components/hooks → api → shared`
    (mục 2) được tuân thủ trên toàn package: không page nào import chéo page khác ngoài `MessagePage`
    (một component trình bày thuần), không `api/` nào import React, không component nào tự gọi API.
-2. **Logic nghiệp vụ tách khỏi React.** Nhờ `utils/**` và `*.utils.ts` thuần, 105 test case chạy bằng
+2. **Logic nghiệp vụ tách khỏi React.** Nhờ `utils/**` và `*.utils.ts` thuần, 115 test case chạy bằng
    `node:test` trong ~0,4 giây, không cần jsdom/jest/vitest. Đây là lựa chọn rất hợp đồ án: chi phí thấp,
    phản hồi nhanh, ép logic phải "thuần".
 3. **i18n chặt ở mức kiểu.** `TranslationKey = keyof typeof vi` khiến mọi `t('...')` sai key bị lỗi
@@ -516,12 +517,12 @@ bằng cách truyền state giả. `onToastSuccess` cũng là callback từ page
 
 Bằng chứng (đã kiểm tra bằng tìm kiếm trong `src/`):
 
-- `config/navigation.ts` khai `/sessions`, `/attendance-records`, `/statistics` là `['organizer']`, trong khi
-  `AppRoutes.tsx` cho cả `admin` và `organizer` vào ba route này.
+- `config/navigation.ts` vẫn khai `/sessions`, `/statistics` là `['organizer']`, trong khi
+  `AppRoutes.tsx` cho cả `admin` và `organizer` vào hai route này. `/attendance-records` đã dùng chung
+  `['admin','organizer']` ở menu và route.
 - Hệ quả 1: `SessionsPage.AdminSessionsView` (bộ lọc theo organizer) **không thể mở từ menu** vì admin
   không có mục "Phiên điểm danh"; muốn dùng phải gõ URL `/sessions`.
-- Hệ quả 2: `/attendance-records` và `/statistics` hiện `PlaceholderPage` cho admin qua URL, nhưng admin
-  không biết là có trang đó.
+- Hệ quả 2: `/statistics` hiện `PlaceholderPage` cho admin qua URL, nhưng admin không biết là có trang đó.
 - Hệ quả 3: `isPathAllowedForRole` và `isKnownPath` trong `config/navigation.ts` **không có nơi nào dùng**
   (dead code) trong khi chúng chính là thứ sẽ gom hai nguồn quyền về một chỗ.
 - Comment trong `config/navigation.ts` ("`path` đồng thời là route được phép truy cập, nên menu và route
@@ -582,7 +583,7 @@ một kiểu: `createLoadTracker`, `loadIdRef`, `scopeKeyRef`, `createRequestSco
 
 **P2.3 Test chỉ phủ tầng logic thuần (0 component test).**
 
-- 105 test case đều ở `utils/`, `types/`, `config/`, `*.utils.ts` — không có test cho component/page.
+- 115 test case đều ở `utils/`, `types/`, `config/`, `*.utils.ts` — không có test cho component/page.
   Đây là **đánh đổi có chủ đích** (không cần jsdom) và phù hợp đồ án, nhưng nghĩa là các quy tắc chỉ tồn
   tại trong JSX (disable control khi pending, thứ tự focus, banner stale, wizard step) không được
   kiểm chứng tự động.
@@ -639,9 +640,9 @@ một kiểu: `createLoadTracker`, `loadIdRef`, `scopeKeyRef`, `createRequestSco
 
 ### 9.4 Phần nghiệp vụ còn thiếu (đang là placeholder)
 
-`/users` (quản lý người dùng), `/attendance-records` (bản ghi điểm danh) và `/statistics` (thống kê) hiện
-chỉ render `PlaceholderPage`. Cả ba đều đang chờ API phía `server/attendance`; khi làm, giữ nguyên khuôn
-đã có: `api/*.api.ts` + hook có race guard + component domain nhận state qua props + Panel/`DataState`.
+`/users` (quản lý người dùng) và `/statistics` (thống kê) hiện chỉ render `PlaceholderPage`.
+`/attendance-records` đã hoàn chỉnh luồng đọc bằng API detail phiên có sẵn, hook có race guard,
+logic lọc/tổng hợp thuần và component bảng nhận state qua props.
 
 ### 9.5 Tài liệu liên quan
 

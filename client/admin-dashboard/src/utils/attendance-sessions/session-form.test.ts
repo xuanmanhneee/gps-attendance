@@ -33,15 +33,24 @@ const VALID_VALUES: SessionFormValues = {
 
 describe('isCloseAfterOpen', () => {
   it('cháº¥p nháº­n khi closeAt sau openAt', () => {
-    assert.equal(isCloseAfterOpen('2026-09-20T08:00', '2026-09-20T08:01'), true);
+    assert.equal(
+      isCloseAfterOpen('2026-09-20T08:00', '2026-09-20T08:01'),
+      true,
+    );
   });
 
   it('tá»« chá»‘i khi closeAt báº±ng openAt', () => {
-    assert.equal(isCloseAfterOpen('2026-09-20T08:00', '2026-09-20T08:00'), false);
+    assert.equal(
+      isCloseAfterOpen('2026-09-20T08:00', '2026-09-20T08:00'),
+      false,
+    );
   });
 
   it('tá»« chá»‘i khi closeAt trÆ°á»›c openAt', () => {
-    assert.equal(isCloseAfterOpen('2026-09-20T08:00', '2026-09-20T07:00'), false);
+    assert.equal(
+      isCloseAfterOpen('2026-09-20T08:00', '2026-09-20T07:00'),
+      false,
+    );
   });
 
   it('tá»« chá»‘i khi thiáº¿u má»™t trong hai thá»i Ä‘iá»ƒm', () => {
@@ -55,6 +64,15 @@ describe('parseParticipantCodes', () => {
     assert.deepEqual(parseParticipantCodes(VALID_VALUES.codeIncludeText), [
       'SV001',
       'SV002',
+    ]);
+  });
+
+  it('chấp nhận cùng các dấu phân cách được hướng dẫn trên giao diện', () => {
+    assert.deepEqual(parseParticipantCodes('SV001; SV002\nSV003\tSV004'), [
+      'SV001',
+      'SV002',
+      'SV003',
+      'SV004',
     ]);
   });
 });
@@ -168,7 +186,12 @@ describe('createDefaultSessionFormValues', () => {
 
 describe('resolveGeolocationErrorKey', () => {
   const geolocationError = (code: number): GeolocationPositionError =>
-    ({ code, PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }) as GeolocationPositionError;
+    ({
+      code,
+      PERMISSION_DENIED: 1,
+      POSITION_UNAVAILABLE: 2,
+      TIMEOUT: 3,
+    }) as GeolocationPositionError;
 
   it('map mÃ£ lá»—i GeolocationPositionError sang key i18n', () => {
     assert.equal(
@@ -192,9 +215,11 @@ describe('resolveGeolocationErrorKey', () => {
 
 describe('combineLocalDateTime', () => {
   it('ghÃ©p ngÃ y + giá» vÃ  tráº£ rá»—ng khi thiáº¿u má»™t pháº§n', () => {
-    assert.equal(combineLocalDateTime('2026-09-20', '08:00'), '2026-09-20T08:00');
+    assert.equal(
+      combineLocalDateTime('2026-09-20', '08:00'),
+      '2026-09-20T08:00',
+    );
     assert.equal(combineLocalDateTime('', '08:00'), '');
     assert.equal(combineLocalDateTime('2026-09-20', ''), '');
   });
 });
-

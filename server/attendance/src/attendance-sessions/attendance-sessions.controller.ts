@@ -25,6 +25,7 @@ import {
 import { AttendanceSessionQueryService } from './attendance-session-query.service';
 import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto';
 import { UserFilterCriteria } from '@gps-attendance/shared'; // gộp vào import @gps-attendance/shared có sẵn
+import type { AuthenticatedUser } from '../auth/types/authenticated-user.type';
 
 @ApiTags('attendance-sessions')
 @ApiBearerAuth()
@@ -141,8 +142,9 @@ export class AttendanceSessionsController {
   @Get(':id')
   async getDetail(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<AttendanceSessionDetailResponse> {
-    return this.attendanceSessionQueryService.getDetail(id);
+    return this.attendanceSessionQueryService.getDetail(id, user);
   }
 
   @ApiOperation({

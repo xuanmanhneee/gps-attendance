@@ -90,7 +90,7 @@ const AppRoutes = () => (
           />
         </Route>
 
-        {/* Chi tiết phiên: cả admin và organizer đều được xem (backend chỉ yêu cầu đăng nhập). */}
+        {/* Chi tiết phiên: admin xem mọi phiên; organizer chỉ xem phiên do mình tạo. */}
         <Route element={<RoleGuard allowedRoles={['admin', 'organizer']} />}>
           <Route
             path={ROUTE_PATHS.attendanceSessionDetail}

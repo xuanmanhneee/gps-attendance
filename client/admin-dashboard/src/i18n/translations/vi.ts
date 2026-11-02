@@ -38,6 +38,7 @@ export const vi = {
   'common.emptyTitle': 'Chưa có dữ liệu',
   'common.errorTitle': 'Không thể tải dữ liệu',
   'common.retry': 'Thử lại',
+  'common.refresh': 'Làm mới',
   'common.dataUnavailable': 'Chưa có nguồn dữ liệu',
   'common.dataUnavailableHint':
     'API cho chỉ số này chưa có trong dashboard nên hệ thống không hiển thị số liệu ước lượng.',
@@ -88,7 +89,8 @@ export const vi = {
   'dashboard.recentSessionsTitle': 'Phiên điểm danh gần đây',
   'dashboard.recentSessionsSubtitle.admin':
     'Các phiên mới nhất đang có trên hệ thống',
-  'dashboard.recentSessionsSubtitle.organizer': 'Các phiên bạn tạo gần đây nhất',
+  'dashboard.recentSessionsSubtitle.organizer':
+    'Các phiên bạn tạo gần đây nhất',
   'dashboard.mySessionsTitle': 'Phiên điểm danh của tôi',
   'dashboard.attendanceRateTitle': 'Tỷ lệ có mặt',
   'dashboard.attendanceRateSubtitle': '7 ngày gần nhất',
@@ -118,6 +120,29 @@ export const vi = {
     'Tra cứu chi tiết từng lượt điểm danh của người tham gia.',
   'pages.statistics.description':
     'Báo cáo tỷ lệ có mặt và xu hướng điểm danh theo thời gian.',
+  // ---- Bản ghi điểm danh ----
+  'attendanceRecords.title': 'Tra cứu bản ghi điểm danh',
+  'attendanceRecords.description':
+    'Chọn một phiên để xem trạng thái điểm danh của từng người tham gia.',
+  'attendanceRecords.selectedSession': 'Đang xem: {title}',
+  'attendanceRecords.loadingSessions': 'Đang tải danh sách phiên điểm danh...',
+  'attendanceRecords.emptySessions': 'Chưa có phiên điểm danh nào để tra cứu.',
+  'attendanceRecords.session': 'Phiên điểm danh',
+  'attendanceRecords.search': 'Tìm người tham gia',
+  'attendanceRecords.searchPlaceholder': 'Nhập tên hoặc mã người tham gia',
+  'attendanceRecords.status': 'Trạng thái',
+  'attendanceRecords.allStatuses': 'Tất cả trạng thái',
+  'attendanceRecords.loading': 'Đang tải bản ghi điểm danh...',
+  'attendanceRecords.rosterPending':
+    'Danh sách điểm danh chưa được khởi tạo. Dữ liệu sẽ xuất hiện khi phiên sắp mở.',
+  'attendanceRecords.total': 'Tổng số',
+  'attendanceRecords.empty': 'Phiên này chưa có bản ghi điểm danh.',
+  'attendanceRecords.noMatches':
+    'Không có bản ghi nào khớp với bộ lọc hiện tại.',
+  'attendanceRecords.code': 'Mã',
+  'attendanceRecords.participant': 'Người tham gia',
+  'attendanceRecords.checkedInAt': 'Thời gian điểm danh',
+  'attendanceRecords.updatedAt': 'Cập nhật gần nhất',
   // ---- Phiên điểm danh ----
   'sessions.page.description':
     'Quản lý các phiên điểm danh GPS do bạn tạo và theo dõi trạng thái.',
@@ -187,6 +212,9 @@ export const vi = {
     'Cấu hình phạm vi GPS, thời gian và danh sách người tham gia',
   'sessions.form.close': 'Đóng cửa sổ tạo phiên',
   'sessions.form.locationSection': 'Toạ độ GPS & bán kính',
+  'sessions.form.locationHelp':
+    'Nhập trực tiếp hoặc dùng vị trí hiện tại, sau đó tinh chỉnh trên bản đồ.',
+  'sessions.form.locationReady': 'Đã có vị trí',
   'sessions.form.openDate': 'Ngày mở',
   'sessions.form.openClock': 'Giờ mở',
   'sessions.form.closeDate': 'Ngày đóng',
@@ -215,7 +243,7 @@ export const vi = {
   'sessions.form.participantCodes': 'Mã người được phép tham gia',
   'sessions.form.participantCodesHint': 'Phân cách các mã bằng dấu phẩy',
   'sessions.form.participantCodesRequired':
-    'Vui lòng nhập ít nhất một mã người tham gia.',
+    'Vui lòng chọn ít nhất một điều kiện người tham gia.',
   'sessions.form.participantCodesValid': '{count} mã hợp lệ',
   'sessions.form.useCurrentLocation': 'Lấy vị trí hiện tại',
   'sessions.form.locationSuccess': 'Đã lấy toạ độ hiện tại thành công.',
@@ -243,11 +271,19 @@ export const vi = {
   'sessions.form.locationMode.manual': 'Nhập toạ độ',
   'sessions.form.locating': 'Đang xác định vị trí hiện tại...',
   'sessions.form.mapNeedsCoordinates':
-    'Chưa có toạ độ nên chưa hiển thị được bản đồ. Bấm "Lấy vị trí hiện tại" hoặc chuyển sang nhập toạ độ.',
+    'Hãy nhập toạ độ và bán kính hợp lệ hoặc bấm "Lấy vị trí hiện tại" trước khi mở bản đồ.',
   'sessions.form.mapHint':
     'Kéo điểm xanh để đổi tâm, kéo điểm ở rìa vòng tròn để đổi bán kính.',
   'sessions.form.participantsStepNote':
-    'Bước này tạm thời nhập mã người tham gia bằng tay; phần chọn theo đơn vị sẽ bổ sung sau.',
+    'Chọn theo đơn vị, tag hoặc mã. Có thể kết hợp điều kiện bao gồm và loại trừ.',
+  'sessions.form.participantHeading': 'Ai được phép điểm danh?',
+  'sessions.form.editDetails': 'Sửa thông tin phiên',
+  'sessions.form.draftSummary': 'Tóm tắt phiên',
+  'sessions.form.draftSummaryHint': 'Cập nhật theo dữ liệu đang nhập',
+  'sessions.form.participantsNextHint':
+    'Ở bước tiếp theo, bạn sẽ chọn người tham gia theo đơn vị, tag hoặc mã.',
+  'sessions.form.notSet': 'Chưa thiết lập',
+  'sessions.form.untitled': 'Phiên chưa đặt tên',
 
   'sessions.form.pickLocationTitle': 'Chọn vị trí trên bản đồ',
   'sessions.form.confirmLocation': 'Xác nhận',

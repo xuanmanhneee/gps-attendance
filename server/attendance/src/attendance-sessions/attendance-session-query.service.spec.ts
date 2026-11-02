@@ -25,6 +25,11 @@ const user = {
 };
 
 describe('AttendanceSessionQueryService.getDetail', () => {
+  const organizer = {
+    userId: session.createdBy,
+    username: 'organizer',
+    role: 'organizer' as const,
+  };
   const sessions = {
     findById: jest.fn(),
     getPendingCriteria: jest.fn(),
@@ -51,7 +56,7 @@ describe('AttendanceSessionQueryService.getDetail', () => {
     sessions.getPendingCriteria.mockResolvedValue(criteria);
     userFilter.resolveUserIds.mockResolvedValue([user.id]);
 
-    const detail = await service.getDetail(session.id);
+    const detail = await service.getDetail(session.id, organizer);
 
     expect(userFilter.resolveUserIds).toHaveBeenCalledWith(criteria);
     expect(users.findByIds).toHaveBeenCalledWith([user.id]);
@@ -69,7 +74,7 @@ describe('AttendanceSessionQueryService.getDetail', () => {
     userFilter.resolveUserIds.mockResolvedValue([]);
     users.findByIds.mockResolvedValue([]);
 
-    const detail = await service.getDetail(session.id);
+    const detail = await service.getDetail(session.id, organizer);
 
     expect(detail.plannedParticipants).toEqual([]);
     expect(detail.participants).toEqual([]);
@@ -87,7 +92,7 @@ describe('AttendanceSessionQueryService.getDetail', () => {
       },
     ]);
 
-    const detail = await service.getDetail(session.id);
+    const detail = await service.getDetail(session.id, organizer);
 
     expect(userFilter.resolveUserIds).not.toHaveBeenCalled();
     expect(detail.plannedParticipants).toBeNull();
@@ -104,5 +109,33 @@ describe('AttendanceSessionQueryService.getDetail', () => {
         updatedAt: '2026-10-24T08:55:00.000Z',
       },
     ]);
+  });
+
+  it('không cho organizer xem record của phiên do người khác tạo', async () => {
+    await expect(
+      service.getDetail(session.id, {
+        userId: 999,
+        username: 'other-organizer',
+        role: 'organizer',
+      }),
+    ).rejects.toMatchObject({
+      response: { code: 'ATTENDANCE_SESSION_FORBIDDEN' },
+    });
+
+    expect(records.findBySessionId).not.toHaveBeenCalled();
+  });
+
+  it('cho phép admin xem record của mọi phiên', async () => {
+    sessions.getPendingCriteria.mockResolvedValue(null);
+    records.findBySessionId.mockResolvedValue([]);
+    users.findByIds.mockResolvedValue([]);
+
+    await expect(
+      service.getDetail(session.id, {
+        userId: 999,
+        username: 'admin',
+        role: 'admin',
+      }),
+    ).resolves.toMatchObject({ id: session.id, participants: [] });
   });
 });
