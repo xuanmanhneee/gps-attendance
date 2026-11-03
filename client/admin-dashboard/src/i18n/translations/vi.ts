@@ -197,6 +197,7 @@ export const vi = {
   'sessions.error.criteriaLocked':
     'Danh sách người tham gia đã được khởi tạo, không thể sửa tiêu chí.',
   'sessions.updateError': 'Không thể cập nhật phiên điểm danh.',
+  'sessions.updateSuccess': 'Đã cập nhật phiên điểm danh.',
   'sessions.cancelError': 'Không thể huỷ phiên điểm danh.',
 
   'sessions.card.edit': 'Sửa',
@@ -204,6 +205,23 @@ export const vi = {
   'sessions.card.cancelling': 'Đang huỷ...',
   'sessions.card.cancelConfirm': 'Huỷ phiên này? Phiên sẽ không thể mở lại.',
   'sessions.cancelSuccess': 'Đã huỷ phiên',
+
+  // ---- Sửa phiên ----
+  'sessions.edit.heading': 'Sửa phiên điểm danh',
+  'sessions.edit.description':
+    'Cập nhật thông tin phiên trong phạm vi trạng thái hiện tại cho phép',
+  'sessions.edit.loading': 'Đang tải dữ liệu phiên để chỉnh sửa...',
+  'sessions.edit.submit': 'Lưu thay đổi',
+  'sessions.edit.submitting': 'Đang lưu...',
+  'sessions.edit.timeHelp':
+    'Thời gian đóng phải sau thời gian mở và chưa xảy ra.',
+  'sessions.edit.openLockedTitle': 'Phiên đang mở',
+  'sessions.edit.openLockedDescription':
+    'Tên, giờ mở và vị trí đã được khóa. Bạn chỉ có thể điều chỉnh giờ đóng.',
+  'sessions.edit.participantsUnchanged':
+    'Tiêu chí và danh sách người tham gia được giữ nguyên trong lần cập nhật này.',
+  'sessions.edit.unavailableTitle': 'Không thể sửa phiên này',
+  'sessions.edit.backToDetail': 'Quay lại chi tiết phiên',
 
   // ---- Form tạo phiên ----
   'sessions.form.title': 'Tên phiên',

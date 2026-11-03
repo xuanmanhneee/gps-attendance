@@ -204,7 +204,25 @@ export const en: Record<TranslationKey, string> = {
   'sessions.error.criteriaLocked':
     'The participant list has already been generated, so the criteria can no longer be changed.',
   'sessions.updateError': 'Could not update the attendance session.',
+  'sessions.updateSuccess': 'Attendance session updated.',
   'sessions.cancelError': 'Could not cancel the attendance session.',
+
+  // ---- Edit session ----
+  'sessions.edit.heading': 'Edit attendance session',
+  'sessions.edit.description':
+    'Update the session fields allowed by its current status',
+  'sessions.edit.loading': 'Loading the session for editing...',
+  'sessions.edit.submit': 'Save changes',
+  'sessions.edit.submitting': 'Saving...',
+  'sessions.edit.timeHelp':
+    'The closing time must be after the opening time and still in the future.',
+  'sessions.edit.openLockedTitle': 'This session is open',
+  'sessions.edit.openLockedDescription':
+    'The title, opening time and location are locked. Only the closing time can be changed.',
+  'sessions.edit.participantsUnchanged':
+    'Participant criteria and the participant list remain unchanged by this update.',
+  'sessions.edit.unavailableTitle': 'This session cannot be edited',
+  'sessions.edit.backToDetail': 'Back to session details',
 
   // ---- Session form ----
   'sessions.form.title': 'Session title',

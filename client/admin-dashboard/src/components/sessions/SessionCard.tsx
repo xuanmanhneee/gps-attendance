@@ -3,7 +3,10 @@ import { MdAccessTime, MdBlock, MdEdit, MdOutlinePlace } from 'react-icons/md';
 import { Link } from 'react-router-dom';
 
 import { useTranslation } from '../../hooks/useTranslation';
-import { ROUTE_PATHS } from '../../routes/paths';
+import {
+  buildSessionEditPath,
+  ROUTE_PATHS,
+} from '../../routes/paths';
 import { StatusBadge } from '../ui/StatusBadge';
 
 const formatTime = (iso: string): string => {
@@ -99,7 +102,7 @@ export const SessionCard = ({
           <div className="relative z-10 flex shrink-0 items-center gap-1.5">
             <div className="group relative">
               <Link
-                to={ROUTE_PATHS.attendanceSessionEdit.replace(':id', idParam)}
+                to={buildSessionEditPath(session.id)}
                 aria-label={editLabel}
                 className={`${ICON_BUTTON_CLASS} text-ink hover:border-accent-strong hover:bg-accent-soft hover:text-accent-strong`}
               >

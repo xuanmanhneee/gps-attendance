@@ -20,6 +20,9 @@ export const ROUTE_PATHS = {
 export const buildSessionDetailPath = (sessionId: number): string =>
   `/sessions/${sessionId}`;
 
+export const buildSessionEditPath = (sessionId: number): string =>
+  `/sessions/${sessionId}/edit`;
+
 /**
  * Trang đầu tiên của từng vai trò sau khi đăng nhập.
  * Organizer không có trang tổng quan: vào thẳng danh sách phiên điểm danh.

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MdOpenInNew, MdRefresh } from 'react-icons/md';
+import { MdEdit, MdOpenInNew, MdRefresh } from 'react-icons/md';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import type { AttendanceSessionDetailResponse } from '@gps-attendance/shared';
@@ -18,7 +18,7 @@ import type { TranslationKey } from '../i18n/translation-keys';
 import { useLocale } from '../hooks/useLocale';
 import { useRole } from '../hooks/useRole';
 import { useTranslation } from '../hooks/useTranslation';
-import { ROUTE_PATHS } from '../routes/paths';
+import { buildSessionEditPath, ROUTE_PATHS } from '../routes/paths';
 import {
   isAttendanceSessionDetail,
   parseSessionId,
@@ -179,7 +179,23 @@ const SessionDetailPage = () => {
         <PanelHeader
           title={session.title}
           subtitle={`#${session.id}`}
-          action={<StatusBadge status={session.status} />}
+          action={
+            <>
+              {role === 'organizer' &&
+                (session.status === 'pending' ||
+                  session.status === 'open') && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(buildSessionEditPath(session.id))}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-bold text-ink transition-colors hover:border-accent-strong hover:text-accent-strong"
+                  >
+                    <MdEdit aria-hidden="true" />
+                    {t('sessions.card.edit')}
+                  </button>
+                )}
+              <StatusBadge status={session.status} />
+            </>
+          }
         />
 
         <dl className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
