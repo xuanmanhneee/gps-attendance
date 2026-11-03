@@ -12,6 +12,8 @@ export const en: Record<TranslationKey, string> = {
   'app.brandSecondary': 'Attendance',
   'app.sidebarAria': 'Navigation sidebar',
   'app.primaryNavAria': 'Main navigation',
+  'app.sidebarExpandAria': 'Expand navigation sidebar',
+  'app.sidebarCollapseAria': 'Collapse navigation sidebar',
 
   // ---- Navigation ----
   'navigation.group.admin': 'Admin',

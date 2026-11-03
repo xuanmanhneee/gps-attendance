@@ -10,6 +10,8 @@ export const vi = {
   'app.brandSecondary': 'Attendance',
   'app.sidebarAria': 'Thanh điều hướng',
   'app.primaryNavAria': 'Điều hướng chính',
+  'app.sidebarExpandAria': 'Mở rộng thanh điều hướng',
+  'app.sidebarCollapseAria': 'Thu gọn thanh điều hướng',
 
   // ---- Navigation ----
   'navigation.group.admin': 'Admin',

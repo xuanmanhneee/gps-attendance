@@ -5,6 +5,7 @@ import type { ThemeMode } from '../types/theme';
 
 const THEME_KEY = 'gps-attendance.theme';
 const LOCALE_KEY = 'gps-attendance.locale';
+const SIDEBAR_STATE_KEY = 'gps-attendance.sidebar-state';
 
 /**
  * Lưu lựa chọn hiển thị (theme, locale) bằng storage key ổn định.
@@ -31,5 +32,16 @@ export const preferenceService = {
 
   setLocale(locale: SupportedLocale): void {
     localStorage.setItem(LOCALE_KEY, locale);
+  },
+
+  getSidebarCollapsed(): boolean {
+    return localStorage.getItem(SIDEBAR_STATE_KEY) === 'collapsed';
+  },
+
+  setSidebarCollapsed(isCollapsed: boolean): void {
+    localStorage.setItem(
+      SIDEBAR_STATE_KEY,
+      isCollapsed ? 'collapsed' : 'expanded',
+    );
   },
 };
