@@ -10,7 +10,12 @@ import type { UserProfileResponse } from '@gps-attendance/shared';
 
 import { authApi } from '../api/auth.api';
 import { userApi } from '../api/user.api';
-import { removeToken, restoreToken, saveToken } from '../services/token';
+import {
+  removeTokens,
+  restoreTokens,
+  saveTokens,
+  subscribeToAccessToken,
+} from '../services/token';
 
 interface AuthContextType {
   user: UserProfileResponse | null;
@@ -30,23 +35,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    restoreAuth();
+    const unsubscribe = subscribeToAccessToken((accessToken) => {
+      setToken(accessToken);
+      if (!accessToken) setUser(null);
+    });
+
+    void restoreAuth();
+    return unsubscribe;
   }, []);
 
   const restoreAuth = async () => {
     try {
-      const savedToken = await restoreToken();
+      const savedTokens = await restoreTokens();
 
-      if (savedToken) {
-        setToken(savedToken);
-
+      if (savedTokens) {
         const profile = await userApi.getProfile();
         setUser(profile);
       }
     } catch (error) {
       console.error('Failed to restore auth:', error);
 
-      await removeToken();
+      await removeTokens();
       setToken(null);
       setUser(null);
     } finally {
@@ -60,15 +69,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const response = await authApi.login(username, password);
 
-      await saveToken(response.accessToken);
-      setToken(response.accessToken);
+      await saveTokens(response);
 
       const profile = await userApi.getProfile();
       setUser(profile);
     } catch (error) {
       console.error('Login error:', error);
 
-      await removeToken();
+      await removeTokens();
       setToken(null);
       setUser(null);
 
@@ -88,14 +96,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setToken(null);
 
-      await removeToken();
+      await removeTokens();
     } catch (error) {
       console.error('Logout error:', error);
 
       setUser(null);
       setToken(null);
 
-      await removeToken();
+      await removeTokens();
 
       throw error;
     } finally {
