@@ -4,7 +4,6 @@ import {
   MdKeyboardArrowUp,
   MdLanguage,
   MdLogout,
-  MdMenu,
   MdPalette,
   MdSettings,
 } from 'react-icons/md';
@@ -12,7 +11,6 @@ import {
 import { useRole } from '../hooks/useRole';
 import { useTranslation } from '../hooks/useTranslation';
 import type { TranslationKey } from '../i18n/translation-keys';
-import { preferenceService } from '../services/preference.service';
 import type { UserRole } from '../types/user-role';
 import { Brand } from './layout/Brand';
 import { SidebarNav } from './layout/SidebarNav';
@@ -35,9 +33,6 @@ const DashboardSidebar = ({ user, onLogout }: DashboardSidebarProps) => {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(() =>
-    preferenceService.getSidebarCollapsed(),
-  );
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -74,47 +69,16 @@ const DashboardSidebar = ({ user, onLogout }: DashboardSidebarProps) => {
     onLogout();
   };
 
-  const handleToggleSidebar = () => {
-    const nextIsCollapsed = !isCollapsed;
-
-    setIsCollapsed(nextIsCollapsed);
-    setIsMenuOpen(false);
-    setIsSettingsOpen(false);
-    preferenceService.setSidebarCollapsed(nextIsCollapsed);
-  };
-
   return (
     <aside
       aria-label={t('app.sidebarAria')}
-      className={`sticky top-0 flex h-dvh w-16 shrink-0 flex-col
-        overflow-y-auto border-r border-line bg-surface px-2 pt-[22px] pb-3
-        transition-[width,padding] duration-200 ease-out
-        ${isCollapsed ? 'md:w-16' : 'md:w-64 md:px-3.5'}`}
+      className="sticky top-0 flex h-dvh w-16 shrink-0 flex-col
+        overflow-y-auto border-r border-line bg-surface
+        px-2 pt-[22px] pb-3 md:w-[220px] md:px-3.5 lg:w-64"
     >
-      <div className="relative h-[58px]">
-        <div className={isCollapsed ? 'md:hidden' : ''}>
-          <Brand />
-        </div>
+      <Brand />
 
-        <button
-          type="button"
-          aria-label={
-            isCollapsed
-              ? t('app.sidebarExpandAria')
-              : t('app.sidebarCollapseAria')
-          }
-          aria-expanded={!isCollapsed}
-          onClick={handleToggleSidebar}
-          className={`absolute top-0 hidden h-[34px] w-[34px] place-items-center
-            rounded-lg text-muted transition-colors hover:bg-surface-secondary
-            hover:text-ink focus-visible:ring-2 focus-visible:ring-accent-strong
-            md:grid ${isCollapsed ? 'left-1/2 -translate-x-1/2' : 'right-0'}`}
-        >
-          <MdMenu aria-hidden="true" className="text-xl" />
-        </button>
-      </div>
-
-      <SidebarNav isCollapsed={isCollapsed} />
+      <SidebarNav />
 
       <div className="mt-auto border-t border-line pt-3">
         <div ref={menuRef} className="relative">
@@ -217,9 +181,7 @@ const DashboardSidebar = ({ user, onLogout }: DashboardSidebarProps) => {
               {initial}
             </span>
 
-            <span
-              className={`hidden min-w-0 flex-1 ${isCollapsed ? '' : 'md:block'}`}
-            >
+            <span className="hidden min-w-0 flex-1 md:block">
               <span className="block truncate text-xs font-bold text-ink">
                 {user?.fullname ?? 'Tài khoản'}
               </span>
@@ -232,8 +194,7 @@ const DashboardSidebar = ({ user, onLogout }: DashboardSidebarProps) => {
             <MdKeyboardArrowUp
               aria-hidden="true"
               className={`hidden shrink-0 text-muted transition-transform
-                ${isCollapsed ? '' : 'md:block'}
-                ${isMenuOpen ? '' : 'rotate-180'}`}
+                md:block ${isMenuOpen ? '' : 'rotate-180'}`}
             />
           </button>
         </div>
