@@ -1,5 +1,12 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
-import { AttendanceSessionErrorCode } from '@gps-attendance/shared';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+} from '@nestjs/common';
+import {
+  AttendanceReviewErrorCode,
+  AttendanceSessionErrorCode,
+} from '@gps-attendance/shared';
 
 import { AttendanceCheckInService } from './attendance-check-in.service';
 import { CheckInRequestDto } from './attendance-check-in.dto';
@@ -57,6 +64,18 @@ describe('AttendanceCheckInService concurrent requests', () => {
         ) => records.tryMarkPresentAndClaimDevice(input, deviceId, ttl),
       } as never,
       { evaluate: jest.fn().mockResolvedValue({ isTooMany: false }) } as never,
+      { set: jest.fn().mockResolvedValue('OK') } as never,
+      { findByIds: jest.fn().mockResolvedValue([]) } as never,
+      { record: jest.fn() } as never,
+      {
+        create: jest.fn().mockReturnValue({
+          log: jest.fn(),
+          warn: jest.fn(),
+          error: jest.fn(),
+          debug: jest.fn(),
+          verbose: jest.fn(),
+        }),
+      } as never,
     );
   });
 
@@ -105,5 +124,59 @@ describe('AttendanceCheckInService concurrent requests', () => {
     });
 
     expect((await records.getRecord(1, 1))?.status).toBe('absent');
+  });
+
+  it('lưu REVIEW là absent kèm reasons và không giữ thiết bị', async () => {
+    (service as any).attendanceValidationService.validate.mockReturnValue({
+      status: 'REVIEW',
+      reasons: ['LOW_CONFIDENCE_SCORE'],
+    });
+
+    await expect(
+      service.checkIn(requestFor('shared-device'), 1),
+    ).resolves.toEqual({
+      status: 'REVIEW',
+      reasons: ['LOW_CONFIDENCE_SCORE'],
+    });
+    expect(await records.getRecord(1, 1)).toMatchObject({
+      status: 'absent',
+      reasons: ['LOW_CONFIDENCE_SCORE'],
+      updateBy: null,
+    });
+
+    (service as any).attendanceValidationService.validate.mockReturnValue({
+      status: 'VALID',
+    });
+    await expect(
+      service.checkIn(requestFor('shared-device'), 2),
+    ).resolves.toEqual({
+      status: 'VALID',
+    });
+  });
+
+  it('không ghi buffer khi validation trả REJECTED', async () => {
+    (service as any).attendanceValidationService.validate.mockReturnValue({
+      status: 'REJECTED',
+      reasons: ['MOCK_LOCATION'],
+    });
+
+    await expect(service.checkIn(requestFor('device-1'), 1)).resolves.toEqual({
+      status: 'REJECTED',
+      reasons: ['MOCK_LOCATION'],
+    });
+    expect(await records.getRecord(1, 1)).toMatchObject({ status: 'absent' });
+  });
+
+  it('cooldown chặn trước validate', async () => {
+    (service as any).redisService.set.mockResolvedValue(null);
+    const validate = (service as any).attendanceValidationService.validate;
+
+    await expect(
+      service.checkIn(requestFor('device-1'), 1),
+    ).rejects.toMatchObject({
+      response: { code: AttendanceReviewErrorCode.COOLDOWN },
+      constructor: HttpException,
+    });
+    expect(validate).not.toHaveBeenCalled();
   });
 });

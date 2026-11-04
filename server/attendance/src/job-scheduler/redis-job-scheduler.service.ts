@@ -22,61 +22,61 @@ const MAX_BACKOFF_STEPS = 5;
 // Job vẫn ở index/data trong lúc chạy. Nếu process chết, lease hết hạn và
 // một worker khác có thể thử lại. Chỉ xóa job sau khi handler thành công.
 const CLAIM_SCRIPT = `
-local score = redis.call('ZSCORE', KEYS[1], ARGV[1])
-if not score or tonumber(score) > tonumber(ARGV[3]) then return nil end
-local raw = redis.call('HGET', KEYS[2], ARGV[1])
-if not raw then
-  redis.call('ZREM', KEYS[1], ARGV[1])
-  return nil
-end
-if not redis.call('SET', KEYS[3], ARGV[2], 'NX', 'PX', ARGV[4]) then return nil end
-return raw
+  local score = redis.call('ZSCORE', KEYS[1], ARGV[1])
+  if not score or tonumber(score) > tonumber(ARGV[3]) then return nil end
+  local raw = redis.call('HGET', KEYS[2], ARGV[1])
+  if not raw then
+    redis.call('ZREM', KEYS[1], ARGV[1])
+    return nil
+  end
+  if not redis.call('SET', KEYS[3], ARGV[2], 'NX', 'PX', ARGV[4]) then return nil end
+  return raw
 `;
 
 const RENEW_SCRIPT = `
-if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
-return redis.call('PEXPIRE', KEYS[1], ARGV[2])
+  if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+  return redis.call('PEXPIRE', KEYS[1], ARGV[2])
 `;
 
 const ACK_SCRIPT = `
-if redis.call('GET', KEYS[3]) ~= ARGV[2] then return 0 end
-if redis.call('HGET', KEYS[2], ARGV[1]) ~= ARGV[3] then
+  if redis.call('GET', KEYS[3]) ~= ARGV[2] then return 0 end
+  if redis.call('HGET', KEYS[2], ARGV[1]) ~= ARGV[3] then
+    redis.call('DEL', KEYS[3])
+    return 0
+  end
+  redis.call('ZREM', KEYS[1], ARGV[1])
+  redis.call('HDEL', KEYS[2], ARGV[1])
   redis.call('DEL', KEYS[3])
-  return 0
-end
-redis.call('ZREM', KEYS[1], ARGV[1])
-redis.call('HDEL', KEYS[2], ARGV[1])
-redis.call('DEL', KEYS[3])
-return 1
+  return 1
 `;
 
 const RETRY_SCRIPT = `
-if redis.call('GET', KEYS[3]) ~= ARGV[2] then return 0 end
-if redis.call('HGET', KEYS[2], ARGV[1]) ~= ARGV[3] then
+  if redis.call('GET', KEYS[3]) ~= ARGV[2] then return 0 end
+  if redis.call('HGET', KEYS[2], ARGV[1]) ~= ARGV[3] then
+    redis.call('DEL', KEYS[3])
+    return 0
+  end
+  redis.call('HSET', KEYS[2], ARGV[1], ARGV[4])
+  redis.call('ZADD', KEYS[1], ARGV[5], ARGV[1])
   redis.call('DEL', KEYS[3])
-  return 0
-end
-redis.call('HSET', KEYS[2], ARGV[1], ARGV[4])
-redis.call('ZADD', KEYS[1], ARGV[5], ARGV[1])
-redis.call('DEL', KEYS[3])
-return 1
+  return 1
 `;
 
 const RELEASE_SCRIPT = `
-if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
-return redis.call('DEL', KEYS[1])
+  if redis.call('GET', KEYS[1]) ~= ARGV[1] then return 0 end
+  return redis.call('DEL', KEYS[1])
 `;
 
 const SCHEDULE_SCRIPT = `
-redis.call('HSET', KEYS[2], ARGV[1], ARGV[2])
-redis.call('ZADD', KEYS[1], ARGV[3], ARGV[1])
-return 1
+  redis.call('HSET', KEYS[2], ARGV[1], ARGV[2])
+  redis.call('ZADD', KEYS[1], ARGV[3], ARGV[1])
+  return 1
 `;
 
 const CANCEL_SCRIPT = `
-redis.call('ZREM', KEYS[1], ARGV[1])
-redis.call('HDEL', KEYS[2], ARGV[1])
-return 1
+  redis.call('ZREM', KEYS[1], ARGV[1])
+  redis.call('HDEL', KEYS[2], ARGV[1])
+  return 1
 `;
 
 @Injectable()
@@ -165,7 +165,9 @@ export class RedisJobSchedulerService implements IJobScheduler {
         void this.redisService
           .eval(RENEW_SCRIPT, [lockKey], [owner, String(LEASE_MS)])
           .catch((err: Error) =>
-            this.logger.error(`Không gia hạn được lease job ${jobId}: ${err.message}`),
+            this.logger.error(
+              `Không gia hạn được lease job ${jobId}: ${err.message}`,
+            ),
           );
       }, LEASE_RENEWAL_MS);
       renewal.unref();
@@ -184,7 +186,9 @@ export class RedisJobSchedulerService implements IJobScheduler {
           [jobId, owner, raw],
         );
         if (acknowledged !== 1) {
-          this.logger.warn(`Job ${jobId} đã chạy nhưng không thể xác nhận; sẽ thử lại`);
+          this.logger.warn(
+            `Job ${jobId} đã chạy nhưng không thể xác nhận; sẽ thử lại`,
+          );
         }
       } catch (err) {
         await this.retry(jobId, owner, raw, err as Error);
@@ -195,7 +199,12 @@ export class RedisJobSchedulerService implements IJobScheduler {
     }
   }
 
-  private async retry(jobId: string, owner: string, raw: string, err: Error): Promise<void> {
+  private async retry(
+    jobId: string,
+    owner: string,
+    raw: string,
+    err: Error,
+  ): Promise<void> {
     let nextRaw = raw;
     let attempts = 1;
     try {
@@ -207,7 +216,9 @@ export class RedisJobSchedulerService implements IJobScheduler {
     }
 
     const delay = RETRY_BACKOFF_MS * Math.min(attempts, MAX_BACKOFF_STEPS);
-    this.logger.error(`Job ${jobId} lỗi lần ${attempts}, thử lại sau ${delay}ms: ${err.message}`);
+    this.logger.error(
+      `Job ${jobId} lỗi lần ${attempts}, thử lại sau ${delay}ms: ${err.message}`,
+    );
     await this.redisService.eval(
       RETRY_SCRIPT,
       [INDEX_KEY, DATA_KEY, lockKeyFor(jobId)],

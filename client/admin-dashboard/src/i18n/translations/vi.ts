@@ -10,6 +10,10 @@ export const vi = {
   'app.brandSecondary': 'Attendance',
   'app.sidebarAria': 'Thanh điều hướng',
   'app.primaryNavAria': 'Điều hướng chính',
+  'app.sidebarExpandAria': 'Mở rộng thanh điều hướng',
+  'app.sidebarCollapseAria': 'Thu gọn thanh điều hướng',
+  'app.breadcrumbAria': 'Vị trí trang hiện tại',
+  'app.pageActionsAria': 'Thao tác trên trang',
 
   // ---- Navigation ----
   'navigation.group.admin': 'Admin',
@@ -336,6 +340,11 @@ export const vi = {
   'sessionDetail.participants': 'Người tham gia',
   'sessionDetail.participantCount': '{count} người',
   'sessionDetail.refreshAria': 'Tải lại danh sách người tham gia',
+  'sessionDetail.autoRefresh': 'Tự làm mới',
+  'sessionDetail.autoRefreshAria': 'Bật hoặc tắt tự động làm mới',
+  'sessionDetail.autoRefreshIntervalAria':
+    'Số phút giữa mỗi lần tự động làm mới',
+  'sessionDetail.minutes': 'phút',
   'sessionDetail.refreshError':
     'Không thể tải lại danh sách người tham gia. Vui lòng thử lại.',
   'sessionDetail.emptyParticipants':

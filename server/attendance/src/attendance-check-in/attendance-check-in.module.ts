@@ -6,17 +6,23 @@ import { AttendanceValidationModule } from '../attendance-validation/attendance-
 import { AttendanceCheckInController } from './attendance-check-in.controller';
 import { AttendanceCheckInService } from './attendance-check-in.service';
 import { AttendanceRecordModule } from '../attendance-record/attendance-record.module';
-import {
-  ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY,
-} from './attendance-check-in.token';
+import { ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY } from './attendance-check-in.token';
 import { AttemptCheck } from './checks/attempt.check';
 import { RedisAttendanceCheckInAttemptRepository } from './infra/redis/redis-attendance-checkin-attempt.repository';
+import { RedisModule } from '../redis/redis.module';
+import { UsersModule } from '../users/users.module';
+import { AuditLogModule } from '../audit-log/audit-log.module';
+import { LoggingModule } from '../common/logging/logging.module';
 
 @Module({
   imports: [
     AttendanceSessionsModule,
     AttendanceValidationModule,
     AttendanceRecordModule,
+    RedisModule,
+    UsersModule,
+    AuditLogModule,
+    LoggingModule,
   ],
   providers: [
     AttendanceCheckInService,

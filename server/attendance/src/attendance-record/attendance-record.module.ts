@@ -7,7 +7,6 @@ import {
   DEVICE_USAGE_REPOSITORY,
 } from './attendance-record.token';
 import { AttendanceRecordsService } from './attendance-records.service';
-import { JOB_SCHEDULER } from '#job-scheduler/job-scheduler.token';
 import { PrismaAttendanceRecordRepository } from './infra/redis/prisma-attendance-record.repository';
 import { RedisAttendanceCheckInAttemptRepository } from '#attendance-check-in/infra/redis/redis-attendance-checkin-attempt.repository';
 import { RedisAttendanceCheckInDeviceUsageRepository } from '#attendance-check-in/infra/redis/redis-attendance-checkin-device-usage.repository';

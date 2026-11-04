@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { MdAccessTime, MdLock, MdOutlineTitle } from 'react-icons/md';
+import {
+  MdAccessTime,
+  MdArrowBack,
+  MdLock,
+  MdOutlineTitle,
+} from 'react-icons/md';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
@@ -9,6 +14,7 @@ import type {
 } from '@gps-attendance/shared';
 
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
+import { PageActionBarPortal } from '../components/layout/page-action-bar';
 import { SessionLocationFields } from '../components/sessions/SessionLocationFields';
 import { SessionLocationPickerModal } from '../components/sessions/SessionLocationPickerModal';
 import {
@@ -236,35 +242,65 @@ const SessionEditPage = () => {
     }
   };
 
+  const actionBar = (
+    <PageActionBarPortal>
+      <div className="flex w-full items-center">
+        <button
+          type="button"
+          onClick={() =>
+            session
+              ? navigate(buildSessionDetailPath(session.id))
+              : navigate(ROUTE_PATHS.attendanceSessions)
+          }
+          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-xs font-bold text-ink transition-colors hover:border-accent-strong hover:text-accent-strong"
+        >
+          <MdArrowBack aria-hidden="true" />
+          {session
+            ? t('sessions.edit.backToDetail')
+            : t('sessionDetail.backToList')}
+        </button>
+      </div>
+    </PageActionBarPortal>
+  );
+
   if (isLoading) {
     return (
-      <Panel>
-        <LoadingState description={t('sessions.edit.loading')} />
-      </Panel>
+      <>
+        {actionBar}
+        <Panel>
+          <LoadingState description={t('sessions.edit.loading')} />
+        </Panel>
+      </>
     );
   }
 
   if (loadError || !session) {
     return (
-      <MessagePage
-        variant="error"
-        title={t('common.errorTitle')}
-        description={t('sessionDetail.loadError')}
-        actionLabel={t('sessionDetail.backToList')}
-        onAction={() => navigate(ROUTE_PATHS.attendanceSessions)}
-      />
+      <>
+        {actionBar}
+        <MessagePage
+          variant="error"
+          title={t('common.errorTitle')}
+          description={t('sessionDetail.loadError')}
+          actionLabel={t('sessionDetail.backToList')}
+          onAction={() => navigate(ROUTE_PATHS.attendanceSessions)}
+        />
+      </>
     );
   }
 
   if (session.status === 'closed' || session.status === 'cancelled') {
     return (
-      <MessagePage
-        variant="error"
-        title={t('sessions.edit.unavailableTitle')}
-        description={t('sessions.error.updateInvalidStatus')}
-        actionLabel={t('sessions.edit.backToDetail')}
-        onAction={() => navigate(buildSessionDetailPath(session.id))}
-      />
+      <>
+        {actionBar}
+        <MessagePage
+          variant="error"
+          title={t('sessions.edit.unavailableTitle')}
+          description={t('sessions.error.updateInvalidStatus')}
+          actionLabel={t('sessions.edit.backToDetail')}
+          onAction={() => navigate(buildSessionDetailPath(session.id))}
+        />
+      </>
     );
   }
 
@@ -272,6 +308,8 @@ const SessionEditPage = () => {
 
   return (
     <>
+      {actionBar}
+
       <Panel className="flex h-full min-h-0 flex-col">
         <PanelHeader
           title={t('sessions.edit.heading')}

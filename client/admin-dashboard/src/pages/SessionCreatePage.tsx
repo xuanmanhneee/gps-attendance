@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
+import { PageActionBarPortal } from '../components/layout/page-action-bar';
 import { SessionLocationFields } from '../components/sessions/SessionLocationFields';
 import { SessionLocationPickerModal } from '../components/sessions/SessionLocationPickerModal';
 import { ParticipantCriteriaEditor } from '../components/sessions/ParticipantCriteriaEditor';
@@ -276,6 +277,19 @@ const SessionCreatePage = () => {
 
   return (
     <>
+      <PageActionBarPortal>
+        <div className="flex w-full items-center">
+          <button
+            type="button"
+            onClick={() => navigate(ROUTE_PATHS.attendanceSessions)}
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-xs font-bold text-ink transition-colors hover:border-accent-strong hover:text-accent-strong"
+          >
+            <MdArrowBack aria-hidden="true" />
+            {t('sessionDetail.backToList')}
+          </button>
+        </div>
+      </PageActionBarPortal>
+
       <Panel className="flex h-full min-h-0 flex-col">
         <PanelHeader
           title={t('sessions.form.heading')}

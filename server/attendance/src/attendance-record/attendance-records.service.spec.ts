@@ -41,6 +41,8 @@ describe('AttendanceRecordsService', () => {
       ),
       upsertRecord: jest.fn(),
       insertRecordIfAbsent: jest.fn(),
+      requestReview: jest.fn(),
+      resolveReview: jest.fn(),
       tryMarkPresentAndClaimDevice: jest.fn(async (input) => {
         if (sessionIsFlushing) return 'session-flushing';
         if (!bufferedRecord) return 'record-missing';
@@ -112,6 +114,7 @@ describe('AttendanceRecordsService', () => {
         longitude: 106,
         accuracy: 5,
         updateBy: 10,
+        validationStatus: 'VALID',
       },
       'device-10',
       3600,
@@ -171,5 +174,51 @@ describe('AttendanceRecordsService', () => {
       'database unavailable',
     );
     expect(buffer.completeSessionFlush).not.toHaveBeenCalled();
+  });
+
+  it('loại field review trước khi bulkUpsert xuống Postgres', async () => {
+    const record: AttendanceRecord = {
+      sessionId: 1,
+      userId: 10,
+      status: 'absent',
+      checkedInAt: null,
+      latitude: null,
+      longitude: null,
+      accuracy: null,
+      updatedAt: new Date(),
+      updateBy: null,
+      reasons: ['LOW_CONFIDENCE_SCORE'],
+      reviewRequested: true,
+      note: 'Em có mặt',
+    };
+    const repository = {
+      bulkUpsert: jest.fn().mockResolvedValue(undefined),
+    } as unknown as IAttendanceRecordRepository;
+    const buffer = {
+      beginSessionFlush: jest.fn().mockResolvedValue([record]),
+      completeSessionFlush: jest.fn().mockResolvedValue(undefined),
+    } as unknown as IAttendanceRecordBuffer;
+    const service = new AttendanceRecordsService(
+      repository,
+      buffer,
+      {} as IJobScheduler,
+      {
+        create: () => ({
+          log: jest.fn(),
+          warn: jest.fn(),
+          error: jest.fn(),
+          debug: jest.fn(),
+          verbose: jest.fn(),
+        }),
+      },
+      {} as RedisService,
+    );
+
+    await service.flushSessionToDb(1);
+
+    const persisted = (repository.bulkUpsert as jest.Mock).mock.calls[0][0][0];
+    expect(persisted).not.toHaveProperty('reasons');
+    expect(persisted).not.toHaveProperty('reviewRequested');
+    expect(persisted).not.toHaveProperty('note');
   });
 });

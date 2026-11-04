@@ -12,6 +12,10 @@ export const en: Record<TranslationKey, string> = {
   'app.brandSecondary': 'Attendance',
   'app.sidebarAria': 'Navigation sidebar',
   'app.primaryNavAria': 'Main navigation',
+  'app.sidebarExpandAria': 'Expand navigation sidebar',
+  'app.sidebarCollapseAria': 'Collapse navigation sidebar',
+  'app.breadcrumbAria': 'Current page location',
+  'app.pageActionsAria': 'Page actions',
 
   // ---- Navigation ----
   'navigation.group.admin': 'Admin',
@@ -344,6 +348,11 @@ export const en: Record<TranslationKey, string> = {
   'sessionDetail.participants': 'Participants',
   'sessionDetail.participantCount': '{count} people',
   'sessionDetail.refreshAria': 'Reload participant list',
+  'sessionDetail.autoRefresh': 'Auto refresh',
+  'sessionDetail.autoRefreshAria': 'Turn automatic refresh on or off',
+  'sessionDetail.autoRefreshIntervalAria':
+    'Minutes between automatic refreshes',
+  'sessionDetail.minutes': 'min',
   'sessionDetail.refreshError':
     'Unable to reload the participant list. Please try again.',
   'sessionDetail.emptyParticipants':

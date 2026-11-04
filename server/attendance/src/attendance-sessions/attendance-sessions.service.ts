@@ -28,7 +28,11 @@ import { IAttendanceSessionRepository } from './attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
 import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
 import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto';
-import { criteriaKeyFor, rosterInitializedKeyFor } from './attendance-session-keys';
+import {
+  criteriaKeyFor,
+  rosterInitializedKeyFor,
+} from './attendance-session-keys';
+import { REVIEW_RESOLUTION_WINDOW_MS } from '../attendance-record/attendance-review.constants';
 
 const ROSTER_INIT_BUFFER_MS = 5 * 60 * 1000;
 
@@ -127,7 +131,7 @@ export class AttendanceSessionsService {
     }
     await this.jobScheduler.schedule(
       'attendance:flush',
-      session.closeAt,
+      new Date(session.closeAt.getTime() + REVIEW_RESOLUTION_WINDOW_MS),
       { sessionId: session.id },
       `flush:${session.id}`,
     );
@@ -222,7 +226,11 @@ export class AttendanceSessionsService {
       }
     }
     if (dto.closeAt) {
-      await this.reschedule('flush', sessionId, closeAt);
+      await this.reschedule(
+        'flush',
+        sessionId,
+        new Date(closeAt.getTime() + REVIEW_RESOLUTION_WINDOW_MS),
+      );
     }
 
     return this.withComputedStatus(updated);
@@ -280,7 +288,9 @@ export class AttendanceSessionsService {
   async getPendingCriteria(
     sessionId: number,
   ): Promise<UserFilterCriteria | null> {
-    if ((await this.redisService.get(rosterInitializedKeyFor(sessionId))) === '1') {
+    if (
+      (await this.redisService.get(rosterInitializedKeyFor(sessionId))) === '1'
+    ) {
       return null;
     }
     const raw = await this.redisService.get(criteriaKeyFor(sessionId));
@@ -346,7 +356,9 @@ export class AttendanceSessionsService {
   }
 
   private async initializeRoster(sessionId: number): Promise<void> {
-    if ((await this.redisService.get(rosterInitializedKeyFor(sessionId))) === '1') {
+    if (
+      (await this.redisService.get(rosterInitializedKeyFor(sessionId))) === '1'
+    ) {
       await this.redisService.del(criteriaKeyFor(sessionId));
       await this.scheduleFlushIfClosed(sessionId);
       return;
@@ -354,13 +366,17 @@ export class AttendanceSessionsService {
     const rawCriteria = await this.redisService.get(criteriaKeyFor(sessionId));
 
     if (!rawCriteria) {
-      throw new Error(`Init roster session ${sessionId}: không tìm thấy criteria trong Redis`);
+      throw new Error(
+        `Init roster session ${sessionId}: không tìm thấy criteria trong Redis`,
+      );
     }
 
     const criteria: unknown = JSON.parse(rawCriteria);
 
     if (!isValidUserFilterCriteria(criteria)) {
-      throw new Error(`Init roster session ${sessionId}: criteria trong Redis không hợp lệ`);
+      throw new Error(
+        `Init roster session ${sessionId}: criteria trong Redis không hợp lệ`,
+      );
     }
 
     const userIds = await this.userFilterService.resolveUserIds(criteria);
@@ -377,9 +393,15 @@ export class AttendanceSessionsService {
   private async scheduleFlushIfClosed(sessionId: number): Promise<void> {
     const session = await this.findById(sessionId);
     if (session.status === 'closed') {
+      const flushAt = new Date(
+        Math.max(
+          Date.now(),
+          session.closeAt.getTime() + REVIEW_RESOLUTION_WINDOW_MS,
+        ),
+      );
       await this.jobScheduler.schedule(
         'attendance:flush',
-        new Date(),
+        flushAt,
         { sessionId },
         `flush:${sessionId}`,
       );
