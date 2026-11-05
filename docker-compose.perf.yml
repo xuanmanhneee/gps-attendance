@@ -18,17 +18,31 @@ services:
       retries: 12
 
   redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
+    image: redis:7.4-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --aof-use-rdb-preamble
+      - "yes"
+      - --maxmemory
+      - "${PERF_REDIS_MAXMEMORY:-384mb}"
+      - --maxmemory-policy
+      - noeviction
     volumes:
       - perf_redis:/data
     cpus: "${PERF_REDIS_CPUS:-1.0}"
     mem_limit: "${PERF_REDIS_MEMORY:-512m}"
+    restart: unless-stopped
+    stop_grace_period: 30s
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 12
+      start_period: 5s
 
   api:
     image: gps-attendance-perf-api:local

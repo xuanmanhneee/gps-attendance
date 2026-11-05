@@ -16,6 +16,7 @@ import { APP_FILTER } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/filters/all-exception.filter';
 import { UnitOfWorkModule } from '#common/unit-of-work/unit-of-work.module';
 import { UnitModule } from '#units/units.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { UnitModule } from '#units/units.module';
     TagModule,
     UnitOfWorkModule,
     UnitModule,
+    AuditLogModule,
   ],
   controllers: [AppController],
   providers: [

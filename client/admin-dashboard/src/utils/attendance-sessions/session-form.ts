@@ -4,7 +4,11 @@
  * Tách khỏi component để validate/parse có thể kiểm tra bằng `node:test` mà
  * không cần DOM, và để component chỉ hiển thị kết quả đã tính sẵn.
  */
-import type { CreateAttendanceSessionRequest } from '@gps-attendance/shared';
+import type {
+  CreateAttendanceSessionRequest,
+  SessionStatus,
+  UpdateAttendanceSessionRequest,
+} from '@gps-attendance/shared';
 
 import type { TranslationKey } from '../../i18n/translation-keys';
 
@@ -239,6 +243,51 @@ export const buildCreateSessionRequest = (
         : {}),
     },
   };
+};
+
+export type SessionEditDirtyFields = Partial<
+  Record<
+    | 'title'
+    | 'latitude'
+    | 'longitude'
+    | 'radius'
+    | 'openDate'
+    | 'openTime'
+    | 'closeDate'
+    | 'closeTime',
+    boolean
+  >
+>;
+
+/**
+ * Chỉ dựng các field người dùng đã sửa và backend cho phép theo trạng thái.
+ * Phiên đang mở tuyệt đối không gửi lại field đã khóa, kể cả form còn giữ giá
+ * trị của chúng để hiển thị.
+ */
+export const buildUpdateSessionRequest = (
+  values: SessionFormValues,
+  dirtyFields: SessionEditDirtyFields,
+  status: SessionStatus,
+): UpdateAttendanceSessionRequest => {
+  const request: UpdateAttendanceSessionRequest = {};
+  const openAt = combineLocalDateTime(values.openDate, values.openTime);
+  const closeAt = combineLocalDateTime(values.closeDate, values.closeTime);
+
+  if (status === 'open') {
+    if (dirtyFields.closeDate || dirtyFields.closeTime) {
+      request.closeAt = closeAt;
+    }
+    return request;
+  }
+
+  if (dirtyFields.title) request.title = values.title.trim();
+  if (dirtyFields.latitude) request.latitude = values.latitude;
+  if (dirtyFields.longitude) request.longitude = values.longitude;
+  if (dirtyFields.radius) request.radius = values.radius;
+  if (dirtyFields.openDate || dirtyFields.openTime) request.openAt = openAt;
+  if (dirtyFields.closeDate || dirtyFields.closeTime) request.closeAt = closeAt;
+
+  return request;
 };
 
 /** Giới hạn trùng DTO backend (`@IsLatitude`, `@IsLongitude`, `@IsPositive`). */

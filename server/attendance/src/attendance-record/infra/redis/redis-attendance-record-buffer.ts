@@ -8,6 +8,8 @@ import {
 import {
   IAttendanceRecordBuffer,
   MarkPresentResult,
+  RequestReviewResult,
+  ResolveReviewResult,
 } from '../../attendance-record.buffer';
 import { RedisService } from '../../../redis/redis.service'; // chỉnh path đúng theo project
 
@@ -23,11 +25,46 @@ const MARK_PRESENT_SCRIPT = `
 if redis.call('EXISTS', KEYS[3]) == 1 then return 4 end
 local existing = redis.call('HGET', KEYS[1], ARGV[1])
 if not existing then return 0 end
-if cjson.decode(existing).status == 'present' then return 1 end
+local rec = cjson.decode(existing)
+if rec.status == 'present' then return 1 end
+if rec.status ~= 'absent' or (rec.updateBy ~= nil and rec.updateBy ~= cjson.null) then return 5 end
+if ARGV[4] == 'REVIEW' then
+  redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+  return 6
+end
 if redis.call('EXISTS', KEYS[2]) == 1 then return 2 end
 redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
 redis.call('SET', KEYS[2], ARGV[1], 'EX', ARGV[3])
 return 3
+`;
+
+const REQUEST_REVIEW_SCRIPT = `
+if redis.call('EXISTS', KEYS[2]) == 1 then return 4 end
+local existing = redis.call('HGET', KEYS[1], ARGV[1])
+if not existing then return 0 end
+local rec = cjson.decode(existing)
+if rec.updateBy ~= nil and rec.updateBy ~= cjson.null then return 1 end
+if rec.status ~= 'absent' or rec.reasons == nil or #rec.reasons == 0 then return 2 end
+rec.reviewRequested = true
+if ARGV[2] == '' then rec.note = nil else rec.note = ARGV[2] end
+rec.updatedAt = ARGV[3]
+redis.call('HSET', KEYS[1], ARGV[1], cjson.encode(rec))
+return 3
+`;
+
+const RESOLVE_REVIEW_SCRIPT = `
+if redis.call('EXISTS', KEYS[2]) == 1 then return {4} end
+local existing = redis.call('HGET', KEYS[1], ARGV[1])
+if not existing then return {0} end
+local rec = cjson.decode(existing)
+if rec.updateBy ~= nil and rec.updateBy ~= cjson.null then return {1} end
+if rec.status ~= 'absent' or rec.reviewRequested ~= true then return {2} end
+local previousStatus = rec.status
+if ARGV[2] == 'approve' then rec.status = 'present' else rec.status = 'absent' end
+rec.updateBy = tonumber(ARGV[3])
+rec.updatedAt = ARGV[4]
+redis.call('HSET', KEYS[1], ARGV[1], cjson.encode(rec))
+return {3, previousStatus, cjson.encode(rec)}
 `;
 
 const BEGIN_SESSION_FLUSH_SCRIPT = `
@@ -61,7 +98,7 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
     do {
       const [next, keys] = await this.redisService.scan(
         cursor,
-        'attendance:buffer:*',
+        'attendance:buffer:[0-9]*',
         100,
       );
       cursor = next;
@@ -110,13 +147,17 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
     const record: AttendanceRecord = {
       sessionId: input.sessionId,
       userId: input.userId,
-      status: 'present',
-      checkedInAt: input.checkedInAt,
-      latitude: input.latitude,
-      longitude: input.longitude,
-      accuracy: input.accuracy,
-      updateBy: input.updateBy,
+      status: input.validationStatus === 'VALID' ? 'present' : 'absent',
+      checkedInAt:
+        input.validationStatus === 'VALID' ? input.checkedInAt : null,
+      latitude: input.validationStatus === 'VALID' ? input.latitude : null,
+      longitude: input.validationStatus === 'VALID' ? input.longitude : null,
+      accuracy: input.validationStatus === 'VALID' ? input.accuracy : null,
+      updateBy: input.validationStatus === 'VALID' ? input.updateBy : null,
       updatedAt: new Date(),
+      ...(input.validationStatus === 'REVIEW'
+        ? { reasons: input.reasons }
+        : {}),
     };
     const result = await this.redisService.eval(
       MARK_PRESENT_SCRIPT,
@@ -125,7 +166,12 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
         deviceKeyFor(input.sessionId, deviceId),
         flushingKeyFor(input.sessionId),
       ],
-      [String(input.userId), JSON.stringify(record), String(deviceTtlSeconds)],
+      [
+        String(input.userId),
+        JSON.stringify(record),
+        String(deviceTtlSeconds),
+        input.validationStatus,
+      ],
     );
 
     switch (result) {
@@ -139,9 +185,72 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
         return 'present';
       case 4:
         return 'session-flushing';
+      case 5:
+        return 'locked';
+      case 6:
+        return 'review';
       default:
         throw new Error(`Unexpected check-in commit result: ${String(result)}`);
     }
+  }
+
+  async requestReview(
+    sessionId: number,
+    userId: number,
+    note?: string,
+  ): Promise<RequestReviewResult> {
+    const result = await this.redisService.eval(
+      REQUEST_REVIEW_SCRIPT,
+      [keyFor(sessionId), flushingKeyFor(sessionId)],
+      [String(userId), note ?? '', new Date().toISOString()],
+    );
+
+    const results: RequestReviewResult[] = [
+      'record-missing',
+      'locked',
+      'not-eligible',
+      'requested',
+      'session-flushing',
+    ];
+    const mapped = results[Number(result)];
+    if (!mapped)
+      throw new Error(`Unexpected review request result: ${String(result)}`);
+    return mapped;
+  }
+
+  async resolveReview(
+    sessionId: number,
+    userId: number,
+    decision: 'approve' | 'reject',
+    resolverId: number,
+  ): Promise<ResolveReviewResult> {
+    const result = await this.redisService.eval(
+      RESOLVE_REVIEW_SCRIPT,
+      [keyFor(sessionId), flushingKeyFor(sessionId)],
+      [String(userId), decision, String(resolverId), new Date().toISOString()],
+    );
+    if (!Array.isArray(result)) {
+      throw new Error(`Unexpected review resolution result: ${String(result)}`);
+    }
+    const code = Number(result[0]);
+    if (code === 3) {
+      return {
+        status: 'resolved',
+        previousStatus: String(result[1]) as AttendanceRecord['status'],
+        record: this.deserialize(String(result[2])),
+      };
+    }
+    const failures = [
+      'record-missing',
+      'locked',
+      'not-requested',
+      '',
+      'session-flushing',
+    ] as const;
+    const status = failures[code];
+    if (!status)
+      throw new Error(`Unexpected review resolution result: ${String(result)}`);
+    return { status };
   }
 
   async beginSessionFlush(sessionId: number): Promise<AttendanceRecord[]> {

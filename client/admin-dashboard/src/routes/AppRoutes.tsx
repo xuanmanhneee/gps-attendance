@@ -8,6 +8,7 @@ import DashboardPage from '../pages/DashboardPage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import SessionDetailPage from '../pages/SessionDetailPage';
+import SessionEditPage from '../pages/SessionEditPage';
 import SessionsPage from '../pages/SessionsPage';
 import StatisticsPage from '../pages/StatisticsPage';
 import TagsPage from '../pages/TagsPage';
@@ -82,7 +83,7 @@ const AppRoutes = () => (
           <Route path={ROUTE_PATHS.statistics} element={<StatisticsPage />} />
         </Route>
 
-        {/* Tạo phiên: chỉ organizer được tạo (backend trả 403 cho role khác).
+        {/* Tạo/sửa phiên: chỉ organizer được thao tác (backend trả 403 cho role khác).
             Route tĩnh `/sessions/new` không phụ thuộc thứ tự khai báo vì
             react-router ưu tiên route khớp cụ thể hơn `/sessions/:id`. */}
         <Route element={<RoleGuard allowedRoles={['organizer']} />}>
@@ -93,6 +94,10 @@ const AppRoutes = () => (
                 <SessionCreatePage />
               </Suspense>
             }
+          />
+          <Route
+            path={ROUTE_PATHS.attendanceSessionEdit}
+            element={<SessionEditPage />}
           />
         </Route>
 

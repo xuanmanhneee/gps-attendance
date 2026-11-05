@@ -9,9 +9,41 @@ const markPresentInput = {
   longitude: 106,
   accuracy: 5,
   updateBy: 9,
+  validationStatus: 'VALID' as const,
 };
 
 describe('RedisAttendanceRecordBuffer session flush', () => {
+  it.each([
+    [5, 'locked'],
+    [6, 'review'],
+  ] as const)(
+    'maps atomic check-in result %s to %s',
+    async (code, expected) => {
+      const redisService = {
+        eval: jest.fn().mockResolvedValue(code),
+      } as unknown as RedisService;
+      const buffer = new RedisAttendanceRecordBuffer(redisService);
+
+      await expect(
+        buffer.tryMarkPresentAndClaimDevice(
+          {
+            ...markPresentInput,
+            validationStatus: 'REVIEW',
+            reasons: ['LOW_CONFIDENCE_SCORE'],
+          },
+          'device-9',
+          3600,
+        ),
+      ).resolves.toBe(expected);
+
+      expect(redisService.eval).toHaveBeenCalledWith(
+        expect.stringContaining('rec.updateBy ~= cjson.null'),
+        expect.any(Array),
+        expect.arrayContaining(['REVIEW']),
+      );
+    },
+  );
+
   it('checks the flush lock in the same Lua commit and maps the locked result', async () => {
     const redisService = {
       eval: jest.fn().mockResolvedValue(4),

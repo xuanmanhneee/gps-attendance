@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { SessionDaySection } from '../components/sessions/SessionDaySection';
 import { SessionStatusFilter } from '../components/sessions/SessionStatusFilter';
+import { PageActionBarPortal } from '../components/layout/page-action-bar';
 import { ScrollArea } from '../components/layout/ScrollArea';
 import { PageContainer } from '../components/ui/PageContainer';
 import { Panel } from '../components/ui/Panel';
@@ -69,8 +70,9 @@ const OrganizerSessionsView = () => {
   const showFilteredEmpty = isReady && filteredSessions.length === 0;
 
   return (
-    <Panel>
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+    <>
+      <PageActionBarPortal>
+        <div className="flex w-full items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-4">
           <SessionStatusFilter
             value={statusFilter}
@@ -94,8 +96,10 @@ const OrganizerSessionsView = () => {
           icon={MdAdd}
           onClick={() => navigate(ROUTE_PATHS.attendanceSessionCreate)}
         />
-      </div>
+        </div>
+      </PageActionBarPortal>
 
+      <Panel>
       <ScrollArea>
         {showFilteredEmpty ? (
           <p className="px-5 py-8 text-center text-[12px] text-muted">
@@ -117,7 +121,8 @@ const OrganizerSessionsView = () => {
           </div>
         )}
       </ScrollArea>
-    </Panel>
+      </Panel>
+    </>
   );
 };
 
@@ -147,22 +152,25 @@ const AdminSessionsView = () => {
   const showFilteredEmpty = isReady && filteredSessions.length === 0;
 
   return (
-    <Panel>
-      <div className="flex shrink-0 flex-wrap items-center gap-4 border-b border-line px-5 py-4">
-        <SessionStatusFilter value={statusFilter} onChange={setStatusFilter} />
-        {hasCancelled && (
-          <label className="flex items-center gap-2 text-[12px] text-muted">
-            <input
-              type="checkbox"
-              checked={includeCancelled}
-              onChange={(e) => setIncludeCancelled(e.target.checked)}
-              className="rounded border-line"
-            />
-            {t('sessions.filter.includeCancelled')}
-          </label>
-        )}
-      </div>
+    <>
+      <PageActionBarPortal>
+        <div className="flex w-full items-center gap-4">
+          <SessionStatusFilter value={statusFilter} onChange={setStatusFilter} />
+          {hasCancelled && (
+            <label className="flex items-center gap-2 text-[12px] text-muted">
+              <input
+                type="checkbox"
+                checked={includeCancelled}
+                onChange={(e) => setIncludeCancelled(e.target.checked)}
+                className="rounded border-line"
+              />
+              {t('sessions.filter.includeCancelled')}
+            </label>
+          )}
+        </div>
+      </PageActionBarPortal>
 
+      <Panel>
       <ScrollArea>
         {showFilteredEmpty ? (
           <p className="px-5 py-8 text-center text-[12px] text-muted">
@@ -182,7 +190,8 @@ const AdminSessionsView = () => {
           </div>
         )}
       </ScrollArea>
-    </Panel>
+      </Panel>
+    </>
   );
 };
 

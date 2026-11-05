@@ -5,6 +5,7 @@ import { en } from '../../i18n/translations/en.ts';
 import { vi } from '../../i18n/translations/vi.ts';
 import {
   buildCreateSessionRequest,
+  buildUpdateSessionRequest,
   combineLocalDateTime,
   createDefaultSessionFormValues,
   isCloseAfterOpen,
@@ -168,6 +169,34 @@ describe('buildCreateSessionRequest', () => {
         },
       },
     });
+  });
+});
+
+describe('buildUpdateSessionRequest', () => {
+  it('phiên pending chỉ gửi các field đã thay đổi', () => {
+    assert.deepEqual(
+      buildUpdateSessionRequest(
+        { ...VALID_VALUES, title: '  Tên mới  ', radius: 80 },
+        { title: true, radius: true, closeTime: true },
+        'pending',
+      ),
+      {
+        title: 'Tên mới',
+        radius: 80,
+        closeAt: '2026-09-20T10:00',
+      },
+    );
+  });
+
+  it('phiên open chỉ gửi closeAt dù form đánh dấu field bị khóa là dirty', () => {
+    assert.deepEqual(
+      buildUpdateSessionRequest(
+        VALID_VALUES,
+        { title: true, latitude: true, openTime: true, closeTime: true },
+        'open',
+      ),
+      { closeAt: '2026-09-20T10:00' },
+    );
   });
 });
 

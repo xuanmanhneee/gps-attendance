@@ -13,12 +13,12 @@ viên điểm danh cùng lúc.
 
 Là **pnpm workspace monorepo** — dùng chung 1 `pnpm-lock.yaml` ở root.
 
-| Thành phần | Package | Công nghệ | Vai trò |
-|---|---|---|---|
-| Backend | `server/attendance` | NestJS + Prisma 7 (PostgreSQL) + Redis | API, prefix `/v0` |
-| Admin | `client/admin-dashboard` | React + Vite + TS | Giảng viên/quản trị tạo phiên, xem kết quả |
-| Mobile | `client/mobile-client` | Expo SDK 54 (React Native 0.81) | Sinh viên điểm danh |
-| Shared | `packages/shared` | TypeScript thuần | Type/DTO + HTTP client dùng chung |
+| Thành phần | Package                  | Công nghệ                              | Vai trò                                    |
+| ---------- | ------------------------ | -------------------------------------- | ------------------------------------------ |
+| Backend    | `server/attendance`      | NestJS + Prisma 7 (PostgreSQL) + Redis | API, prefix `/v0`                          |
+| Admin      | `client/admin-dashboard` | React + Vite + TS                      | Giảng viên/quản trị tạo phiên, xem kết quả |
+| Mobile     | `client/mobile-client`   | Expo SDK 54 (React Native 0.81)        | Sinh viên điểm danh                        |
+| Shared     | `packages/shared`        | TypeScript thuần                       | Type/DTO + HTTP client dùng chung          |
 
 Luồng nghiệp vụ: giảng viên tạo **phiên điểm danh** (thời gian, toạ độ tâm,
 bán kính) → sinh viên mở app trong khung thời gian, app lấy GPS → server kiểm
@@ -108,25 +108,27 @@ Screen (app/**)
 
 ### 3.3 API contract mobile đang dùng
 
-| # | Method | Path | Guard | Response type (shared) |
-|---|---|---|---|---|
-| 1 | POST | `/v0/user/auth/login` | LocalAuthGuard (chỉ `student`) | `LoginResponse { accessToken }` |
-| 2 | POST | `/v0/user/auth/logout` | JWT | `null` — ⏸️ mobile **tạm thời chưa gọi** |
-| 3 | POST | `/v0/user/auth/refresh` | JWT | `{ accessToken }` |
-| 4 | GET | `/v0/users/me` | JWT | `UserProfileResponse` |
-| 5 | GET | `/v0/attendance-sessions/me` | JWT | `MyAttendanceSessionResponse[]` |
-| 6 | POST | `/v0/attendance/check-in` | JWT | `CheckInResponse` |
+| #   | Method | Path                             | Guard                             | Response type (shared)          |
+| --- | ------ | -------------------------------- | --------------------------------- | ------------------------------- |
+| 1   | POST   | `/v0/user/auth/login`            | LocalAuthGuard; chỉ `participant` | `LoginResponse`                 |
+| 2   | POST   | `/v0/user/auth/refresh`          | Public, kiểm tra refresh token    | `LoginResponse`                 |
+| 3   | GET    | `/v0/users/me`                   | JWT                               | `UserProfileResponse`           |
+| 4   | GET    | `/v0/attendance-sessions/me`     | JWT                               | `MyAttendanceSessionResponse[]` |
+| 5   | POST   | `/v0/attendance/check-in`        | JWT                               | `CheckInResponse`               |
+| 6   | POST   | `/v0/attendance/review-requests` | JWT, `participant`                | Không có data                   |
 
 `CheckInResponse` là discriminated union: `{ status: 'VALID' }` hoặc
-`{ status: 'REVIEW' | 'REJECTED', reasons: [...] }` với reason gồm
-`OUT_OF_RANGE | MOCK_LOCATION | LOW_CONFIDENCE_SCORE | TOO_MANY_ATTEMPTS | DUPLICATE_DEVICE`.
+`{ status: 'REVIEW' | 'REJECTED', reasons: [...] }`. Khi nhận `REVIEW`, mobile
+có thể gọi endpoint gửi yêu cầu xác nhận; client không gửi reasons.
 
-> Lưu ý `userId` trong JWT là `User.id` (không phải `Account.id`) — xem
-> `docs/conventions/auth-guards.md`.
+Danh sách đầy đủ endpoint, payload, quyền và error code nằm tại
+[`docs/api.md`](api.md). `userId` trong JWT là `User.id`, không phải
+`Account.id`.
 
 ## 4. Trạng thái hiện tại của luồng điểm danh
 
 Đã có:
+
 - Login → lưu token → lấy profile → vào tab Home.
 - `GET /v0/attendance-sessions/me` → render danh sách phiên + trạng thái
   (`getStudentSessionStatus`: pending/absent/present/late/excused/closed/cancelled
@@ -144,15 +146,16 @@ Screen (app/**)
   nguồn chân lý, tránh lệch giờ máy và lặp lại logic đã gây bug `cancelled`.
 
 Chưa xong:
+
 - `integrity.ts` vẫn là stub (trả `null`) — xem mục 5.
 
 ## 5. Gap / nợ kỹ thuật (cần xử lý để khép kín luồng)
 
-| # | Mức | Mô tả | Vị trí |
-|---|---|---|---|
-| 1 | 🟡 | `integrity.ts` trả `null` (chưa có Play Integrity/App Attest thật) | `src/services/integrity.ts` |
-| 2 | 🟡 | Chưa auto refresh token khi 401 | `src/api/http.ts` |
-| 3 | 🟢 | Chưa có tab Lịch sử điểm danh | `src/app/(tabs)/` |
+| #   | Mức | Mô tả                                                              | Vị trí                      |
+| --- | --- | ------------------------------------------------------------------ | --------------------------- |
+| 1   | 🟡  | `integrity.ts` trả `null` (chưa có Play Integrity/App Attest thật) | `src/services/integrity.ts` |
+| 2   | 🟡  | Chưa auto refresh token khi 401                                    | `src/api/http.ts`           |
+| 3   | 🟢  | Chưa có tab Lịch sử điểm danh                                      | `src/app/(tabs)/`           |
 
 Đã xử lý ở B1–B3: payload điểm danh thật; xoá `attendance-modal.tsx` /
 `gps-status-card.tsx` / `attendance-session-card.tsx` (dead + stale); xoá starter
@@ -168,6 +171,7 @@ Mục tiêu: khép kín **1 luồng duy nhất** = login → xem phiên → bấ
 bằng dữ liệu thật → nhận kết quả → cập nhật trạng thái. Không mở rộng xa.
 
 ### B1 — Wire dữ liệu thật vào điểm danh ✅
+
 - `home.tsx` gọi `checkIn(sessionId)` từ `services/attendance` (GPS + device +
   integrity gom trong service), không còn payload stub.
 - Bắt `LocationPermissionError` (alert xin quyền vị trí) và lỗi API chung.
@@ -175,11 +179,13 @@ bằng dữ liệu thật → nhận kết quả → cập nhật trạng thái.
   `getCheckInFailureMessage(reasons)`.
 
 ### B2 — Chuẩn hoá type & kết quả ✅
+
 - Xoá `attendance-modal.tsx`, `gps-status-card.tsx`, `attendance-session-card.tsx`
   (dead/stale — home render inline và dùng `showAlert`).
 - Xoá barrel stale `components/index.ts`, `ui/index.ts`, `context/index.ts`.
 
 ### B3 — Dọn dẹp tối thiểu + cập nhật tài liệu ✅
+
 - Xoá starter code không dùng (`explore.tsx`, `themed-*`, `app-tabs*`,
   `web-badge`, `animated-icon*`, `hint-row`, `collapsible`, `icon-symbol`,
   `external-link`, `AppButton`, `AppTextInput`, `ui/card`).
@@ -190,6 +196,7 @@ bằng dữ liệu thật → nhận kết quả → cập nhật trạng thái.
 - Viết lại `STRUCTURE.md` cho khớp thực tế.
 
 ### Ngoài scope (giai đoạn 2)
+
 - Play Integrity (Android) / App Attest (iOS) thật trong `integrity.ts`.
 - Tab Lịch sử điểm danh.
 - GPS "follow" liên tục / cập nhật khoảng cách realtime.
@@ -208,4 +215,3 @@ pnpm dev:mobile     # quét QR bằng Expo Go (dùng thiết bị thật cho GPS
   (mẫu: `.env.example`).
 - GPS/anti-spoofing cần thiết bị thật để kiểm thử chính xác.
 - Lint mobile: `pnpm --filter @gps-attendance/mobile-client lint`.
-

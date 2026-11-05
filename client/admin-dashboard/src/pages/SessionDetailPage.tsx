@@ -1,5 +1,10 @@
-import { useEffect, useState } from 'react';
-import { MdOpenInNew, MdRefresh } from 'react-icons/md';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  MdArrowBack,
+  MdEdit,
+  MdOpenInNew,
+  MdRefresh,
+} from 'react-icons/md';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import type { AttendanceSessionDetailResponse } from '@gps-attendance/shared';
@@ -11,6 +16,7 @@ import {
   PARTICIPANT_ROLE_LABEL_KEYS,
 } from '../config/attendance-status';
 import { EmptyState, LoadingState } from '../components/ui/DataState';
+import { PageActionBarPortal } from '../components/layout/page-action-bar';
 import { Panel, PanelHeader } from '../components/ui/Panel';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { LOCALE_TAGS } from '../i18n';
@@ -18,7 +24,7 @@ import type { TranslationKey } from '../i18n/translation-keys';
 import { useLocale } from '../hooks/useLocale';
 import { useRole } from '../hooks/useRole';
 import { useTranslation } from '../hooks/useTranslation';
-import { ROUTE_PATHS } from '../routes/paths';
+import { buildSessionEditPath, ROUTE_PATHS } from '../routes/paths';
 import {
   isAttendanceSessionDetail,
   parseSessionId,
@@ -61,10 +67,14 @@ const SessionDetailPage = () => {
   const [errorKey, setErrorKey] = useState<TranslationKey | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasRefreshError, setHasRefreshError] = useState(false);
+  const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(false);
+  const [autoRefreshMinutesInput, setAutoRefreshMinutesInput] = useState('1');
+  const refreshInFlightRef = useRef(false);
 
-  const handleRefreshParticipants = async () => {
-    if (!session || isRefreshing) return;
+  const handleRefreshParticipants = useCallback(async () => {
+    if (!session || refreshInFlightRef.current) return;
 
+    refreshInFlightRef.current = true;
     setIsRefreshing(true);
     setHasRefreshError(false);
 
@@ -84,9 +94,36 @@ const SessionDetailPage = () => {
       logSessionError('detail', refreshError);
       setHasRefreshError(true);
     } finally {
+      refreshInFlightRef.current = false;
       setIsRefreshing(false);
     }
-  };
+  }, [session]);
+
+  const autoRefreshMinutes = Math.min(
+    60,
+    Math.max(1, Number.parseInt(autoRefreshMinutesInput, 10) || 1),
+  );
+
+  useEffect(() => {
+    if (
+      !isAutoRefreshEnabled ||
+      !session ||
+      session.status !== 'open'
+    ) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void handleRefreshParticipants();
+    }, autoRefreshMinutes * 60_000);
+
+    return () => window.clearInterval(interval);
+  }, [
+    autoRefreshMinutes,
+    handleRefreshParticipants,
+    isAutoRefreshEnabled,
+    session,
+  ]);
 
   useEffect(() => {
     const loadSession = async () => {
@@ -120,24 +157,63 @@ const SessionDetailPage = () => {
   }, [id]);
 
   const localeTag = LOCALE_TAGS[locale];
+  const canEdit =
+    session !== null &&
+    role === 'organizer' &&
+    (session.status === 'pending' || session.status === 'open');
+  const actionBar = (
+    <PageActionBarPortal>
+      <div className="flex w-full items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={() => navigate(backPath)}
+          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-xs font-bold text-ink transition-colors hover:border-accent-strong hover:text-accent-strong"
+        >
+          <MdArrowBack aria-hidden="true" />
+          {t('sessionDetail.backToList')}
+        </button>
+
+        {session && (
+          <div className="flex shrink-0 items-center gap-2">
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => navigate(buildSessionEditPath(session.id))}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-bold text-ink transition-colors hover:border-accent-strong hover:text-accent-strong"
+              >
+                <MdEdit aria-hidden="true" />
+                {t('sessions.card.edit')}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </PageActionBarPortal>
+  );
 
   if (isLoading) {
     return (
-      <Panel>
-        <LoadingState description={t('sessionDetail.loading')} />
-      </Panel>
+      <>
+        {actionBar}
+        <Panel>
+          <LoadingState description={t('sessionDetail.loading')} />
+        </Panel>
+      </>
     );
   }
 
   if (errorKey || !session) {
     return (
-      <MessagePage
-        variant="error"
-        title={t('common.errorTitle')}
-        description={t(errorKey ?? 'sessionDetail.loadError')}
-        actionLabel={t('sessionDetail.backToList')}
-        onAction={() => navigate(backPath)}
-      />
+      <>
+        {actionBar}
+        <MessagePage
+          variant="error"
+          title={t('common.errorTitle')}
+          description={t(errorKey ?? 'sessionDetail.loadError')}
+          actionLabel={t('sessionDetail.backToList')}
+          onAction={() => navigate(backPath)}
+        />
+      </>
     );
   }
 
@@ -167,13 +243,7 @@ const SessionDetailPage = () => {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => navigate(backPath)}
-        className="mb-4 text-[12px] font-bold text-muted transition-colors hover:text-accent-strong"
-      >
-        ← {t('sessionDetail.backToList')}
-      </button>
+      {actionBar}
 
       <Panel className="mb-4">
         <PanelHeader
@@ -213,25 +283,90 @@ const SessionDetailPage = () => {
         <PanelHeader
           title={t('sessionDetail.participants')}
           action={
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3">
               <span className="text-[12px] text-muted">
                 {t('sessionDetail.participantCount', {
                   count: displayedParticipants.length,
                 })}
               </span>
 
-              <button
-                type="button"
-                onClick={handleRefreshParticipants}
-                disabled={isRefreshing}
-                aria-label={t('sessionDetail.refreshAria')}
-                className="inline-flex items-center rounded-lg border border-line bg-surface-subtle px-3 py-2 text-accent-strong transition-colors hover:border-accent-strong/40 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <MdRefresh
-                  aria-hidden="true"
-                  className={`text-[16px] ${isRefreshing ? 'animate-spin' : ''}`}
-                />
-              </button>
+              {session.status === 'open' && (
+                <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-subtle p-1.5">
+                  <span className="pl-1 text-[11px] font-semibold text-muted">
+                    {t('sessionDetail.autoRefresh')}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isAutoRefreshEnabled}
+                    aria-label={t('sessionDetail.autoRefreshAria')}
+                    onClick={() =>
+                      setIsAutoRefreshEnabled((current) => !current)
+                    }
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-soft focus-visible:ring-offset-2 ${
+                      isAutoRefreshEnabled
+                        ? 'bg-accent-strong'
+                        : 'bg-muted-soft'
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow-sm transition-transform ${
+                        isAutoRefreshEnabled
+                          ? 'translate-x-5'
+                          : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+              )}
+
+              {session.status === 'open' && (
+                <div className="flex w-28 shrink-0 justify-end">
+                  {isAutoRefreshEnabled ? (
+                  <label className="flex min-h-9 w-full items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[11px] font-semibold text-muted">
+                    <span className="grid w-[15px] shrink-0 place-items-center">
+                      <MdRefresh
+                        aria-hidden="true"
+                        className={`text-[15px] text-accent-strong ${
+                          isRefreshing ? 'animate-spin opacity-100' : 'opacity-0'
+                        }`}
+                      />
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      step={1}
+                      inputMode="numeric"
+                      value={autoRefreshMinutesInput}
+                      onChange={(event) =>
+                        setAutoRefreshMinutesInput(event.target.value)
+                      }
+                      onBlur={() =>
+                        setAutoRefreshMinutesInput(String(autoRefreshMinutes))
+                      }
+                      aria-label={t('sessionDetail.autoRefreshIntervalAria')}
+                      className="w-12 rounded-md border border-line bg-surface-subtle px-2 py-1 text-center text-xs font-bold tabular-nums text-ink outline-none focus:border-accent-strong focus:ring-2 focus:ring-accent-soft"
+                    />
+                    <span>{t('sessionDetail.minutes')}</span>
+                  </label>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleRefreshParticipants()}
+                    disabled={isRefreshing}
+                    aria-label={t('sessionDetail.refreshAria')}
+                    className="inline-flex min-h-9 items-center rounded-lg border border-line bg-surface-subtle px-3 text-accent-strong transition-colors hover:border-accent-strong/40 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <MdRefresh
+                      aria-hidden="true"
+                      className={`text-[16px] ${isRefreshing ? 'animate-spin' : ''}`}
+                    />
+                  </button>
+                  )}
+                </div>
+              )}
             </div>
           }
         />

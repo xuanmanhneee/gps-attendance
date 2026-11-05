@@ -1,5 +1,8 @@
 # GPS Attendance System
 
+Tài liệu: [API hiện tại](docs/api.md) · [Kiến trúc](docs/architecture.md) ·
+[Quy ước code](docs/conventions/)
+
 Hệ thống điểm danh tự động sử dụng định vị GPS thời gian thực, kết hợp các cơ chế chống gian lận (giả mạo vị trí, trùng thiết bị) và kiến trúc đảm bảo chịu tải khi nhiều sinh viên điểm danh cùng lúc.
 
 ## Mục tiêu
@@ -29,12 +32,12 @@ gps-attendance/
 
 ## Công nghệ sử dụng
 
-| Thành phần | Công nghệ |
-|---|---|
-| Backend | NestJS + Prisma ORM 7 (PostgreSQL) |
-| Admin Dashboard | React + Vite + TypeScript |
-| Mobile Client | Expo SDK 54 (React Native) |
-| Package manager | pnpm workspace |
+| Thành phần      | Công nghệ                          |
+| --------------- | ---------------------------------- |
+| Backend         | NestJS + Prisma ORM 7 (PostgreSQL) |
+| Admin Dashboard | React + Vite + TypeScript          |
+| Mobile Client   | Expo SDK 54 (React Native)         |
+| Package manager | pnpm workspace                     |
 
 ## Yêu cầu môi trường
 
@@ -113,6 +116,7 @@ Sau khi cài xong (và đã setup Database ở trên với `server/attendance`),
 ```bash
 pnpm dev:server
 ```
+
 Mặc định chạy tại `http://localhost:3000`. Lệnh này tự build `shared` trước khi khởi động.
 
 ### 2. Admin Dashboard (React)
@@ -120,6 +124,7 @@ Mặc định chạy tại `http://localhost:3000`. Lệnh này tự build `shar
 ```bash
 pnpm dev:admin
 ```
+
 Mặc định chạy tại `http://localhost:5173`.
 
 ### 3. Mobile Client (Expo)
@@ -127,6 +132,7 @@ Mặc định chạy tại `http://localhost:5173`.
 ```bash
 pnpm dev:mobile
 ```
+
 Quét mã QR hiện trên terminal bằng app **Expo Go** để chạy thử trên điện thoại thật (khuyến nghị dùng thiết bị thật thay vì emulator, vì tính năng GPS/anti-spoofing cần thiết bị thật để hoạt động và kiểm thử chính xác).
 
 > Nếu điện thoại và máy tính không cùng mạng WiFi, dùng `expo start --tunnel` (chạy trong `client/mobile-client`), hoặc kết nối qua USB bằng `adb reverse tcp:8081 tcp:8081`.
@@ -141,9 +147,11 @@ pnpm clean           # dọn cache/output khi gặp lỗi build lạ
 ### Lưu ý khi sửa `packages/shared`
 
 Server dùng bản đã build sẵn (`dist/`) của `shared`, không đọc trực tiếp file `.ts` nguồn. Nếu sửa `shared` trong lúc `server` đang chạy dev, mở thêm terminal chạy:
+
 ```bash
 pnpm dev:attendance
 ```
+
 để tự động build lại mỗi khi lưu file. (Admin dashboard và mobile không cần bước này — 2 project đó dùng bundler nên đọc thẳng file `.ts` nguồn, thay đổi có hiệu lực ngay khi lưu.)
 
 ## Cách hoạt động (tổng quan)
@@ -163,6 +171,7 @@ Dự án đang trong giai đoạn phát triển ban đầu. Cấu trúc và API 
 ## Đóng góp
 
 Repo dùng chung cho các thành viên trong nhóm đồ án. Khi thêm tính năng mới:
+
 - Tạo branch riêng, không push trực tiếp lên `main`.
 - Đặt tên commit rõ ràng, mô tả đúng thay đổi.
 - Cập nhật README này nếu có thay đổi về cấu trúc hoặc cách chạy dự án.

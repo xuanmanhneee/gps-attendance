@@ -97,19 +97,33 @@ describe('AttendanceSessionsService', () => {
 
   describe('khởi tạo roster có thể chạy lại', () => {
     const initialize = (sessionId: number) =>
-      (service as unknown as { initializeRoster: (id: number) => Promise<void> })
-        .initializeRoster(sessionId);
+      (
+        service as unknown as {
+          initializeRoster: (id: number) => Promise<void>;
+        }
+      ).initializeRoster(sessionId);
 
     it('giữ criteria để retry khi ghi roster lỗi', async () => {
       const session = await seed(min(30), min(60));
       const criteria = { codeFilter: { include: ['S1'] } };
-      await redis.set(`attendance:session:${session.id}:criteria`, JSON.stringify(criteria));
+      await redis.set(
+        `attendance:session:${session.id}:criteria`,
+        JSON.stringify(criteria),
+      );
       userFilter.resolveUserIds.mockResolvedValue([3]);
-      records.initializeForSession.mockRejectedValueOnce(new Error('Redis tạm thời lỗi'));
+      records.initializeForSession.mockRejectedValueOnce(
+        new Error('Redis tạm thời lỗi'),
+      );
 
-      await expect(initialize(session.id)).rejects.toThrow('Redis tạm thời lỗi');
-      expect(await redis.get(`attendance:session:${session.id}:criteria`)).not.toBeNull();
-      expect(await redis.get(`attendance:session:${session.id}:roster-initialized`)).toBeNull();
+      await expect(initialize(session.id)).rejects.toThrow(
+        'Redis tạm thời lỗi',
+      );
+      expect(
+        await redis.get(`attendance:session:${session.id}:criteria`),
+      ).not.toBeNull();
+      expect(
+        await redis.get(`attendance:session:${session.id}:roster-initialized`),
+      ).toBeNull();
     });
 
     it('không khởi tạo lại roster đã hoàn tất và lên lịch flush nếu phiên đã đóng', async () => {
@@ -124,7 +138,9 @@ describe('AttendanceSessionsService', () => {
       await initialize(session.id);
 
       expect(records.initializeForSession).toHaveBeenCalledTimes(1);
-      expect(await redis.get(`attendance:session:${session.id}:roster-initialized`)).toBe('1');
+      expect(
+        await redis.get(`attendance:session:${session.id}:roster-initialized`),
+      ).toBe('1');
       expect(scheduler.schedule).toHaveBeenCalledWith(
         'attendance:flush',
         expect.any(Date),
@@ -165,7 +181,7 @@ describe('AttendanceSessionsService', () => {
       expect(scheduler.schedule).toHaveBeenCalledTimes(1);
       expect(scheduler.schedule).toHaveBeenCalledWith(
         'attendance:flush',
-        min(60),
+        min(70),
         { sessionId: session.id },
         `flush:${session.id}`,
       );
@@ -246,7 +262,7 @@ describe('AttendanceSessionsService', () => {
       expect(scheduler.cancel).toHaveBeenCalledWith(`flush:${s.id}`);
       expect(scheduler.schedule).toHaveBeenCalledWith(
         'attendance:flush',
-        newClose,
+        new Date(newClose.getTime() + 10 * 60 * 1000),
         { sessionId: s.id },
         `flush:${s.id}`,
       );

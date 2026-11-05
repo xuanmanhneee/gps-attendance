@@ -10,6 +10,10 @@ export const vi = {
   'app.brandSecondary': 'Attendance',
   'app.sidebarAria': 'Thanh điều hướng',
   'app.primaryNavAria': 'Điều hướng chính',
+  'app.sidebarExpandAria': 'Mở rộng thanh điều hướng',
+  'app.sidebarCollapseAria': 'Thu gọn thanh điều hướng',
+  'app.breadcrumbAria': 'Vị trí trang hiện tại',
+  'app.pageActionsAria': 'Thao tác trên trang',
 
   // ---- Navigation ----
   'navigation.group.admin': 'Admin',
@@ -201,6 +205,7 @@ export const vi = {
   'sessions.error.criteriaLocked':
     'Danh sách người tham gia đã được khởi tạo, không thể sửa tiêu chí.',
   'sessions.updateError': 'Không thể cập nhật phiên điểm danh.',
+  'sessions.updateSuccess': 'Đã cập nhật phiên điểm danh.',
   'sessions.cancelError': 'Không thể huỷ phiên điểm danh.',
 
   'sessions.card.edit': 'Sửa',
@@ -208,6 +213,23 @@ export const vi = {
   'sessions.card.cancelling': 'Đang huỷ...',
   'sessions.card.cancelConfirm': 'Huỷ phiên này? Phiên sẽ không thể mở lại.',
   'sessions.cancelSuccess': 'Đã huỷ phiên',
+
+  // ---- Sửa phiên ----
+  'sessions.edit.heading': 'Sửa phiên điểm danh',
+  'sessions.edit.description':
+    'Cập nhật thông tin phiên trong phạm vi trạng thái hiện tại cho phép',
+  'sessions.edit.loading': 'Đang tải dữ liệu phiên để chỉnh sửa...',
+  'sessions.edit.submit': 'Lưu thay đổi',
+  'sessions.edit.submitting': 'Đang lưu...',
+  'sessions.edit.timeHelp':
+    'Thời gian đóng phải sau thời gian mở và chưa xảy ra.',
+  'sessions.edit.openLockedTitle': 'Phiên đang mở',
+  'sessions.edit.openLockedDescription':
+    'Tên, giờ mở và vị trí đã được khóa. Bạn chỉ có thể điều chỉnh giờ đóng.',
+  'sessions.edit.participantsUnchanged':
+    'Tiêu chí và danh sách người tham gia được giữ nguyên trong lần cập nhật này.',
+  'sessions.edit.unavailableTitle': 'Không thể sửa phiên này',
+  'sessions.edit.backToDetail': 'Quay lại chi tiết phiên',
 
   // ---- Form tạo phiên ----
   'sessions.form.title': 'Tên phiên',
@@ -322,6 +344,11 @@ export const vi = {
   'sessionDetail.participants': 'Người tham gia',
   'sessionDetail.participantCount': '{count} người',
   'sessionDetail.refreshAria': 'Tải lại danh sách người tham gia',
+  'sessionDetail.autoRefresh': 'Tự làm mới',
+  'sessionDetail.autoRefreshAria': 'Bật hoặc tắt tự động làm mới',
+  'sessionDetail.autoRefreshIntervalAria':
+    'Số phút giữa mỗi lần tự động làm mới',
+  'sessionDetail.minutes': 'phút',
   'sessionDetail.refreshError':
     'Không thể tải lại danh sách người tham gia. Vui lòng thử lại.',
   'sessionDetail.emptyParticipants':
