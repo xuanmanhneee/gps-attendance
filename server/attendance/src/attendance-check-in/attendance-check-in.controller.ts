@@ -11,6 +11,11 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { DeviceRateLimitGuard } from '../common/guards/device-rate-limit.guard';
 
+const checkInThrottleLimit =
+  process.env.NODE_ENV === 'test' && process.env.LOAD_TEST_MODE === 'true'
+    ? 100000
+    : 3;
+
 @ApiTags('attendance-check-in')
 @ApiBearerAuth()
 @Controller('v0/attendance')
@@ -22,7 +27,7 @@ export class AttendanceCheckInController {
   @ApiOperation({ summary: 'Sinh viên thực hiện điểm danh (Check-in GPS)' })
   @UseGuards(JwtAuthGuard, DeviceRateLimitGuard, RolesGuard)
   @Roles('student')
-  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Throttle({ default: { limit: checkInThrottleLimit, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @Post('check-in')
   async checkIn(

@@ -1,0 +1,21 @@
+[
+  {
+    "token": "replace-with-student-access-token",
+    "payload": {
+      "sessionId": 123,
+      "location": {
+        "latitude": 11.9404,
+        "longitude": 108.4583,
+        "accuracy": 10,
+        "timestamp": 1790000000000,
+        "isMockLocation": false
+      },
+      "device": {
+        "deviceId": "load-test-device-001",
+        "platform": "android",
+        "model": "load-test"
+      },
+      "integrity": { "integrityToken": null }
+    }
+  }
+]

@@ -34,6 +34,24 @@ async function bootstrap() {
     logger: new WinstonJsonLogger('Nest'),
   });
 
+  if (process.env.LOAD_TEST_MODE === 'true') {
+    let databaseName = '';
+    try {
+      databaseName = new URL(process.env.DATABASE_URL ?? '').pathname.replace(
+        /^\/+|\/+$/g,
+        '',
+      );
+    } catch {
+      databaseName = '';
+    }
+
+    if (process.env.NODE_ENV !== 'test' || databaseName !== 'gps_attendance_loadtest') {
+      throw new Error(
+        'LOAD_TEST_MODE requires NODE_ENV=test and the gps_attendance_loadtest database',
+      );
+    }
+  }
+
   app.useGlobalFilters(new ApiExceptionFilter());
 
   const defaultCorsOrigins = [

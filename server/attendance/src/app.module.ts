@@ -24,6 +24,9 @@ import { UnitModule } from './units/units.module';
 import { LocationRegistryModule } from './location-registry/location-registry.module';
 import { DeviceTrustModule } from './device-trust/device-trust.module';
 
+const loadTestMode =
+  process.env.NODE_ENV === 'test' && process.env.LOAD_TEST_MODE === 'true';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -32,7 +35,7 @@ import { DeviceTrustModule } from './device-trust/device-trust.module';
     ThrottlerModule.forRoot({
       // General dashboard/mobile traffic includes several parallel reads;
       // stricter limits remain configured on login and check-in endpoints.
-      throttlers: [{ limit: 120, ttl: 60000 }],
+      throttlers: [{ limit: loadTestMode ? 100000 : 120, ttl: 60000 }],
     }),
     DatabaseModule,
     PrismaModule,

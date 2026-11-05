@@ -12,5 +12,6 @@ build/
 *.log
 *.tsbuildinfo
 *.code-workspace
+/tests/load/*.local.json
 
 server/attendance/src/prisma/generated/

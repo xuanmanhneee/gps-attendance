@@ -13,6 +13,13 @@ export class DeviceRateLimitGuard implements CanActivate {
   constructor(private readonly rateLimitService: RateLimitService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (
+      process.env.NODE_ENV === 'test' &&
+      process.env.LOAD_TEST_MODE === 'true'
+    ) {
+      return true;
+    }
+
     const req = context.switchToHttp().getRequest<Request & { body?: any }>();
     const forwarded = req.headers['x-forwarded-for'];
     const clientIp =

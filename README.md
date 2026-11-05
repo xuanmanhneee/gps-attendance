@@ -14,6 +14,7 @@
 6. [Chức năng theo vai trò](#6-chức-năng-theo-vai-trò)
 7. [Công nghệ và dữ liệu](#7-công-nghệ-và-dữ-liệu)
 8. [Cài đặt và thực thi](#8-cài-đặt-và-thực-thi)
+  - [8.7. Benchmark tải chức năng check-in](#87-benchmark-tải-chức-năng-check-in)
 9. [API, cấu hình và vận hành](#9-api-cấu-hình-và-vận-hành)
 10. [Bảo mật, giới hạn và lưu ý](#10-bảo-mật-giới-hạn-và-lưu-ý)
 11. [Tài liệu liên quan](#11-tài-liệu-liên-quan)
@@ -506,6 +507,133 @@ docker compose logs -f backend
 ```
 
 Dashboard được phục vụ tại `http://localhost:8080`; API tại `http://localhost:3000`; health tại `http://localhost:3000/v0/health`; Swagger tại `http://localhost:3000/api-docs`. Mobile không phải service Compose và vẫn cần chạy Expo riêng.
+
+### 8.7. Benchmark tải chức năng check-in
+
+#### Mục tiêu
+
+Đo khả năng xử lý của `POST /v0/attendance/check-in` khi nhiều tài khoản sinh viên mô phỏng cùng gửi một lượt điểm danh. Benchmark giúp tìm mức tải đã kiểm chứng đạt SLA và quan sát điểm latency bắt đầu tăng mạnh; đây không phải phép đo người dùng thật hay cam kết năng lực production.
+
+| Chỉ số đánh giá | Ngưỡng benchmark |
+|---|---:|
+| p95 latency của check-in | `< 1.000 ms` |
+| Lỗi kỹ thuật (transport/status 0 hoặc HTTP 5xx) | `< 1%` |
+| Check-in được chấp nhận | Đủ một lượt cho mỗi VU |
+| HTTP 429 | `0` |
+| Từ chối nghiệp vụ trong fixture hợp lệ | `0` |
+
+#### Vai trò và thành phần
+
+| Thành phần/vai trò | Trách nhiệm |
+|---|---|
+| Người vận hành | Dùng database test riêng, khởi động dịch vụ, chọn số VU và theo dõi health/tài nguyên |
+| Seeder | Tạo 350 tài khoản student mô phỏng, session đang mở, attendance records, JWT và payload fixture |
+| k6 | Mỗi VU dùng một fixture/tài khoản và gửi đúng một request check-in |
+| Backend NestJS | Xác thực JWT, kiểm tra session/record, GPS/device/integrity và ghi attendance/attempt |
+| PostgreSQL | Lưu user, account, session, attendance record và evidence của lượt thử |
+| Redis | Phục vụ các phần token/runtime của backend |
+
+Mã nguồn chính: [checkin-burst.js](tests/load/checkin-burst.js), [load-seed.ts](server/attendance/test/load-seed.ts), [hướng dẫn tải](tests/load/README.md).
+
+#### Input
+
+| Input | Mô tả |
+|---|---|
+| `BASE_URL` | URL API, benchmark local dùng `http://127.0.0.1:3000` |
+| `CHECKIN_FIXTURES` | JSON có ít nhất `MAX_VUS` fixture; mỗi fixture có JWT và payload riêng |
+| `MAX_VUS` | Mức concurrent VU cần thử; không lớn hơn số fixture |
+| `RAMP_VUS`, `RAMP_DURATION` | Mức tải khởi đầu và thời gian ramp, mặc định 10 VU/15 giây |
+| `SPIKE_DURATION`, `HOLD_DURATION`, `COOLDOWN_DURATION` | Thời gian tăng tới target, giữ tải và hạ tải; mặc định 10/30/10 giây |
+| `P95_MS`, `TECHNICAL_ERROR_RATE` | Ngưỡng SLA, mặc định 1.000 ms và 0,01 |
+
+Mỗi fixture theo đúng DTO backend: `sessionId` là số nguyên; `location` có latitude, longitude, accuracy, epoch timestamp, `isMockLocation`; `device` có `deviceId`, platform, model; `integrity.integrityToken` có thể null. Seeder tạo tọa độ nằm trong geofence, thiết bị khác nhau cho từng tài khoản và JWT hợp lệ. Không dùng chung token/device giữa các VU.
+
+#### Output
+
+- `checkin_accepted`: số kết quả `VALID` hoặc `REVIEW`; phải bằng hoặc lớn hơn số VU mục tiêu.
+- `checkin_latency`: phân bố latency của request check-in, đặc biệt p95.
+- `checkin_technical_error_rate`: tỷ lệ transport error/HTTP 5xx; không gộp lỗi nghiệp vụ vào lỗi kỹ thuật.
+- `checkin_rate_limited` và `checkin_business_rejected`: phải bằng 0 trong bài đo capacity với fixture hợp lệ.
+- `http_reqs`/`http_req_duration`: tổng request, throughput trung bình và độ trễ theo báo cáo k6.
+- `--summary-export`: ghi báo cáo JSON local; fixture và kết quả `*.local.json` đã được Git ignore.
+
+Không dùng `iterations` làm số check-in: sau request đầu tiên, mỗi VU sleep và không gửi lại POST. Chỉ số request/accepted phản ánh số lượt điểm danh thực tế.
+
+#### Điều kiện và cách hoạt động
+
+- Dùng k6 `v2.3.0`, API NestJS local, PostgreSQL/Redis Docker và database riêng `gps_attendance_loadtest`; database này đã được migrate 19 migration.
+- Rate limit chỉ được nới/bỏ guard khi đồng thời có `NODE_ENV=test`, `LOAD_TEST_MODE=true` và database đúng tên `gps_attendance_loadtest`. Bootstrap từ chối bật chế độ này với database khác. Không giả mạo IP, không seed hoặc chạy benchmark vào production.
+- Profile mặc định: ramp lên 10 VU trong 15 giây, ramp tiếp tới `MAX_VUS` trong 10 giây, giữ 30 giây, rồi ramp về 0 trong 10 giây. Mỗi VU gửi một check-in khi bắt đầu; thời điểm gửi được phân bố theo ramp, không phải tất cả trong cùng một mili-giây.
+- Một lượt đo kéo dài khoảng 65,7 giây. RPS trong bảng là trung bình trên toàn lượt gồm ramp-up/ramp-down; đây không phải peak RPS của riêng đoạn spike.
+- Seeder tạo session mới mỗi lần chạy và không xóa dữ liệu cũ. Sau khi xác nhận database test, dùng lại session mới cho mỗi lượt để tránh check-in trùng; giữ fixture/summary để đối chiếu.
+
+#### Quy trình thực hiện
+
+1. Cài Docker/Compose và k6; cấu hình `server/attendance/.env` với JWT secret local không phải placeholder.
+2. Mở **Terminal A** tại thư mục gốc, khởi động PostgreSQL/Redis, tạo database test lần đầu, sau đó migrate, seed và chạy API bằng biến môi trường test.
+3. Chờ API sẵn sàng tại `http://127.0.0.1:3000/v0/health`; xác nhận database connected và migration applied.
+4. Mở **Terminal B** tại thư mục gốc, đặt biến k6 và chạy profile ở mức VU cần đo.
+5. Đọc summary: trước hết xét `checkin_accepted`, p95, lỗi kỹ thuật, 429 và business rejection; sau đó đối chiếu health/RAM/CPU/DB. Tăng VU theo nấc, tạo session mới cho từng lượt.
+6. Sau benchmark, dừng API bằng `Ctrl+C` và dừng Redis nếu đã khởi động riêng. Không xóa database/attendance evidence để “reset” kết quả.
+
+#### Số liệu thực tế
+
+| VU | Accepted | p95 | Trung bình req/s | Kết quả SLA |
+|---:|---:|---:|---:|---|
+| 50 | 50 | 146,77 ms | 0,76 | Đạt |
+| 100 | 100 | 106,66 ms | 1,52 | Đạt |
+| 200 | 200 | 37,45 ms | 3,04 | Đạt |
+| 300 | 300 | 530,18 ms | 4,56 | Đạt |
+| 312 | 312 | 40,00 ms | 4,75 | Đạt |
+| 313 | 313 | 32,48 ms | 4,76 | Đạt |
+| 315 | 315 | 1,13 s | 4,79 | Trượt p95 |
+| 318 | 318 | 1,14 s | 4,84 | Trượt p95 |
+| 325 | 325 | 3,81 s | 4,94 | Trượt p95 |
+| 350 | 350 | 7,82 s | 5,32 | Trượt p95 |
+
+Tất cả các nấc trong bảng có 0 lỗi kỹ thuật, 0 HTTP 429 và 0 từ chối nghiệp vụ. Ở 350 VU, backend vẫn nhận đủ check-in nhưng latency vượt SLA.
+
+**Kết luận:** mức cao nhất đã xác nhận đạt trong các nấc đo là 313 VU; 315 VU là nấc đầu tiên trong dải gần đó bị trượt. 314 VU chưa đo, do đó đây không phải cực đại chính xác hay cam kết production. Kết quả p95 biến động đáng kể giữa một số nấc; nên benchmark lại trên staging gần production và lặp nhiều lần trước khi công bố capacity ổn định.
+
+#### Tài nguyên và lưu ý kết quả
+
+- Snapshot sau nấc 350 ghi nhận health `ok`, PostgreSQL `connected`, API RSS khoảng `251 MB`, heap `106 MB`, RAM hệ thống sử dụng `92%` so với khoảng `87%` ban đầu. Đây là snapshot sau test, không phải biểu đồ mức dùng RAM/CPU theo thời gian; CPU time-series và peak RPS chưa được thu thập.
+- Lượt 350 đầu tiên có lỗi script `sleep is not defined`; p95 `291,35 ms` ở log đó **không dùng làm kết quả**. Sau khi sửa import `sleep`, lượt 350 hợp lệ có p95 `7,82 s` như bảng.
+- Summary JSON và fixture local nằm dưới `tests/load/` với hậu tố `.local.json` và được Git ignore. Seeder không xóa dữ liệu; mỗi lần chạy tạo session/evidence mới. Dữ liệu database `gps_attendance_loadtest` được giữ lại để đối chiếu, không phải dữ liệu production.
+- Kết quả tải còn phụ thuộc cấu hình máy, PostgreSQL, Redis, load generator và phiên bản runtime; không ngoại suy trực tiếp thành capacity của hệ thống production.
+
+#### Lệnh thực thi PowerShell
+
+Chạy phần chuẩn bị trong **Terminal A**. Lệnh `createdb` chỉ chạy lần đầu; nếu database đã tồn tại thì giữ nguyên, không drop/reset.
+
+```powershell
+docker compose up -d postgres redis
+$pgUser = (docker compose exec -T postgres printenv POSTGRES_USER | Out-String).Trim()
+docker compose exec -T postgres createdb -U $pgUser gps_attendance_loadtest
+
+$env:NODE_ENV = 'test'
+$env:LOAD_TEST_MODE = 'true'
+$env:DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/gps_attendance_loadtest'
+pnpm --filter @gps-attendance/attendance exec prisma migrate deploy
+pnpm --filter @gps-attendance/attendance exec tsx test/load-seed.ts
+pnpm --filter @gps-attendance/attendance dev
+```
+
+Nếu thông tin PostgreSQL local khác mặc định Compose, sửa user/password trong `DATABASE_URL` cho khớp. Khi API đã chạy, đặt `MAX_VUS` không vượt quá 350 và chạy trong **Terminal B**. Ví dụ benchmark mức cao nhất đã xác nhận đạt:
+
+```powershell
+$env:BASE_URL = 'http://127.0.0.1:3000'
+$env:CHECKIN_FIXTURES = 'checkin-fixtures.local.json'
+$env:MAX_VUS = '313'
+$env:RAMP_VUS = '10'
+$env:RAMP_DURATION = '15s'
+$env:SPIKE_DURATION = '10s'
+$env:HOLD_DURATION = '30s'
+$env:COOLDOWN_DURATION = '10s'
+$env:P95_MS = '1000'
+$env:TECHNICAL_ERROR_RATE = '0.01'
+k6 run tests/load/checkin-burst.js --summary-export=tests/load/result-spike-313vu.local.json
+```
 
 ---
 
