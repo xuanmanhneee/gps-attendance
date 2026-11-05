@@ -1,12 +1,14 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTE_PATHS } from '../../routes/paths';
 import DashboardSidebar from '../DashboardSidebar';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const DashboardLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
@@ -19,7 +21,9 @@ export const DashboardLayout = () => {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
-          <Outlet />
+          <ErrorBoundary resetKey={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

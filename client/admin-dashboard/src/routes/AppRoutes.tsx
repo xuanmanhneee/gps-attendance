@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { DashboardLayout } from '../components/layout/DashboardLayout';
@@ -6,7 +7,6 @@ import AttendanceRecordsPage from '../pages/AttendanceRecordsPage';
 import DashboardPage from '../pages/DashboardPage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
-import SessionCreatePage from '../pages/SessionCreatePage';
 import SessionDetailPage from '../pages/SessionDetailPage';
 import SessionsPage from '../pages/SessionsPage';
 import StatisticsPage from '../pages/StatisticsPage';
@@ -18,6 +18,8 @@ import { useAuth } from '../hooks/useAuth';
 import ProtectedRoute from './ProtectedRoute';
 import { RoleGuard } from './RoleGuard';
 import { ROUTE_PATHS } from './paths';
+
+const SessionCreatePage = lazy(() => import('../pages/SessionCreatePage'));
 
 /** `/` đưa người dùng tới trang chủ của vai trò nếu đã đăng nhập, ngược lại về login. */
 const LandingRedirect = () => {
@@ -86,7 +88,11 @@ const AppRoutes = () => (
         <Route element={<RoleGuard allowedRoles={['organizer']} />}>
           <Route
             path={ROUTE_PATHS.attendanceSessionCreate}
-            element={<SessionCreatePage />}
+            element={
+              <Suspense fallback={<LoadingState />}>
+                <SessionCreatePage />
+              </Suspense>
+            }
           />
         </Route>
 

@@ -60,6 +60,10 @@ export const vi = {
   'common.locale.vi': 'Tiếng Việt',
   'common.locale.en': 'Tiếng Anh',
   'common.cancel': 'Hủy',
+  'common.errorBoundaryTitle': 'Đã xảy ra sự cố khi hiển thị trang',
+  'common.errorBoundaryBody':
+    'Hệ thống gặp lỗi không mong muốn trong quá trình kết xuất. Bạn có thể tải lại trang để thử lại.',
+  'common.reloadPage': 'Tải lại',
 
   // ---- Topbar ----
   'topbar.context.admin': 'Trung tâm điều hành',
@@ -422,4 +426,34 @@ export const vi = {
   'tags.error.tooManyRequests': 'Bạn thao tác quá nhanh, vui lòng thử lại sau.',
   'tags.error.internal': 'Máy chủ đang gặp sự cố, vui lòng thử lại sau.',
   'tags.error.unknown': 'Đã có lỗi xảy ra, vui lòng thử lại.',
+
+  // ---- Đăng nhập ----
+  'login.title': 'Hệ thống điểm danh GPS',
+  'login.heading': 'Đăng nhập tài khoản',
+  'login.subtitle': 'Chào mừng bạn trở lại! Nhập thông tin để vào hệ thống.',
+  'login.username.label': 'Tài khoản',
+  'login.username.placeholder': 'Nhập tên đăng nhập hoặc MSSV',
+  'login.username.required': 'Vui lòng nhập tên đăng nhập hoặc MSSV',
+  'login.password.label': 'Mật khẩu',
+  'login.password.required': 'Vui lòng nhập mật khẩu',
+  'login.password.show': 'Hiện mật khẩu',
+  'login.password.hide': 'Ẩn mật khẩu',
+  'login.rememberMe': 'Ghi nhớ thiết bị này',
+  'login.forgotPassword': 'Quên mật khẩu?',
+  'login.forgotPasswordHint':
+    'Vui lòng liên hệ quản trị viên để cấp lại mật khẩu.',
+  'login.submit': 'Đăng nhập',
+  'login.submitting': 'Đang đăng nhập...',
+  'login.success': 'Đăng nhập thành công!',
+  'login.footer': 'Hệ thống điểm danh GPS',
+  'login.theme.light': 'Chế độ sáng',
+  'login.theme.dark': 'Chế độ tối',
+  'login.theme.toggleToLight': 'Chuyển sang chế độ sáng',
+  'login.theme.toggleToDark': 'Chuyển sang chế độ tối',
+  'login.theme.titleLight': 'Chuyển sang giao diện sáng',
+  'login.theme.titleDark': 'Chuyển sang giao diện tối',
+  'login.error.invalidCredentials': 'Sai username hoặc password',
+  'login.error.accountNotLinked': 'Tài khoản chưa được liên kết',
+  'login.error.roleNotAllowed': 'Bạn không có quyền truy cập',
+  'login.error.generic': 'Đăng nhập thất bại',
 } as const;
