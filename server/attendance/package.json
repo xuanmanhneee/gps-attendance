@@ -9,6 +9,7 @@
     "postinstall": "prisma generate",
     "predev": "rimraf tsconfig.build.tsbuildinfo tsconfig.tsbuildinfo",
     "dev": "nest start --watch",
+    "dev:patch-review": "tsx scripts/dev/patch-review-candidate.ts",
     "debug": "nest start --debug --watch",
     "build": "nest build && tsc-alias",
     "start": "node dist/main",
