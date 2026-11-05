@@ -2,8 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  HttpException,
-  HttpStatus,
   Inject,
   Injectable,
 } from '@nestjs/common';
@@ -20,7 +18,6 @@ import {
 import { AttendanceSessionsService } from '../attendance-sessions/attendance-sessions.service';
 import { AttendanceValidationService } from '../attendance-validation/attendance-validation.service';
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
-import { RedisService } from '../redis/redis.service';
 import { UsersService } from '../users/users.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { LOGGER_FACTORY } from '../common/logging/logger.token';
@@ -39,7 +36,6 @@ export class AttendanceCheckInService {
     private readonly attendanceValidationService: AttendanceValidationService,
     private readonly attendanceRecordsService: AttendanceRecordsService,
     private readonly attemptCheck: AttemptCheck,
-    private readonly redisService: RedisService,
     private readonly usersService: UsersService,
     private readonly auditLogService: AuditLogService,
     @Inject(LOGGER_FACTORY) loggerFactory: ILoggerFactory,
@@ -92,21 +88,6 @@ export class AttendanceCheckInService {
     });
     if (attempt.isTooMany) {
       return { status: 'REJECTED', reasons: ['TOO_MANY_ATTEMPTS'] };
-    }
-
-    const cooldownAccepted = await this.redisService.set(
-      `attendance:cooldown:${dto.sessionId}:${userId}`,
-      '1',
-      { ttlSec: 10, ifNotExists: true },
-    );
-    if (cooldownAccepted === null) {
-      throw new HttpException(
-        {
-          code: AttendanceReviewErrorCode.COOLDOWN,
-          message: 'Vui lòng thử lại sau vài giây',
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
     }
 
     const validation = this.attendanceValidationService.validate({

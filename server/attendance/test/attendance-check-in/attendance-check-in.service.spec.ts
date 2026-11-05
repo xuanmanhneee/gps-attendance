@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  HttpException,
 } from '@nestjs/common';
 import {
   AttendanceReviewErrorCode,
@@ -64,7 +63,6 @@ describe('AttendanceCheckInService concurrent requests', () => {
         ) => records.tryMarkPresentAndClaimDevice(input, deviceId, ttl),
       } as never,
       { evaluate: jest.fn().mockResolvedValue({ isTooMany: false }) } as never,
-      { set: jest.fn().mockResolvedValue('OK') } as never,
       { findByIds: jest.fn().mockResolvedValue([]) } as never,
       { record: jest.fn() } as never,
       {
@@ -172,16 +170,4 @@ describe('AttendanceCheckInService concurrent requests', () => {
     expect(await records.getRecord(1, 1)).toMatchObject({ status: 'absent' });
   });
 
-  it('cooldown chặn trước validate', async () => {
-    (service as any).redisService.set.mockResolvedValue(null);
-    const validate = (service as any).attendanceValidationService.validate;
-
-    await expect(
-      service.checkIn(requestFor('device-1'), 1),
-    ).rejects.toMatchObject({
-      response: { code: AttendanceReviewErrorCode.COOLDOWN },
-      constructor: HttpException,
-    });
-    expect(validate).not.toHaveBeenCalled();
-  });
 });

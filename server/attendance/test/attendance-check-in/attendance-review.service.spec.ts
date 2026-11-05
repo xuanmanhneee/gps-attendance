@@ -42,7 +42,6 @@ describe('AttendanceCheckInService review resolution audit', () => {
       } as never,
       {} as never,
       {} as never,
-      {} as never,
       audit as never,
       { create: () => logger } as never,
     );

@@ -215,7 +215,6 @@ Các endpoint unit hiện là public và base path là `/units`.
 
 | Code                                         | Ý nghĩa                                          |
 | -------------------------------------------- | ------------------------------------------------ |
-| `ATTENDANCE_REVIEW_COOLDOWN`                 | Check-in lại trong thời gian cooldown            |
 | `ATTENDANCE_REVIEW_USER_NOT_IN_SESSION`      | Không có record của user trong phiên             |
 | `ATTENDANCE_REVIEW_ALREADY_CHECKED_IN`       | Record đã `present`                              |
 | `ATTENDANCE_REVIEW_RECORD_LOCKED`            | Organizer đã chốt record                         |
