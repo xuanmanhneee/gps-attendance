@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { AttendanceRecord, MarkPresentInput } from '../attendance-record.model';
+import { AttendanceReviewCandidate } from '../attendance-review.model';
 import {
   IAttendanceRecordBuffer,
   MarkPresentResult,
-  RequestReviewResult,
   ResolveReviewResult,
 } from '#attendance-record/attendance-record.buffer';
 
@@ -11,6 +11,10 @@ import {
 export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
   private recordsBySession = new Map<number, Map<number, AttendanceRecord>>();
   private usedDevicesBySession = new Map<number, Set<string>>();
+  private reviewCandidatesBySession = new Map<
+    number,
+    Map<number, AttendanceReviewCandidate>
+  >();
   private flushingSessions = new Set<number>();
 
   async getRecord(
@@ -67,17 +71,16 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
       return 'locked';
 
     if (input.validationStatus === 'REVIEW') {
-      sessionMap!.set(input.userId, {
+      let candidates = this.reviewCandidatesBySession.get(input.sessionId);
+      if (!candidates) {
+        candidates = new Map();
+        this.reviewCandidatesBySession.set(input.sessionId, candidates);
+      }
+      candidates.set(input.userId, {
         sessionId: input.sessionId,
         userId: input.userId,
-        status: 'absent',
-        checkedInAt: null,
-        latitude: null,
-        longitude: null,
-        accuracy: null,
-        updateBy: null,
-        updatedAt: new Date(),
-        reasons: input.reasons,
+        reasons: input.reasons ?? [],
+        createdAt: new Date(),
       });
       return 'review';
     }
@@ -89,6 +92,7 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     }
     if (usedDevices.has(deviceId)) return 'device-used';
 
+    this.reviewCandidatesBySession.get(input.sessionId)?.delete(input.userId);
     sessionMap!.set(input.userId, {
       sessionId: input.sessionId,
       userId: input.userId,
@@ -104,25 +108,6 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     return 'present';
   }
 
-  async requestReview(
-    sessionId: number,
-    userId: number,
-    note?: string,
-  ): Promise<RequestReviewResult> {
-    if (this.flushingSessions.has(sessionId)) return 'session-flushing';
-    const record = this.recordsBySession.get(sessionId)?.get(userId);
-    if (!record) return 'record-missing';
-    if (record.updateBy !== null) return 'locked';
-    if (record.status !== 'absent' || !record.reasons?.length)
-      return 'not-eligible';
-    Object.assign(record, {
-      reviewRequested: true,
-      note,
-      updatedAt: new Date(),
-    });
-    return 'requested';
-  }
-
   async resolveReview(
     sessionId: number,
     userId: number,
@@ -133,17 +118,38 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
       return { status: 'session-flushing' };
     const record = this.recordsBySession.get(sessionId)?.get(userId);
     if (!record) return { status: 'record-missing' };
+    const candidate = this.reviewCandidatesBySession.get(sessionId)?.get(userId);
+    if (!candidate) return { status: 'not-requested' };
     if (record.updateBy !== null) return { status: 'locked' };
-    if (record.status !== 'absent' || record.reviewRequested !== true) {
+    if (record.status !== 'absent') {
       return { status: 'not-requested' };
     }
     const previousStatus = record.status;
     Object.assign(record, {
       status: decision === 'approve' ? 'present' : 'absent',
+      ...(decision === 'approve'
+        ? {
+            checkedInAt: candidate.createdAt,
+          }
+        : {}),
       updateBy: resolverId,
       updatedAt: new Date(),
     });
-    return { status: 'resolved', previousStatus, record: { ...record } };
+    this.reviewCandidatesBySession.get(sessionId)!.delete(userId);
+    return {
+      status: 'resolved',
+      previousStatus,
+      record: { ...record },
+      candidate: { ...candidate },
+    };
+  }
+
+  async findReviewCandidates(
+    sessionId: number,
+  ): Promise<AttendanceReviewCandidate[]> {
+    return [
+      ...(this.reviewCandidatesBySession.get(sessionId)?.values() ?? []),
+    ];
   }
 
   async beginSessionFlush(sessionId: number): Promise<AttendanceRecord[]> {
@@ -154,6 +160,7 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
   async completeSessionFlush(sessionId: number): Promise<void> {
     this.recordsBySession.delete(sessionId);
     this.usedDevicesBySession.delete(sessionId);
+    this.reviewCandidatesBySession.delete(sessionId);
     this.flushingSessions.delete(sessionId);
   }
 

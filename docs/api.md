@@ -123,29 +123,13 @@ Reason có thể trả về:
 Review chỉ tồn tại trong Redis đến hết cửa sổ chốt 10 phút sau `closeAt`.
 Client không được gửi `reasons`.
 
-### Gửi yêu cầu
+### Danh sách review candidate
 
-`POST /v0/attendance/review-requests`
-
-- Quyền: JWT, `participant`.
-- Chỉ hợp lệ khi record vẫn `absent`, chưa khóa và có reasons từ lần check-in
-  `REVIEW` gần nhất.
-
-```json
-{
-  "sessionId": 1,
-  "note": "Em đang có mặt trong lớp"
-}
-```
-
-`note` là tùy chọn, tối đa 300 ký tự.
-
-### Danh sách yêu cầu
-
-`GET /v0/attendance/sessions/:sessionId/review-requests`
+`GET /v0/attendance/sessions/:sessionId/reviews`
 
 - Quyền: JWT, `organizer` tạo phiên.
-- Chỉ trả record có `reviewRequested = true` và chưa bị khóa.
+- Candidate được tạo tự động từ lần check-in trả `REVIEW`.
+- Client không cần gửi thêm request và không được gửi reasons.
 
 ```json
 [
@@ -157,15 +141,14 @@ Client không được gửi `reasons`.
       "role": "participant",
       "fullname": "Nguyễn Văn A"
     },
-    "reasons": ["LOW_CONFIDENCE_SCORE"],
-    "note": "Em đang có mặt trong lớp"
+    "reasons": ["LOW_CONFIDENCE_SCORE"]
   }
 ]
 ```
 
 ### Duyệt hoặc từ chối
 
-`PATCH /v0/attendance/sessions/:sessionId/review-requests/:userId`
+`PATCH /v0/attendance/sessions/:sessionId/reviews/:userId`
 
 - Quyền: JWT, `organizer` tạo phiên.
 - Chỉ xử lý từ `openAt` đến `closeAt + 10 phút`.
@@ -236,8 +219,7 @@ Các endpoint unit hiện là public và base path là `/units`.
 | `ATTENDANCE_REVIEW_USER_NOT_IN_SESSION`      | Không có record của user trong phiên             |
 | `ATTENDANCE_REVIEW_ALREADY_CHECKED_IN`       | Record đã `present`                              |
 | `ATTENDANCE_REVIEW_RECORD_LOCKED`            | Organizer đã chốt record                         |
-| `ATTENDANCE_REVIEW_NOT_ELIGIBLE`             | Record không có reasons hợp lệ để yêu cầu review |
-| `ATTENDANCE_REVIEW_REQUEST_NOT_FOUND`        | Không có yêu cầu review đang chờ                 |
+| `ATTENDANCE_REVIEW_CANDIDATE_NOT_FOUND`      | Không có review candidate đang chờ                |
 | `ATTENDANCE_REVIEW_RESOLUTION_WINDOW_CLOSED` | Ngoài cửa sổ chốt hoặc buffer đang flush         |
 
 Các nhóm code còn lại được định nghĩa tại

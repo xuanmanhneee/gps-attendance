@@ -1,7 +1,4 @@
-import {
-  AttendanceStatus,
-  AttendanceValidationReason,
-} from '@gps-attendance/shared';
+import { AttendanceStatus, AttendanceValidationReason } from '@gps-attendance/shared';
 
 export interface AttendanceRecord {
   sessionId: number;
@@ -13,9 +10,6 @@ export interface AttendanceRecord {
   accuracy: number | null;
   updatedAt: Date;
   updateBy: number | null;
-  reasons?: AttendanceValidationReason[];
-  reviewRequested?: boolean;
-  note?: string;
 }
 
 export interface MarkPresentInput {

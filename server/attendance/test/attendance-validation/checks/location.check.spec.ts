@@ -1,8 +1,8 @@
 import { Location } from '@gps-attendance/shared';
 
-import { AttendanceSession } from '../../attendance-sessions/attendance-session.model';
-import { GeoService } from '../../geo/geo.service';
-import { LocationCheck } from './location.check';
+import { AttendanceSession } from '../../../src/attendance-sessions/attendance-session.model';
+import { GeoService } from '../../../src/geo/geo.service';
+import { LocationCheck } from '../../../src/attendance-validation/checks/location.check';
 
 const location = (accuracy: number): Location => ({
   latitude: 10,

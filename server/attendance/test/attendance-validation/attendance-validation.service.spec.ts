@@ -1,4 +1,4 @@
-import { AttendanceValidationService } from './attendance-validation.service';
+import { AttendanceValidationService } from '../../src/attendance-validation/attendance-validation.service';
 
 const input = {
   session: {

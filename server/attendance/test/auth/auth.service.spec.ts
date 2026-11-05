@@ -1,6 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common';
 
-import { AuthService } from './auth.service';
+import { AuthService } from '../../src/auth/auth.service';
 
 describe('AuthService.refresh', () => {
   const accounts = { findById: jest.fn(), findByUserId: jest.fn() };

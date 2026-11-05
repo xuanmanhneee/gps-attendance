@@ -1,5 +1,5 @@
-import { AttemptCheck } from './attempt.check';
-import { IAttendanceCheckInAttemptRepository } from '../repositories/attendance-check-in-attempt.repository';
+import { AttemptCheck } from '../../../src/attendance-check-in/checks/attempt.check';
+import { IAttendanceCheckInAttemptRepository } from '../../../src/attendance-check-in/repositories/attendance-check-in-attempt.repository';
 
 describe('AttemptCheck', () => {
   it('allows attempts up to the third one in a two-minute window', async () => {

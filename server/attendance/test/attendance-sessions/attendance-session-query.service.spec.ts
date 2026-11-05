@@ -1,4 +1,4 @@
-import { AttendanceSessionQueryService } from './attendance-session-query.service';
+import { AttendanceSessionQueryService } from '../../src/attendance-sessions/attendance-session-query.service';
 
 const session = {
   id: 7,

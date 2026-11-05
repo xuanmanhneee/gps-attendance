@@ -1,4 +1,4 @@
-import { InMemoryAttendanceRecordStore } from './in-memory-attendance-record.repository';
+import { InMemoryAttendanceRecordStore } from '../../../src/attendance-record/infra/in-memory-attendance-record.repository';
 
 describe('InMemoryAttendanceRecordStore', () => {
   const absent = (userId: number) => ({
@@ -81,8 +81,10 @@ describe('InMemoryAttendanceRecordStore', () => {
     expect(await store.getRecord(1, 2)).toMatchObject({
       status: 'absent',
       updateBy: null,
-      reasons: ['OUT_OF_RANGE'],
     });
+    expect(await store.findReviewCandidates(1)).toEqual([
+      expect.objectContaining({ reasons: ['OUT_OF_RANGE'] }),
+    ]);
   });
 
   it('chỉ giữ thiết bị khi VALID', async () => {
@@ -114,25 +116,13 @@ describe('InMemoryAttendanceRecordStore', () => {
       'device-1',
       3600,
     );
-    await store.requestReview(1, 1, 'Em có mặt');
-
     await expect(
       store.tryMarkPresentAndClaimDevice(checkIn(1, 'VALID'), 'device-1', 3600),
     ).resolves.toBe('present');
 
     const record = await store.getRecord(1, 1);
     expect(record).toMatchObject({ status: 'present', updateBy: 1 });
-    expect(record).not.toHaveProperty('reasons');
-    expect(record).not.toHaveProperty('reviewRequested');
-    expect(record).not.toHaveProperty('note');
-  });
-
-  it('không cho gửi yêu cầu nếu record chưa có reasons', async () => {
-    const store = new InMemoryAttendanceRecordStore();
-    await store.insertRecordIfAbsent(absent(2));
-    await expect(store.requestReview(1, 2, 'Có mặt')).resolves.toBe(
-      'not-eligible',
-    );
+    expect(await store.findReviewCandidates(1)).toHaveLength(0);
   });
 
   it.each([
@@ -146,7 +136,6 @@ describe('InMemoryAttendanceRecordStore', () => {
       'device-2',
       3600,
     );
-    await store.requestReview(1, 2, 'Em có mặt');
     await expect(
       store.resolveReview(1, 2, decision, 99),
     ).resolves.toMatchObject({
@@ -166,8 +155,6 @@ describe('InMemoryAttendanceRecordStore', () => {
       'device-2',
       3600,
     );
-    await store.requestReview(1, 2);
-
     const results = await Promise.all([
       store.resolveReview(1, 2, 'approve', 98),
       store.resolveReview(1, 2, 'reject', 99),
@@ -175,9 +162,9 @@ describe('InMemoryAttendanceRecordStore', () => {
     expect(
       results.filter((result) => result.status === 'resolved'),
     ).toHaveLength(1);
-    expect(results.filter((result) => result.status === 'locked')).toHaveLength(
-      1,
-    );
+    expect(
+      results.filter((result) => result.status === 'not-requested'),
+    ).toHaveLength(1);
   });
 
   it('chặn ghi mới sau khi bắt đầu flush và chỉ xoá sau khi complete', async () => {

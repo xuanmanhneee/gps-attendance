@@ -1,4 +1,4 @@
-import { AttendanceCheckInService } from './attendance-check-in.service';
+import { AttendanceCheckInService } from '../../src/attendance-check-in/attendance-check-in.service';
 
 describe('AttendanceCheckInService review resolution audit', () => {
   it('giữ quyết định thành công khi ghi audit lỗi và log đủ entry', async () => {
@@ -31,8 +31,12 @@ describe('AttendanceCheckInService review resolution audit', () => {
             userId: 2,
             status: 'present',
             updateBy: 99,
+          },
+          candidate: {
+            sessionId: 1,
+            userId: 2,
             reasons: ['LOW_CONFIDENCE_SCORE'],
-            note: 'Em có mặt',
+            createdAt: new Date(now),
           },
         }),
       } as never,
@@ -53,7 +57,6 @@ describe('AttendanceCheckInService review resolution audit', () => {
         newValue: { status: 'present' },
         metadata: {
           reasons: ['LOW_CONFIDENCE_SCORE'],
-          studentNote: 'Em có mặt',
         },
       }),
     );

@@ -1,6 +1,6 @@
 import { RedisService } from '#redis/redis.service';
 
-import { RedisAttendanceCheckInAttemptRepository } from './redis-attendance-checkin-attempt.repository';
+import { RedisAttendanceCheckInAttemptRepository } from '../../../../src/attendance-check-in/infra/redis/redis-attendance-checkin-attempt.repository';
 
 describe('RedisAttendanceCheckInAttemptRepository', () => {
   it('records an attempt in the sliding window atomically', async () => {

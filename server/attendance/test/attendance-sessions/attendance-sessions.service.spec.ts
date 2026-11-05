@@ -9,10 +9,10 @@ import {
   isValidUserFilterCriteria,
 } from '@gps-attendance/shared';
 
-import { AttendanceSessionsService } from './attendance-sessions.service';
-import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
-import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto';
-import { InMemoryAttendanceSessionRepository } from './infra/in-memory/in-memory-attendance-session.repository';
+import { AttendanceSessionsService } from '../../src/attendance-sessions/attendance-sessions.service';
+import { CreateAttendanceSessionDto } from '../../src/attendance-sessions/dto/create-attendance-session.dto';
+import { UpdateAttendanceSessionDto } from '../../src/attendance-sessions/dto/update-attendance-session.dto';
+import { InMemoryAttendanceSessionRepository } from '../../src/attendance-sessions/infra/in-memory/in-memory-attendance-session.repository';
 // chỉnh path đúng theo project
 
 jest.mock('@gps-attendance/shared', () => ({

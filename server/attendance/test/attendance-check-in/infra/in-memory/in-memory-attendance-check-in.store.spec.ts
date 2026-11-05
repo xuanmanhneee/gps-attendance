@@ -1,4 +1,4 @@
-import { InMemoryAttendanceCheckInStore } from './in-memory-attendance-check-in.store';
+import { InMemoryAttendanceCheckInStore } from '../../../../src/attendance-check-in/infra/in-memory/in-memory-attendance-check-in.store';
 
 describe('InMemoryAttendanceCheckInStore attempt window', () => {
   beforeEach(() => {

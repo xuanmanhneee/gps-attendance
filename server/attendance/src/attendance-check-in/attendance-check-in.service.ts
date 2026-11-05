@@ -10,7 +10,7 @@ import {
 import {
   AttendanceReviewDecision,
   AttendanceReviewErrorCode,
-  AttendanceReviewRequestResponse,
+  AttendanceReviewCandidateResponse,
   AttendanceSessionErrorCode,
   AuditAction,
   AuditEntityType,
@@ -176,30 +176,10 @@ export class AttendanceCheckInService {
       : { status: 'REVIEW', reasons: validation.reasons };
   }
 
-  async requestReview(
-    sessionId: number,
-    userId: number,
-    note?: string,
-  ): Promise<void> {
-    const session = await this.attendanceSessionsService.findById(sessionId);
-    if (session.status === 'cancelled') {
-      throw new BadRequestException({
-        code: AttendanceSessionErrorCode.INVALID_TIME_RANGE,
-        message: 'Phiên điểm danh đã bị huỷ',
-      });
-    }
-    const result = await this.attendanceRecordsService.requestReview(
-      sessionId,
-      userId,
-      note,
-    );
-    this.throwForReviewMutationFailure(result);
-  }
-
-  async listReviewRequests(
+  async listReviewCandidates(
     sessionId: number,
     lecturerId: number,
-  ): Promise<AttendanceReviewRequestResponse[]> {
+  ): Promise<AttendanceReviewCandidateResponse[]> {
     const session = await this.assertReviewOwner(sessionId, lecturerId);
     if (session.status === 'cancelled') {
       throw new BadRequestException({
@@ -209,7 +189,7 @@ export class AttendanceCheckInService {
     }
 
     const records =
-      await this.attendanceRecordsService.findReviewRequestsBySession(
+      await this.attendanceRecordsService.findReviewCandidatesBySession(
         sessionId,
       );
     const users = await this.usersService.findByIds(
@@ -219,7 +199,7 @@ export class AttendanceCheckInService {
 
     return records.flatMap((record) => {
       const student = usersById.get(record.userId);
-      if (!student || !record.reasons?.length) return [];
+      if (!student) return [];
       return [
         {
           sessionId,
@@ -230,7 +210,6 @@ export class AttendanceCheckInService {
             fullname: student.fullname,
           },
           reasons: record.reasons,
-          ...(record.note ? { note: record.note } : {}),
         },
       ];
     });
@@ -276,8 +255,7 @@ export class AttendanceCheckInService {
       oldValue: { status: result.previousStatus },
       newValue: { status: result.record.status },
       metadata: {
-        reasons: result.record.reasons ?? [],
-        studentNote: result.record.note ?? null,
+        reasons: result.candidate.reasons,
       },
     };
 
@@ -306,14 +284,11 @@ export class AttendanceCheckInService {
 
   private throwForReviewMutationFailure(
     result:
-      | 'requested'
       | 'record-missing'
       | 'locked'
-      | 'not-eligible'
       | 'not-requested'
       | 'session-flushing',
   ): void {
-    if (result === 'requested') return;
     if (result === 'locked') {
       throw new ConflictException({
         code: AttendanceReviewErrorCode.RECORD_LOCKED,
@@ -333,11 +308,8 @@ export class AttendanceCheckInService {
       });
     }
     throw new BadRequestException({
-      code:
-        result === 'not-requested'
-          ? AttendanceReviewErrorCode.REQUEST_NOT_FOUND
-          : AttendanceReviewErrorCode.NOT_ELIGIBLE,
-      message: 'Record không có yêu cầu review hợp lệ',
+      code: AttendanceReviewErrorCode.CANDIDATE_NOT_FOUND,
+      message: 'Không tìm thấy review candidate',
     });
   }
 }

@@ -4,6 +4,7 @@ import { IJobScheduler } from '#job-scheduler/job-scheduler.interface';
 import { JOB_SCHEDULER } from '#job-scheduler/job-scheduler.token';
 
 import { AttendanceRecord, MarkPresentInput } from './attendance-record.model';
+import { AttendanceReviewCandidate } from './attendance-review.model';
 import { LOGGER_FACTORY } from '../common/logging/logger.token';
 import { ILogger } from '../common/logging/logger.interface';
 import { ILoggerFactory } from '../common/logging/logger.factory';
@@ -63,16 +64,7 @@ export class AttendanceRecordsService {
       return;
     }
 
-    // Các field review chỉ sống trong Redis; tạo object mới để không thể lọt vào Prisma.
-    const persistentRecords = records.map(
-      ({
-        reasons: _reasons,
-        reviewRequested: _reviewRequested,
-        note: _note,
-        ...record
-      }) => record,
-    );
-    await this.attendanceRecordRepository.bulkUpsert(persistentRecords);
+    await this.attendanceRecordRepository.bulkUpsert(records);
     await this.attendanceRecordBuffer.completeSessionFlush(sessionId);
 
     this.logger.log(
@@ -129,10 +121,6 @@ export class AttendanceRecordsService {
     );
   }
 
-  requestReview(sessionId: number, userId: number, note?: string) {
-    return this.attendanceRecordBuffer.requestReview(sessionId, userId, note);
-  }
-
   resolveReview(
     sessionId: number,
     userId: number,
@@ -147,13 +135,10 @@ export class AttendanceRecordsService {
     );
   }
 
-  async findReviewRequestsBySession(
+  async findReviewCandidatesBySession(
     sessionId: number,
-  ): Promise<AttendanceRecord[]> {
-    const records = await this.attendanceRecordBuffer.findBySession(sessionId);
-    return records.filter(
-      (record) => record.reviewRequested === true && record.updateBy === null,
-    );
+  ): Promise<AttendanceReviewCandidate[]> {
+    return this.attendanceRecordBuffer.findReviewCandidates(sessionId);
   }
 
   // Đọc buffer trước (dữ liệu mới nhất khi session đang mở), fallback sang

@@ -1,6 +1,6 @@
 import { validateSync } from 'class-validator';
 
-import { LocationDto } from './attendance-check-in.dto';
+import { LocationDto } from '../../src/attendance-check-in/attendance-check-in.dto';
 
 const validLocation = {
   latitude: 10,

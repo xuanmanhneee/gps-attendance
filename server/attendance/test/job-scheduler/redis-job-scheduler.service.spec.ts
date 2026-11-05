@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import Redis from 'ioredis';
 
-import { RedisService } from '../redis/redis.service';
-import { RedisJobSchedulerService } from './redis-job-scheduler.service';
+import { RedisService } from '../../src/redis/redis.service';
+import { RedisJobSchedulerService } from '../../src/job-scheduler/redis-job-scheduler.service';
 
 jest.mock('@nestjs/schedule', () => ({ Interval: () => () => undefined }));
 

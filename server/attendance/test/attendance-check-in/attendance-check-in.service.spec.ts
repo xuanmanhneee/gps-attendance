@@ -8,9 +8,9 @@ import {
   AttendanceSessionErrorCode,
 } from '@gps-attendance/shared';
 
-import { AttendanceCheckInService } from './attendance-check-in.service';
-import { CheckInRequestDto } from './attendance-check-in.dto';
-import { InMemoryAttendanceRecordStore } from '../attendance-record/infra/in-memory-attendance-record.repository';
+import { AttendanceCheckInService } from '../../src/attendance-check-in/attendance-check-in.service';
+import { CheckInRequestDto } from '../../src/attendance-check-in/attendance-check-in.dto';
+import { InMemoryAttendanceRecordStore } from '../../src/attendance-record/infra/in-memory-attendance-record.repository';
 
 const session = {
   id: 1,
@@ -126,7 +126,7 @@ describe('AttendanceCheckInService concurrent requests', () => {
     expect((await records.getRecord(1, 1))?.status).toBe('absent');
   });
 
-  it('lưu REVIEW là absent kèm reasons và không giữ thiết bị', async () => {
+  it('lưu REVIEW candidate riêng, giữ record absent và không giữ thiết bị', async () => {
     (service as any).attendanceValidationService.validate.mockReturnValue({
       status: 'REVIEW',
       reasons: ['LOW_CONFIDENCE_SCORE'],
@@ -140,9 +140,14 @@ describe('AttendanceCheckInService concurrent requests', () => {
     });
     expect(await records.getRecord(1, 1)).toMatchObject({
       status: 'absent',
-      reasons: ['LOW_CONFIDENCE_SCORE'],
       updateBy: null,
     });
+    expect(await records.findReviewCandidates(1)).toEqual([
+      expect.objectContaining({
+        userId: 1,
+        reasons: ['LOW_CONFIDENCE_SCORE'],
+      }),
+    ]);
 
     (service as any).attendanceValidationService.validate.mockReturnValue({
       status: 'VALID',

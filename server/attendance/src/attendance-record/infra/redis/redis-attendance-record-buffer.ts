@@ -5,10 +5,10 @@ import {
   AttendanceRecord,
   MarkPresentInput,
 } from '../../attendance-record.model';
+import { AttendanceReviewCandidate } from '../../attendance-review.model';
 import {
   IAttendanceRecordBuffer,
   MarkPresentResult,
-  RequestReviewResult,
   ResolveReviewResult,
 } from '../../attendance-record.buffer';
 import { RedisService } from '../../../redis/redis.service'; // chỉnh path đúng theo project
@@ -18,6 +18,7 @@ const flushingKeyFor = (sessionId: number) =>
   `attendance:buffer-flushing:${sessionId}`;
 const deviceKeyFor = (sessionId: number, deviceId: string) =>
   `attendance:device:${sessionId}:${deviceId}`;
+const reviewKeyFor = (sessionId: number) => `attendance:review:${sessionId}`;
 
 // Kiểm tra record và giữ device trong cùng một thao tác Redis. Hai request
 // đồng thời không thể cùng ghi present hoặc dùng chung một device.
@@ -29,26 +30,13 @@ local rec = cjson.decode(existing)
 if rec.status == 'present' then return 1 end
 if rec.status ~= 'absent' or (rec.updateBy ~= nil and rec.updateBy ~= cjson.null) then return 5 end
 if ARGV[4] == 'REVIEW' then
-  redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+  redis.call('HSET', KEYS[4], ARGV[1], ARGV[5])
   return 6
 end
 if redis.call('EXISTS', KEYS[2]) == 1 then return 2 end
+redis.call('HDEL', KEYS[4], ARGV[1])
 redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
 redis.call('SET', KEYS[2], ARGV[1], 'EX', ARGV[3])
-return 3
-`;
-
-const REQUEST_REVIEW_SCRIPT = `
-if redis.call('EXISTS', KEYS[2]) == 1 then return 4 end
-local existing = redis.call('HGET', KEYS[1], ARGV[1])
-if not existing then return 0 end
-local rec = cjson.decode(existing)
-if rec.updateBy ~= nil and rec.updateBy ~= cjson.null then return 1 end
-if rec.status ~= 'absent' or rec.reasons == nil or #rec.reasons == 0 then return 2 end
-rec.reviewRequested = true
-if ARGV[2] == '' then rec.note = nil else rec.note = ARGV[2] end
-rec.updatedAt = ARGV[3]
-redis.call('HSET', KEYS[1], ARGV[1], cjson.encode(rec))
 return 3
 `;
 
@@ -57,14 +45,21 @@ if redis.call('EXISTS', KEYS[2]) == 1 then return {4} end
 local existing = redis.call('HGET', KEYS[1], ARGV[1])
 if not existing then return {0} end
 local rec = cjson.decode(existing)
+local candidateRaw = redis.call('HGET', KEYS[3], ARGV[1])
+if not candidateRaw then return {2} end
+local candidate = cjson.decode(candidateRaw)
 if rec.updateBy ~= nil and rec.updateBy ~= cjson.null then return {1} end
-if rec.status ~= 'absent' or rec.reviewRequested ~= true then return {2} end
+if rec.status ~= 'absent' then return {1} end
 local previousStatus = rec.status
 if ARGV[2] == 'approve' then rec.status = 'present' else rec.status = 'absent' end
+if ARGV[2] == 'approve' then
+  rec.checkedInAt = candidate.createdAt
+end
 rec.updateBy = tonumber(ARGV[3])
 rec.updatedAt = ARGV[4]
 redis.call('HSET', KEYS[1], ARGV[1], cjson.encode(rec))
-return {3, previousStatus, cjson.encode(rec)}
+redis.call('HDEL', KEYS[3], ARGV[1])
+return {3, previousStatus, cjson.encode(rec), candidateRaw}
 `;
 
 const BEGIN_SESSION_FLUSH_SCRIPT = `
@@ -73,7 +68,7 @@ return redis.call('HVALS', KEYS[1])
 `;
 
 const COMPLETE_SESSION_FLUSH_SCRIPT = `
-return redis.call('DEL', KEYS[1], KEYS[2])
+return redis.call('DEL', KEYS[1], KEYS[2], KEYS[3])
 `;
 
 @Injectable()
@@ -165,12 +160,19 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
         keyFor(input.sessionId),
         deviceKeyFor(input.sessionId, deviceId),
         flushingKeyFor(input.sessionId),
+        reviewKeyFor(input.sessionId),
       ],
       [
         String(input.userId),
         JSON.stringify(record),
         String(deviceTtlSeconds),
         input.validationStatus,
+        JSON.stringify({
+          sessionId: input.sessionId,
+          userId: input.userId,
+          reasons: input.reasons ?? [],
+          createdAt: new Date().toISOString(),
+        }),
       ],
     );
 
@@ -194,30 +196,6 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
     }
   }
 
-  async requestReview(
-    sessionId: number,
-    userId: number,
-    note?: string,
-  ): Promise<RequestReviewResult> {
-    const result = await this.redisService.eval(
-      REQUEST_REVIEW_SCRIPT,
-      [keyFor(sessionId), flushingKeyFor(sessionId)],
-      [String(userId), note ?? '', new Date().toISOString()],
-    );
-
-    const results: RequestReviewResult[] = [
-      'record-missing',
-      'locked',
-      'not-eligible',
-      'requested',
-      'session-flushing',
-    ];
-    const mapped = results[Number(result)];
-    if (!mapped)
-      throw new Error(`Unexpected review request result: ${String(result)}`);
-    return mapped;
-  }
-
   async resolveReview(
     sessionId: number,
     userId: number,
@@ -226,7 +204,7 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
   ): Promise<ResolveReviewResult> {
     const result = await this.redisService.eval(
       RESOLVE_REVIEW_SCRIPT,
-      [keyFor(sessionId), flushingKeyFor(sessionId)],
+      [keyFor(sessionId), flushingKeyFor(sessionId), reviewKeyFor(sessionId)],
       [String(userId), decision, String(resolverId), new Date().toISOString()],
     );
     if (!Array.isArray(result)) {
@@ -238,6 +216,7 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
         status: 'resolved',
         previousStatus: String(result[1]) as AttendanceRecord['status'],
         record: this.deserialize(String(result[2])),
+        candidate: this.deserializeCandidate(String(result[3])),
       };
     }
     const failures = [
@@ -269,13 +248,20 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
   async completeSessionFlush(sessionId: number): Promise<void> {
     await this.redisService.eval(
       COMPLETE_SESSION_FLUSH_SCRIPT,
-      [keyFor(sessionId), flushingKeyFor(sessionId)],
+      [keyFor(sessionId), flushingKeyFor(sessionId), reviewKeyFor(sessionId)],
       [],
     );
   }
 
   async clearSession(sessionId: number): Promise<void> {
     await this.completeSessionFlush(sessionId);
+  }
+
+  async findReviewCandidates(
+    sessionId: number,
+  ): Promise<AttendanceReviewCandidate[]> {
+    const all = await this.redisService.hgetall(reviewKeyFor(sessionId));
+    return Object.values(all).map((raw) => this.deserializeCandidate(raw));
   }
 
   private deserialize(raw: string): AttendanceRecord {
@@ -286,6 +272,14 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
       // đúng kiểu Date như AttendanceRecord yêu cầu.
       checkedInAt: parsed.checkedInAt ? new Date(parsed.checkedInAt) : null,
       updatedAt: new Date(parsed.updatedAt),
+    };
+  }
+
+  private deserializeCandidate(raw: string): AttendanceReviewCandidate {
+    const parsed = JSON.parse(raw);
+    return {
+      ...parsed,
+      createdAt: new Date(parsed.createdAt),
     };
   }
 }

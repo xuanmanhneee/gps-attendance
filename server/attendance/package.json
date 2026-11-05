@@ -80,29 +80,32 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
+    "rootDir": ".",
+    "testRegex": "test/.*\\.spec\\.ts$",
     "moduleNameMapper": {
-      "^#account/(.*)$": "<rootDir>/account/$1",
-      "^#attendance-check-in/(.*)$": "<rootDir>/attendance-check-in/$1",
-      "^#attendance-record/(.*)$": "<rootDir>/attendance-record/$1",
-      "^#attendance-sessions/(.*)$": "<rootDir>/attendance-sessions/$1",
-      "^#attendance-validation/(.*)$": "<rootDir>/attendance-validation/$1",
-      "^#auth/(.*)$": "<rootDir>/auth/$1",
-      "^#tag/(.*)$": "<rootDir>/tags/$1",
-      "^#units/(.*)$": "<rootDir>/units/$1",
-      "^#common/(.*)$": "<rootDir>/common/$1",
-      "^#geo/(.*)$": "<rootDir>/geo/$1",
-      "^#prisma/(.*)$": "<rootDir>/prisma/$1",
-      "^#user/(.*)$": "<rootDir>/users/$1",
-      "^#redis/(.*)$": "<rootDir>/redis/$1",
-      "^#job-scheduler/(.*)$": "<rootDir>/job-scheduler/$1"
+      "^#account/(.*)$": "<rootDir>/src/account/$1",
+      "^#attendance-check-in/(.*)$": "<rootDir>/src/attendance-check-in/$1",
+      "^#attendance-record/(.*)$": "<rootDir>/src/attendance-record/$1",
+      "^#attendance-sessions/(.*)$": "<rootDir>/src/attendance-sessions/$1",
+      "^#attendance-validation/(.*)$": "<rootDir>/src/attendance-validation/$1",
+      "^#auth/(.*)$": "<rootDir>/src/auth/$1",
+      "^#tag/(.*)$": "<rootDir>/src/tags/$1",
+      "^#units/(.*)$": "<rootDir>/src/units/$1",
+      "^#common/(.*)$": "<rootDir>/src/common/$1",
+      "^#geo/(.*)$": "<rootDir>/src/geo/$1",
+      "^#prisma/(.*)$": "<rootDir>/src/prisma/$1",
+      "^#user/(.*)$": "<rootDir>/src/users/$1",
+      "^#redis/(.*)$": "<rootDir>/src/redis/$1",
+      "^#job-scheduler/(.*)$": "<rootDir>/src/job-scheduler/$1"
     },
     "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
+      "^.+\\.(t|j)s$": [
+        "ts-jest",
+        { "tsconfig": "<rootDir>/tsconfig.test.json" }
+      ]
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"

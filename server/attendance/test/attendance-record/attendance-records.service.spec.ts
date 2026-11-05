@@ -1,10 +1,10 @@
-import { ILoggerFactory } from '../common/logging/logger.factory';
-import { IJobScheduler } from '../job-scheduler/job-scheduler.interface';
-import { RedisService } from '../redis/redis.service';
-import { IAttendanceRecordBuffer } from './attendance-record.buffer';
-import { AttendanceRecord } from './attendance-record.model';
-import { IAttendanceRecordRepository } from './attendance-record.repository';
-import { AttendanceRecordsService } from './attendance-records.service';
+import { ILoggerFactory } from '../../src/common/logging/logger.factory';
+import { IJobScheduler } from '../../src/job-scheduler/job-scheduler.interface';
+import { RedisService } from '../../src/redis/redis.service';
+import { IAttendanceRecordBuffer } from '../../src/attendance-record/attendance-record.buffer';
+import { AttendanceRecord } from '../../src/attendance-record/attendance-record.model';
+import { IAttendanceRecordRepository } from '../../src/attendance-record/attendance-record.repository';
+import { AttendanceRecordsService } from '../../src/attendance-record/attendance-records.service';
 
 describe('AttendanceRecordsService', () => {
   it('không nhận check-in mới sau khi session bắt đầu flush', async () => {
@@ -41,8 +41,8 @@ describe('AttendanceRecordsService', () => {
       ),
       upsertRecord: jest.fn(),
       insertRecordIfAbsent: jest.fn(),
-      requestReview: jest.fn(),
       resolveReview: jest.fn(),
+      findReviewCandidates: jest.fn(),
       tryMarkPresentAndClaimDevice: jest.fn(async (input) => {
         if (sessionIsFlushing) return 'session-flushing';
         if (!bufferedRecord) return 'record-missing';
@@ -176,7 +176,7 @@ describe('AttendanceRecordsService', () => {
     expect(buffer.completeSessionFlush).not.toHaveBeenCalled();
   });
 
-  it('loại field review trước khi bulkUpsert xuống Postgres', async () => {
+  it('flush chỉ ghi attendance record xuống Postgres', async () => {
     const record: AttendanceRecord = {
       sessionId: 1,
       userId: 10,
@@ -187,9 +187,6 @@ describe('AttendanceRecordsService', () => {
       accuracy: null,
       updatedAt: new Date(),
       updateBy: null,
-      reasons: ['LOW_CONFIDENCE_SCORE'],
-      reviewRequested: true,
-      note: 'Em có mặt',
     };
     const repository = {
       bulkUpsert: jest.fn().mockResolvedValue(undefined),
@@ -217,8 +214,6 @@ describe('AttendanceRecordsService', () => {
     await service.flushSessionToDb(1);
 
     const persisted = (repository.bulkUpsert as jest.Mock).mock.calls[0][0][0];
-    expect(persisted).not.toHaveProperty('reasons');
-    expect(persisted).not.toHaveProperty('reviewRequested');
-    expect(persisted).not.toHaveProperty('note');
+    expect(persisted).toMatchObject({ status: 'absent', updateBy: null });
   });
 });

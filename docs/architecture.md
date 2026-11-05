@@ -115,11 +115,10 @@ Screen (app/**)
 | 3   | GET    | `/v0/users/me`                   | JWT                               | `UserProfileResponse`           |
 | 4   | GET    | `/v0/attendance-sessions/me`     | JWT                               | `MyAttendanceSessionResponse[]` |
 | 5   | POST   | `/v0/attendance/check-in`        | JWT                               | `CheckInResponse`               |
-| 6   | POST   | `/v0/attendance/review-requests` | JWT, `participant`                | Không có data                   |
 
 `CheckInResponse` là discriminated union: `{ status: 'VALID' }` hoặc
-`{ status: 'REVIEW' | 'REJECTED', reasons: [...] }`. Khi nhận `REVIEW`, mobile
-có thể gọi endpoint gửi yêu cầu xác nhận; client không gửi reasons.
+`{ status: 'REVIEW' | 'REJECTED', reasons: [...] }`. Khi nhận `REVIEW`, server
+tự động tạo candidate để organizer xử lý; mobile không cần gửi thêm request.
 
 Danh sách đầy đủ endpoint, payload, quyền và error code nằm tại
 [`docs/api.md`](api.md). `userId` trong JWT là `User.id`, không phải

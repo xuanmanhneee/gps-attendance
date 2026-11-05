@@ -1,5 +1,5 @@
-import { RedisService } from '../../../redis/redis.service';
-import { RedisAttendanceRecordBuffer } from './redis-attendance-record-buffer';
+import { RedisService } from '../../../../src/redis/redis.service';
+import { RedisAttendanceRecordBuffer } from '../../../../src/attendance-record/infra/redis/redis-attendance-record-buffer';
 
 const markPresentInput = {
   sessionId: 4,
@@ -60,6 +60,7 @@ describe('RedisAttendanceRecordBuffer session flush', () => {
         'attendance:buffer:4',
         'attendance:device:4:device-9',
         'attendance:buffer-flushing:4',
+        'attendance:review:4',
       ],
       expect.any(Array),
     );
@@ -98,8 +99,12 @@ describe('RedisAttendanceRecordBuffer session flush', () => {
     await buffer.completeSessionFlush(4);
 
     expect(redisService.eval).toHaveBeenCalledWith(
-      expect.stringContaining("redis.call('DEL', KEYS[1], KEYS[2])"),
-      ['attendance:buffer:4', 'attendance:buffer-flushing:4'],
+      expect.stringContaining("redis.call('DEL', KEYS[1], KEYS[2], KEYS[3])"),
+      [
+        'attendance:buffer:4',
+        'attendance:buffer-flushing:4',
+        'attendance:review:4',
+      ],
       [],
     );
   });

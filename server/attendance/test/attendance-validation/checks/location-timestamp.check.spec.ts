@@ -1,6 +1,6 @@
 import { Location } from '@gps-attendance/shared';
 
-import { LocationTimestampCheck } from './location-timestamp.check';
+import { LocationTimestampCheck } from '../../../src/attendance-validation/checks/location-timestamp.check';
 
 const checkedInAt = new Date('2026-10-25T00:00:30.000Z');
 const locationAt = (timestamp: number): Location => ({

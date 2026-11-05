@@ -1,6 +1,6 @@
 import { validateSync } from 'class-validator';
 
-import { CreateAccountWithUserDto } from './create-account-with-user.dto';
+import { CreateAccountWithUserDto } from '../../../src/account/dto/create-account-with-user.dto';
 
 const validateRole = (role: string) => {
   const dto = Object.assign(new CreateAccountWithUserDto(), {
