@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { ROUTE_PATHS } from '../../routes/paths';
 import { preferenceService } from '../../services/preference.service';
 import DashboardSidebar from '../DashboardSidebar';
+import { ErrorBoundary } from './ErrorBoundary';
 import { PageActionBarProvider } from './page-action-bar';
 import { Topbar } from './Topbar';
 
@@ -49,7 +50,9 @@ export const DashboardLayout = () => {
 
         <PageActionBarProvider isVisible={hasPageActionBar}>
           <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            <Outlet />
+            <ErrorBoundary resetKey={pathname}>
+              <Outlet />
+            </ErrorBoundary>
           </main>
         </PageActionBarProvider>
       </div>

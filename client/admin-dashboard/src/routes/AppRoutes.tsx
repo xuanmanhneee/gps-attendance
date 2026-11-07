@@ -8,7 +8,6 @@ import DashboardPage from '../pages/DashboardPage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import SessionDetailPage from '../pages/SessionDetailPage';
-import SessionEditPage from '../pages/SessionEditPage';
 import SessionsPage from '../pages/SessionsPage';
 import StatisticsPage from '../pages/StatisticsPage';
 import TagsPage from '../pages/TagsPage';
@@ -21,6 +20,7 @@ import { RoleGuard } from './RoleGuard';
 import { ROUTE_PATHS } from './paths';
 
 const SessionCreatePage = lazy(() => import('../pages/SessionCreatePage'));
+const SessionEditPage = lazy(() => import('../pages/SessionEditPage'));
 
 /** `/` đưa người dùng tới trang chủ của vai trò nếu đã đăng nhập, ngược lại về login. */
 const LandingRedirect = () => {
@@ -97,7 +97,11 @@ const AppRoutes = () => (
           />
           <Route
             path={ROUTE_PATHS.attendanceSessionEdit}
-            element={<SessionEditPage />}
+            element={
+              <Suspense fallback={<LoadingState />}>
+                <SessionEditPage />
+              </Suspense>
+            }
           />
         </Route>
 

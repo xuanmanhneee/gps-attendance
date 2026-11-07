@@ -158,7 +158,7 @@ export const en: Record<TranslationKey, string> = {
 
   // ---- Attendance sessions ----
   'sessions.page.description':
-    'Manage the GPS attendance sessions you created and track their status.',
+    'Manage and track GPS attendance sessions.',
   'sessions.total': '{count} attendance sessions',
   'sessions.filter.label': 'Filter by organizer',
   'sessions.filter.allOrganizers': 'All organizers',

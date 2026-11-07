@@ -153,7 +153,7 @@ export const vi = {
   'attendanceRecords.updatedAt': 'Cập nhật gần nhất',
   // ---- Phiên điểm danh ----
   'sessions.page.description':
-    'Quản lý các phiên điểm danh GPS do bạn tạo và theo dõi trạng thái.',
+    'Quản lý và theo dõi các phiên điểm danh GPS.',
   'sessions.total': '{count} phiên điểm danh',
   'sessions.filter.label': 'Lọc theo người tổ chức',
   'sessions.filter.allOrganizers': 'Tất cả người tổ chức',

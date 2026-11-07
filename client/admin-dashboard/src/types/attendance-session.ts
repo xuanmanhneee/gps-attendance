@@ -11,7 +11,7 @@ import type {
 } from '@gps-attendance/shared';
 
 /**
- * Dữ liệu modal tạo phiên gửi cho hook.
+ * Dữ liệu tạo phiên gửi API.
  *
  * Cùng shape với `CreateAttendanceSessionRequest` (shared package) nên không
  * thể lệch field khi gọi API.

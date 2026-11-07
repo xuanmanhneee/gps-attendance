@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
     "test": "node --test --experimental-strip-types \"src/**/*.test.ts\"",
     "clean": "rimraf dist node_modules/.vite"
   },

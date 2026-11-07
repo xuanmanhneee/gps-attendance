@@ -200,11 +200,11 @@ Ghi chú từ plan, bổ sung cho mục 3: `AttendanceCheckInService` gọi `mar
 | `.github/` | Bộ rule/skill ECC cho Copilot (generic): bất biến, file nhỏ (<800 dòng, hàm <50 dòng), TDD, coverage 80%, conventional commits (`feat/fix/refactor/docs/test/chore/perf/ci`) | Chung chung, không riêng dự án |
 
 ### Nợ kỹ thuật phía admin (theo ARCHITECTURE.md mục 8-9)
-- **P1.2** Menu và route lệch quyền: `/sessions` và `/statistics` chỉ có menu cho `organizer` nhưng route cho cả `admin`. Admin không mở được `AdminSessionsView` từ UI. `isPathAllowedForRole` và `isKnownPath` là code chết, comment "menu và route không thể lệch nhau" đã sai.
-- **P1.3** `LoginPage.tsx` lệch design system: hard-code màu, chuỗi tiếng Việt không qua `t()`, nút Google không có chức năng.
-- **P1.4** Không có `ErrorBoundary`, không `React.lazy` (Leaflet nằm trong bundle chính).
+- **P1.2 [ĐÃ XONG — P04-07.1]** Menu và route lệch quyền: `/sessions` đã thêm role `admin` vào `NAVIGATION_ITEMS` để admin mở `AdminSessionsView` từ sidebar. Hai hàm dead code `isPathAllowedForRole` và `isKnownPath` đã xoá; comment giải thích đúng vai trò của `RoleGuard`.
+- **P1.3 [ĐÃ XONG — P04-07.2, P04-07.3]** `LoginPage.tsx` lệch design system: đã đưa về token màu hệ thống (xanh đồng bộ dashboard), i18n đầy đủ qua `t()`, xoá nút Google chết và bỏ nhận diện DLU.
+- **P1.4 [ĐÃ XONG — P04-07.4, P04-07.5, P04-07.5b]** Đã có `ErrorBoundary` bọc `<Outlet />` trong `DashboardLayout` (reset theo `pathname`), lazy load cả `SessionCreatePage` và `SessionEditPage` để tách Leaflet ra chunk riêng (~163 kB).
 - **P1.1** `SessionCreatePage` từng 748 dòng; đã rewrite với `SessionLocationFields`, cần kiểm tra lại kích thước hiện tại.
-- **P3** Code chết: `createSession`/`isCreating` trong `useAttendanceSessions`, key `sessions.form.close`, `unitsApi.getById`, comment nhắc "modal". Chưa có script `lint`/`typecheck`. Chưa có `STRUCTURE.md` cho admin. `AGENTS.md` trỏ tới `docs/conventions/naming.md` trong khi tài liệu ARCHITECTURE nhắc file sai chính tả `nameing.md`.
+- **P3** Dọn dẹp: Đã xoá `createSession`/`isCreating`/`createInFlightRef` trong `useAttendanceSessions`, xoá `unitsApi.getById`, sửa comment "modal" (P04-07.6). Giữ `sessions.form.close` vì đang dùng (aria-label nút đóng bản đồ trong `SessionLocationPickerModal.tsx:208`). Đã thêm script `"typecheck": "tsc -b"` và `"lint": "eslint ."` (P04-07.7; ghi nhận 6 lỗi/cảnh báo lint ở file của đồng đội). Chưa có `STRUCTURE.md` cho admin. `AGENTS.md` trỏ tới `docs/conventions/naming.md`.
 
 ### Mâu thuẫn cần nhớ khi làm việc
 - Thư mục error code: code thật nằm ở `packages/shared/src/api/response/codes/` (khớp `docs/architecture.md`). `docs/conventions/api-response.md` ghi `error_codes/` là cũ.

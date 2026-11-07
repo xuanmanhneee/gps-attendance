@@ -66,14 +66,6 @@ export const unitsApi = {
     );
   },
 
-  async getById(id: number): Promise<UnitResponse | null> {
-    assertValidId(id);
-
-    const data = await httpClient.get<UnitResponse | null>(`/units/${id}`);
-
-    return data ?? null;
-  },
-
   create(request: CreateUnitRequest) {
     const name = assertValidName(request.name);
     assertValidParentId(request.parentId);
