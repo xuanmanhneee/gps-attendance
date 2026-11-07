@@ -152,6 +152,64 @@ export const en: Record<TranslationKey, string> = {
   'attendanceRecords.checkedInAt': 'Check-in time',
   'attendanceRecords.updatedAt': 'Last updated',
 
+  // ---- Attendance review queue ----
+  'attendanceReview.queueTitle': 'Review queue',
+  'attendanceReview.queueDescription':
+    'Review the signals recorded by the system before finalizing attendance results.',
+  'attendanceReview.pendingCount': '{count} requests',
+  'attendanceReview.loading': 'Loading requests that need review...',
+  'attendanceReview.refreshing': 'Updating...',
+  'attendanceReview.emptyTitle': 'No requests need review',
+  'attendanceReview.emptyDescription':
+    'No check-ins in this session need further organizer action.',
+  'attendanceReview.participantCode': 'Participant code',
+  'attendanceReview.flaggedSignals': 'Signals to review',
+  'attendanceReview.approve': 'Approve present',
+  'attendanceReview.reject': 'Reject',
+  'attendanceReview.resolving': 'Finalizing...',
+  'attendanceReview.approveSuccess': 'Approved attendance for {name}.',
+  'attendanceReview.rejectSuccess': 'Rejected the request from {name}.',
+  'attendanceReview.window.notOpen': 'Review window not open',
+  'attendanceReview.window.open': 'Review window open',
+  'attendanceReview.window.closed': 'Review window closed',
+  'attendanceReview.window.notOpenHint':
+    'You can inspect the queue now; final decisions become available when the session opens.',
+  'attendanceReview.window.closedHint':
+    'The review window closed 10 minutes after the session end time. Decision actions are locked.',
+  'attendanceReview.reason.lowConfidence': 'Low confidence score',
+  'attendanceReview.reason.mockLocation': 'Suspected mock location',
+  'attendanceReview.reason.outOfRange': 'Outside the allowed radius',
+  'attendanceReview.reason.invalidTimestamp': 'Invalid location timestamp',
+  'attendanceReview.dialog.approveTitle': 'Confirm attendance approval',
+  'attendanceReview.dialog.rejectTitle': 'Confirm request rejection',
+  'attendanceReview.dialog.approveDescription':
+    '{name} will be marked present and the record will be locked from further changes.',
+  'attendanceReview.dialog.rejectDescription':
+    '{name} will remain absent and the record will be locked from further changes.',
+  'attendanceReview.dialog.note': 'Decision note (optional)',
+  'attendanceReview.dialog.notePlaceholder':
+    'For example: Confirmed directly with the participant',
+  'attendanceReview.dialog.close': 'Close dialog',
+  'attendanceReview.dialog.cancel': 'Go back',
+  'attendanceReview.dialog.confirmApprove': 'Confirm approval',
+  'attendanceReview.dialog.confirmReject': 'Confirm rejection',
+  'attendanceReview.error.load': 'Unable to load the review queue.',
+  'attendanceReview.error.resolve':
+    'Unable to finalize the request. Refresh and try again.',
+  'attendanceReview.error.unauthorized': 'Your session has expired.',
+  'attendanceReview.error.forbidden':
+    'Only the organizer who created this session can process its review queue.',
+  'attendanceReview.error.notFound':
+    'The session or attendance record could not be found.',
+  'attendanceReview.error.alreadyResolved':
+    'This request was already processed elsewhere. The queue is being updated.',
+  'attendanceReview.error.windowClosed':
+    'This session is outside its review window.',
+  'attendanceReview.error.tooManyRequests':
+    'Too many requests, please try again later.',
+  'attendanceReview.error.internal':
+    'The server hit an error, please try again later.',
+
   // ---- Attendance sessions ----
   'sessions.page.description':
     'Manage the GPS attendance sessions you created and track their status.',
@@ -457,4 +515,36 @@ export const en: Record<TranslationKey, string> = {
   'tags.error.tooManyRequests': 'Too many requests, please try again later.',
   'tags.error.internal': 'The server hit an error, please try again later.',
   'tags.error.unknown': 'Something went wrong, please try again.',
+  'navigation.attendanceReviews': 'Attendance review',
+  'pages.attendanceReviews.description':
+    'Review and finalize attendance that needs verification.',
+  'attendanceReview.pageTitle': 'Attendance review',
+  'attendanceReview.pageDescription':
+    'Review unusual signals before finalizing attendance results.',
+  'attendanceReview.selectedSession': 'Reviewing: {title}',
+  'attendanceReview.session': 'Session to review',
+  'attendanceReview.loadingSessions': 'Loading sessions to review...',
+  'attendanceReview.emptySessions':
+    'There are no attendance sessions to review.',
+  'attendanceReview.tabs.label': 'Review mode',
+  'attendanceReview.tabs.current': 'Current sessions',
+  'attendanceReview.tabs.history': 'My history',
+  'attendanceReview.current.emptyTitle': 'No current sessions',
+  'attendanceReview.current.emptyDescription':
+    'There are no upcoming sessions or sessions within the review window.',
+  'attendanceReview.history.description':
+    'Review decisions made by your account only.',
+  'attendanceReview.history.loading': 'Loading review history...',
+  'attendanceReview.history.loadError': 'Unable to load your review history.',
+  'attendanceReview.history.emptyTitle': 'No review history yet',
+  'attendanceReview.history.emptyDescription':
+    'Decisions you make will appear here.',
+  'attendanceReview.history.participant': 'Participant',
+  'attendanceReview.history.session': 'Attendance session',
+  'attendanceReview.history.decision': 'Decision',
+  'attendanceReview.history.signals': 'Signals',
+  'attendanceReview.history.note': 'Note',
+  'attendanceReview.history.resolvedAt': 'Resolved at',
+  'attendanceReview.history.approved': 'Approved',
+  'attendanceReview.history.rejected': 'Rejected',
 } as const;

@@ -13,7 +13,10 @@ const anonymousClient = createHttpClient(baseUrl);
 let refreshPromise: Promise<void> | null = null;
 const getCache = createGetCache();
 const getTtlMs = (path: string) =>
-  path.startsWith('/v0/attendance-sessions') ? 10_000 : 60_000;
+  path.startsWith('/v0/attendance-sessions') ||
+  path.startsWith('/v0/attendance/sessions/')
+    ? 10_000
+    : 60_000;
 
 export const clearGetCache = () => getCache.clear();
 

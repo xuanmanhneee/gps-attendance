@@ -8,7 +8,7 @@ export type NavigationItemId =
   | 'units'
   | 'tags'
   | 'attendanceSessions'
-  | 'attendanceRecords'
+  | 'attendanceReviews'
   | 'statistics';
 
 export type NavigationItem = {
@@ -67,11 +67,11 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     roles: ['organizer'],
   },
   {
-    id: 'attendanceRecords',
-    labelKey: 'navigation.attendanceRecords',
-    descriptionKey: 'pages.attendanceRecords.description',
-    path: ROUTE_PATHS.attendanceRecords,
-    roles: ['admin', 'organizer'],
+    id: 'attendanceReviews',
+    labelKey: 'navigation.attendanceReviews',
+    descriptionKey: 'pages.attendanceReviews.description',
+    path: ROUTE_PATHS.attendanceReviews,
+    roles: ['organizer'],
   },
   {
     id: 'statistics',

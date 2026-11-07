@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { DashboardLayout } from '../components/layout/DashboardLayout';
 import { LoadingState } from '../components/ui/DataState';
-import AttendanceRecordsPage from '../pages/AttendanceRecordsPage';
+import AttendanceReviewsPage from '../pages/AttendanceReviewsPage';
 import DashboardPage from '../pages/DashboardPage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
@@ -74,10 +74,6 @@ const AppRoutes = () => (
             path={ROUTE_PATHS.attendanceSessions}
             element={<SessionsPage />}
           />
-          <Route
-            path={ROUTE_PATHS.attendanceRecords}
-            element={<AttendanceRecordsPage />}
-          />
           <Route path={ROUTE_PATHS.statistics} element={<StatisticsPage />} />
         </Route>
 
@@ -85,6 +81,10 @@ const AppRoutes = () => (
             Route tĩnh `/sessions/new` không phụ thuộc thứ tự khai báo vì
             react-router ưu tiên route khớp cụ thể hơn `/sessions/:id`. */}
         <Route element={<RoleGuard allowedRoles={['organizer']} />}>
+          <Route
+            path={ROUTE_PATHS.attendanceReviews}
+            element={<AttendanceReviewsPage />}
+          />
           <Route
             path={ROUTE_PATHS.attendanceSessionCreate}
             element={<SessionCreatePage />}
@@ -94,6 +94,12 @@ const AppRoutes = () => (
             element={<SessionEditPage />}
           />
         </Route>
+
+        {/* Giữ bookmark cũ hoạt động sau khi bản ghi được gom vào chi tiết phiên. */}
+        <Route
+          path={ROUTE_PATHS.attendanceRecords}
+          element={<Navigate to={ROUTE_PATHS.attendanceSessions} replace />}
+        />
 
         {/* Chi tiết phiên: admin xem mọi phiên; organizer chỉ xem phiên do mình tạo. */}
         <Route element={<RoleGuard allowedRoles={['admin', 'organizer']} />}>

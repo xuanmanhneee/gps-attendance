@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  MdArrowBack,
-  MdEdit,
-  MdOpenInNew,
-  MdRefresh,
-} from 'react-icons/md';
+import { MdArrowBack, MdEdit, MdRefresh } from 'react-icons/md';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import type { AttendanceSessionDetailResponse } from '@gps-attendance/shared';
 
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
+import { AttendanceRecordsTable } from '../components/attendance-records/AttendanceRecordsTable';
 import {
   ATTENDANCE_STATUS_LABEL_KEYS,
   ATTENDANCE_STATUS_TONE_CLASS,
@@ -17,7 +13,7 @@ import {
 } from '../config/attendance-status';
 import { EmptyState, LoadingState } from '../components/ui/DataState';
 import { PageActionBarPortal } from '../components/layout/page-action-bar';
-import { Panel, PanelHeader } from '../components/ui/Panel';
+import { Panel } from '../components/ui/Panel';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { LOCALE_TAGS } from '../i18n';
 import type { TranslationKey } from '../i18n/translation-keys';
@@ -34,6 +30,19 @@ import {
   resolveSessionErrorKey,
 } from '../components/sessions/session-errors';
 import { MessagePage } from './MessagePage';
+import {
+  filterAttendanceRecords,
+  summarizeAttendanceRecords,
+  type AttendanceRecordStatusFilter,
+} from '../utils/attendance-records/attendance-record-list';
+
+const statusOptions: AttendanceRecordStatusFilter[] = [
+  'all',
+  'present',
+  'absent',
+  'late',
+  'excused',
+];
 
 const formatDateTime = (iso: string, localeTag: string) =>
   new Date(iso).toLocaleString(localeTag, {
@@ -69,6 +78,9 @@ const SessionDetailPage = () => {
   const [hasRefreshError, setHasRefreshError] = useState(false);
   const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(false);
   const [autoRefreshMinutesInput, setAutoRefreshMinutesInput] = useState('1');
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] =
+    useState<AttendanceRecordStatusFilter>('all');
   const refreshInFlightRef = useRef(false);
 
   const handleRefreshParticipants = useCallback(async () => {
@@ -105,11 +117,7 @@ const SessionDetailPage = () => {
   );
 
   useEffect(() => {
-    if (
-      !isAutoRefreshEnabled ||
-      !session ||
-      session.status !== 'open'
-    ) {
+    if (!isAutoRefreshEnabled || !session || session.status !== 'open') {
       return;
     }
 
@@ -172,21 +180,6 @@ const SessionDetailPage = () => {
           <MdArrowBack aria-hidden="true" />
           {t('sessionDetail.backToList')}
         </button>
-
-        {session && (
-          <div className="flex shrink-0 items-center gap-2">
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => navigate(buildSessionEditPath(session.id))}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-xs font-bold text-ink transition-colors hover:border-accent-strong hover:text-accent-strong"
-              >
-                <MdEdit aria-hidden="true" />
-                {t('sessions.card.edit')}
-              </button>
-            )}
-          </div>
-        )}
       </div>
     </PageActionBarPortal>
   );
@@ -230,147 +223,170 @@ const SessionDetailPage = () => {
       label: t('sessionDetail.radius'),
       value: t('sessions.radiusValue', { value: session.radius }),
     },
-    {
-      label: t('sessionDetail.coordinates'),
-      value: `${session.latitude}, ${session.longitude}`,
-    },
   ];
   const isPlanned = session.plannedParticipants !== null;
   const displayedParticipants =
     session.plannedParticipants !== null
       ? session.plannedParticipants.map((user) => ({ user, status: null }))
       : session.participants;
+  const filteredParticipants = filterAttendanceRecords(
+    session.participants,
+    query,
+    statusFilter,
+  );
+  const summary = summarizeAttendanceRecords(session.participants);
+  const summaryItems = [
+    {
+      key: 'total',
+      value: summary.total,
+      label: t('attendanceRecords.total'),
+    },
+    {
+      key: 'present',
+      value: summary.present,
+      label: t(ATTENDANCE_STATUS_LABEL_KEYS.present),
+    },
+    {
+      key: 'absent',
+      value: summary.absent,
+      label: t(ATTENDANCE_STATUS_LABEL_KEYS.absent),
+    },
+    {
+      key: 'late',
+      value: summary.late,
+      label: t(ATTENDANCE_STATUS_LABEL_KEYS.late),
+    },
+    {
+      key: 'excused',
+      value: summary.excused,
+      label: t(ATTENDANCE_STATUS_LABEL_KEYS.excused),
+    },
+  ];
+
+  const refreshControls = session.status === 'open' && (
+    <div className="flex shrink-0 items-center gap-2">
+      <div className="flex h-9 items-center gap-2 rounded-lg border border-line bg-surface-subtle px-2.5">
+        <span className="text-[11px] font-semibold text-muted">
+          {t('sessionDetail.autoRefresh')}
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isAutoRefreshEnabled}
+          aria-label={t('sessionDetail.autoRefreshAria')}
+          onClick={() => setIsAutoRefreshEnabled((current) => !current)}
+          className={`relative h-5 w-9 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-soft focus-visible:ring-offset-2 ${
+            isAutoRefreshEnabled ? 'bg-accent-strong' : 'bg-muted-soft'
+          }`}
+        >
+          <span
+            aria-hidden="true"
+            className={`absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow-sm transition-transform ${
+              isAutoRefreshEnabled ? 'translate-x-4' : 'translate-x-0'
+            }`}
+          />
+        </button>
+      </div>
+
+      {isAutoRefreshEnabled ? (
+        <label className="flex h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[11px] font-semibold text-muted">
+          <MdRefresh
+            aria-hidden="true"
+            className={`text-[15px] text-accent-strong ${
+              isRefreshing ? 'animate-spin opacity-100' : 'opacity-0'
+            }`}
+          />
+          <input
+            type="number"
+            min={1}
+            max={60}
+            step={1}
+            inputMode="numeric"
+            value={autoRefreshMinutesInput}
+            onChange={(event) => setAutoRefreshMinutesInput(event.target.value)}
+            onBlur={() =>
+              setAutoRefreshMinutesInput(String(autoRefreshMinutes))
+            }
+            aria-label={t('sessionDetail.autoRefreshIntervalAria')}
+            className="w-10 rounded-md border border-line bg-surface-subtle px-1.5 py-1 text-center text-xs font-bold tabular-nums text-ink outline-none focus:border-accent-strong focus:ring-2 focus:ring-accent-soft"
+          />
+          <span>{t('sessionDetail.minutes')}</span>
+        </label>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void handleRefreshParticipants()}
+          disabled={isRefreshing}
+          aria-label={t('sessionDetail.refreshAria')}
+          className="inline-flex size-9 items-center justify-center rounded-lg border border-line bg-surface-subtle text-accent-strong transition-colors hover:border-accent-strong/40 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <MdRefresh
+            aria-hidden="true"
+            className={`text-[16px] ${isRefreshing ? 'animate-spin' : ''}`}
+          />
+        </button>
+      )}
+    </div>
+  );
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden bg-canvas p-3">
       {actionBar}
 
-      <Panel className="mb-4">
-        <PanelHeader
-          title={session.title}
-          subtitle={`#${session.id}`}
-          action={<StatusBadge status={session.status} />}
-        />
+      <Panel variant="card" className="flex-none">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-line px-5 py-2.5">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h3 className="truncate text-[14px] font-bold text-ink">
+              {session.title}
+            </h3>
+            <span className="shrink-0 text-[11px] text-muted">
+              #{session.id}
+            </span>
+          </div>
 
-        <dl className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-          {details.map((detail) => (
-            <div
-              key={detail.label}
-              className="rounded-lg bg-surface-subtle px-4 py-3"
-            >
-              <dt className="text-[11px] text-muted">{detail.label}</dt>
-              <dd className="mt-1 text-[13px] font-bold text-ink">
-                {detail.value}
-              </dd>
-            </div>
-          ))}
-        </dl>
+          <dl className="flex min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-1">
+            {details.map((detail) => (
+              <div key={detail.label} className="flex items-baseline gap-1.5">
+                <dt className="text-[10px] text-muted">{detail.label}</dt>
+                <dd className="text-[11px] font-bold whitespace-nowrap text-ink">
+                  {detail.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
 
-        <div className="border-t border-line px-5 py-3">
-          <a
-            href={`https://www.google.com/maps?q=${session.latitude},${session.longitude}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg border border-accent-strong bg-accent-strong px-3 py-2 text-[12px] font-bold text-white transition-colors hover:bg-[oklch(45%_0.17_220)]"
-          >
-            <MdOpenInNew aria-hidden="true" className="text-[15px]" />
-            {t('sessionDetail.openMaps')}
-          </a>
+          <div className="flex shrink-0 items-center gap-2">
+            <StatusBadge status={session.status} />
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => navigate(buildSessionEditPath(session.id))}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[11px] font-bold text-ink transition-colors hover:border-accent-strong hover:text-accent-strong"
+              >
+                <MdEdit aria-hidden="true" />
+                {t('sessions.card.edit')}
+              </button>
+            )}
+          </div>
         </div>
+
+        {!isPlanned && (
+          <div className="overflow-x-auto border-b border-line">
+            <div className="grid min-w-[620px] grid-cols-5 gap-px bg-line">
+              {summaryItems.map(({ key, value, label }) => (
+                <div key={key} className="bg-surface-subtle px-4 py-2">
+                  <p className="text-[10px] text-muted">{label}</p>
+                  <p className="mt-0.5 text-base font-extrabold text-ink">
+                    {value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </Panel>
 
-      <Panel>
-        <PanelHeader
-          title={t('sessionDetail.participants')}
-          action={
-            <div className="flex flex-wrap items-center justify-end gap-3">
-              <span className="text-[12px] text-muted">
-                {t('sessionDetail.participantCount', {
-                  count: displayedParticipants.length,
-                })}
-              </span>
-
-              {session.status === 'open' && (
-                <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-subtle p-1.5">
-                  <span className="pl-1 text-[11px] font-semibold text-muted">
-                    {t('sessionDetail.autoRefresh')}
-                  </span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={isAutoRefreshEnabled}
-                    aria-label={t('sessionDetail.autoRefreshAria')}
-                    onClick={() =>
-                      setIsAutoRefreshEnabled((current) => !current)
-                    }
-                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-soft focus-visible:ring-offset-2 ${
-                      isAutoRefreshEnabled
-                        ? 'bg-accent-strong'
-                        : 'bg-muted-soft'
-                    }`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow-sm transition-transform ${
-                        isAutoRefreshEnabled
-                          ? 'translate-x-5'
-                          : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-              )}
-
-              {session.status === 'open' && (
-                <div className="flex w-28 shrink-0 justify-end">
-                  {isAutoRefreshEnabled ? (
-                  <label className="flex min-h-9 w-full items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-[11px] font-semibold text-muted">
-                    <span className="grid w-[15px] shrink-0 place-items-center">
-                      <MdRefresh
-                        aria-hidden="true"
-                        className={`text-[15px] text-accent-strong ${
-                          isRefreshing ? 'animate-spin opacity-100' : 'opacity-0'
-                        }`}
-                      />
-                    </span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={60}
-                      step={1}
-                      inputMode="numeric"
-                      value={autoRefreshMinutesInput}
-                      onChange={(event) =>
-                        setAutoRefreshMinutesInput(event.target.value)
-                      }
-                      onBlur={() =>
-                        setAutoRefreshMinutesInput(String(autoRefreshMinutes))
-                      }
-                      aria-label={t('sessionDetail.autoRefreshIntervalAria')}
-                      className="w-12 rounded-md border border-line bg-surface-subtle px-2 py-1 text-center text-xs font-bold tabular-nums text-ink outline-none focus:border-accent-strong focus:ring-2 focus:ring-accent-soft"
-                    />
-                    <span>{t('sessionDetail.minutes')}</span>
-                  </label>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void handleRefreshParticipants()}
-                    disabled={isRefreshing}
-                    aria-label={t('sessionDetail.refreshAria')}
-                    className="inline-flex min-h-9 items-center rounded-lg border border-line bg-surface-subtle px-3 text-accent-strong transition-colors hover:border-accent-strong/40 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <MdRefresh
-                      aria-hidden="true"
-                      className={`text-[16px] ${isRefreshing ? 'animate-spin' : ''}`}
-                    />
-                  </button>
-                  )}
-                </div>
-              )}
-            </div>
-          }
-        />
-
+      <Panel variant="card" className="min-h-0 flex-1 overflow-hidden">
         {hasRefreshError && (
           <p role="alert" className="px-5 pt-3 text-[12px] text-danger">
             {t('sessionDetail.refreshError')}
@@ -378,51 +394,120 @@ const SessionDetailPage = () => {
         )}
 
         {isPlanned && (
-          <p className="px-5 pt-3 text-[12px] text-muted">
-            {t('sessionDetail.plannedParticipantsNote')}
-          </p>
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-2.5">
+              <div className="flex items-center gap-2 text-[12px]">
+                <span className="font-bold text-ink">
+                  {t('sessionDetail.participants')}
+                </span>
+                <span className="text-muted">
+                  {t('sessionDetail.participantCount', {
+                    count: displayedParticipants.length,
+                  })}
+                </span>
+              </div>
+              {refreshControls}
+            </div>
+            <p className="border-b border-line px-5 py-2 text-[11px] text-muted">
+              {t('sessionDetail.plannedParticipantsNote')}
+            </p>
+          </>
         )}
 
-        {displayedParticipants.length === 0 ? (
-          <EmptyState
-            description={t(
-              isPlanned
-                ? 'sessionDetail.emptyPlannedParticipants'
-                : 'sessionDetail.emptyParticipants',
-            )}
-          />
-        ) : (
-          <ul className="divide-y divide-line">
-            {displayedParticipants.map((participant) => (
-              <li
-                key={participant.user.code}
-                className="flex items-center justify-between gap-4 px-5 py-3"
+        {!isPlanned && (
+          <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-2.5">
+            <label className="min-w-[220px] flex-1">
+              <span className="sr-only">{t('attendanceRecords.search')}</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t('attendanceRecords.searchPlaceholder')}
+                className="h-9 w-full rounded-lg border border-line bg-surface px-3 text-[12px] text-ink outline-none placeholder:text-muted-soft focus:border-accent-strong focus:ring-2 focus:ring-accent-soft"
+              />
+            </label>
+
+            <label className="w-44 shrink-0">
+              <span className="sr-only">{t('attendanceRecords.status')}</span>
+              <select
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(
+                    event.target.value as AttendanceRecordStatusFilter,
+                  )
+                }
+                aria-label={t('attendanceRecords.status')}
+                className="h-9 w-full rounded-lg border border-line bg-surface px-3 text-[12px] text-ink outline-none focus:border-accent-strong focus:ring-2 focus:ring-accent-soft"
               >
-                <div>
-                  <p className="text-[13px] font-bold text-ink">
-                    {participant.user.fullname}
-                  </p>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status === 'all'
+                      ? t('attendanceRecords.allStatuses')
+                      : t(ATTENDANCE_STATUS_LABEL_KEYS[status])}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-                  <p className="mt-0.5 text-[11px] text-muted">
-                    {t('sessionDetail.participantCode')}:{' '}
-                    {participant.user.code} ·{' '}
-                    {t(PARTICIPANT_ROLE_LABEL_KEYS[participant.user.role])}
-                  </p>
-                </div>
-
-                {participant.status !== null && (
-                  <span
-                    className={`rounded-[5px] px-2 py-1 text-[10px] font-extrabold ${ATTENDANCE_STATUS_TONE_CLASS[participant.status]}`}
-                  >
-                    {t(ATTENDANCE_STATUS_LABEL_KEYS[participant.status])}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+            {refreshControls}
+          </div>
         )}
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {isPlanned && displayedParticipants.length === 0 ? (
+            <EmptyState
+              description={t(
+                isPlanned
+                  ? 'sessionDetail.emptyPlannedParticipants'
+                  : 'sessionDetail.emptyParticipants',
+              )}
+            />
+          ) : isPlanned ? (
+            <ul className="divide-y divide-line">
+              {displayedParticipants.map((participant) => (
+                <li
+                  key={participant.user.code}
+                  className="flex items-center justify-between gap-4 px-5 py-3"
+                >
+                  <div>
+                    <p className="text-[13px] font-bold text-ink">
+                      {participant.user.fullname}
+                    </p>
+
+                    <p className="mt-0.5 text-[11px] text-muted">
+                      {t('sessionDetail.participantCode')}:{' '}
+                      {participant.user.code} ·{' '}
+                      {t(PARTICIPANT_ROLE_LABEL_KEYS[participant.user.role])}
+                    </p>
+                  </div>
+
+                  {participant.status !== null && (
+                    <span
+                      className={`rounded-[5px] px-2 py-1 text-[10px] font-extrabold ${ATTENDANCE_STATUS_TONE_CLASS[participant.status]}`}
+                    >
+                      {t(ATTENDANCE_STATUS_LABEL_KEYS[participant.status])}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : filteredParticipants.length === 0 ? (
+            <EmptyState
+              description={
+                session.participants.length === 0
+                  ? t('attendanceRecords.empty')
+                  : t('attendanceRecords.noMatches')
+              }
+            />
+          ) : (
+            <AttendanceRecordsTable
+              participants={filteredParticipants}
+              localeTag={localeTag}
+            />
+          )}
+        </div>
       </Panel>
-    </>
+    </div>
   );
 };
 

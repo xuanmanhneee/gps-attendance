@@ -24,3 +24,16 @@ export interface ResolveAttendanceReviewRequest {
   decision: AttendanceReviewDecision;
   reason?: string;
 }
+
+export interface AttendanceReviewHistoryResponse {
+  id: string;
+  session: {
+    id: number;
+    title: string;
+  };
+  student: UserResponse;
+  decision: AttendanceReviewDecision;
+  reasons: AttendanceValidationReason[];
+  reason: string | null;
+  resolvedAt: string;
+}

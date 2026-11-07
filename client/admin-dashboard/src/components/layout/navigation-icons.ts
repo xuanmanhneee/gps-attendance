@@ -2,10 +2,10 @@ import type { IconType } from 'react-icons';
 import {
   MdAccountBalance,
   MdEventNote,
-  MdFactCheck,
   MdGridView,
   MdGroup,
   MdInsights,
+  MdRateReview,
   MdSell,
 } from 'react-icons/md';
 
@@ -18,6 +18,6 @@ export const NAVIGATION_ICONS: Record<NavigationItemId, IconType> = {
   units: MdAccountBalance,
   tags: MdSell,
   attendanceSessions: MdEventNote,
-  attendanceRecords: MdFactCheck,
+  attendanceReviews: MdRateReview,
   statistics: MdInsights,
 };

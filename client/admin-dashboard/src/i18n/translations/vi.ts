@@ -147,6 +147,65 @@ export const vi = {
   'attendanceRecords.participant': 'Người tham gia',
   'attendanceRecords.checkedInAt': 'Thời gian điểm danh',
   'attendanceRecords.updatedAt': 'Cập nhật gần nhất',
+
+  // ---- Hàng chờ duyệt điểm danh ----
+  'attendanceReview.queueTitle': 'Hàng chờ duyệt',
+  'attendanceReview.queueDescription':
+    'Rà soát các tín hiệu do hệ thống ghi nhận trước khi chốt kết quả điểm danh.',
+  'attendanceReview.pendingCount': '{count} yêu cầu',
+  'attendanceReview.loading': 'Đang tải các yêu cầu chờ duyệt...',
+  'attendanceReview.refreshing': 'Đang cập nhật...',
+  'attendanceReview.emptyTitle': 'Không còn yêu cầu chờ duyệt',
+  'attendanceReview.emptyDescription':
+    'Các lượt điểm danh của phiên này không cần organizer xử lý thêm.',
+  'attendanceReview.participantCode': 'Mã người tham gia',
+  'attendanceReview.flaggedSignals': 'Tín hiệu cần kiểm tra',
+  'attendanceReview.approve': 'Duyệt có mặt',
+  'attendanceReview.reject': 'Từ chối',
+  'attendanceReview.resolving': 'Đang chốt...',
+  'attendanceReview.approveSuccess': 'Đã duyệt có mặt cho {name}.',
+  'attendanceReview.rejectSuccess': 'Đã từ chối yêu cầu của {name}.',
+  'attendanceReview.window.notOpen': 'Chưa đến thời gian duyệt',
+  'attendanceReview.window.open': 'Đang trong thời gian duyệt',
+  'attendanceReview.window.closed': 'Đã hết thời gian duyệt',
+  'attendanceReview.window.notOpenHint':
+    'Có thể xem hàng chờ ngay bây giờ; thao tác chốt chỉ mở từ thời điểm bắt đầu phiên.',
+  'attendanceReview.window.closedHint':
+    'Cửa sổ chốt đã đóng sau 10 phút kể từ giờ kết thúc phiên. Các thao tác duyệt đã bị khóa.',
+  'attendanceReview.reason.lowConfidence': 'Độ tin cậy thấp',
+  'attendanceReview.reason.mockLocation': 'Nghi ngờ vị trí giả lập',
+  'attendanceReview.reason.outOfRange': 'Ngoài phạm vi cho phép',
+  'attendanceReview.reason.invalidTimestamp':
+    'Thời điểm lấy vị trí không hợp lệ',
+  'attendanceReview.dialog.approveTitle': 'Xác nhận duyệt có mặt',
+  'attendanceReview.dialog.rejectTitle': 'Xác nhận từ chối yêu cầu',
+  'attendanceReview.dialog.approveDescription':
+    'Kết quả của {name} sẽ chuyển thành có mặt và được khóa khỏi các lần xử lý tiếp theo.',
+  'attendanceReview.dialog.rejectDescription':
+    'Kết quả của {name} sẽ giữ là vắng và được khóa khỏi các lần xử lý tiếp theo.',
+  'attendanceReview.dialog.note': 'Ghi chú quyết định (không bắt buộc)',
+  'attendanceReview.dialog.notePlaceholder':
+    'Ví dụ: Đã xác nhận trực tiếp với người tham gia',
+  'attendanceReview.dialog.close': 'Đóng hộp thoại',
+  'attendanceReview.dialog.cancel': 'Quay lại',
+  'attendanceReview.dialog.confirmApprove': 'Xác nhận duyệt',
+  'attendanceReview.dialog.confirmReject': 'Xác nhận từ chối',
+  'attendanceReview.error.load': 'Không thể tải hàng chờ duyệt.',
+  'attendanceReview.error.resolve':
+    'Không thể chốt yêu cầu. Vui lòng tải lại và thử lại.',
+  'attendanceReview.error.unauthorized': 'Phiên đăng nhập đã hết hạn.',
+  'attendanceReview.error.forbidden':
+    'Chỉ organizer tạo phiên mới được xử lý hàng chờ này.',
+  'attendanceReview.error.notFound':
+    'Không tìm thấy phiên hoặc bản ghi cần xử lý.',
+  'attendanceReview.error.alreadyResolved':
+    'Yêu cầu này đã được xử lý ở nơi khác. Hàng chờ đang được cập nhật.',
+  'attendanceReview.error.windowClosed':
+    'Đã ngoài thời gian chốt yêu cầu của phiên này.',
+  'attendanceReview.error.tooManyRequests':
+    'Bạn thao tác quá nhanh, vui lòng thử lại sau.',
+  'attendanceReview.error.internal':
+    'Máy chủ đang gặp sự cố, vui lòng thử lại sau.',
   // ---- Phiên điểm danh ----
   'sessions.page.description':
     'Quản lý các phiên điểm danh GPS do bạn tạo và theo dõi trạng thái.',
@@ -449,4 +508,37 @@ export const vi = {
   'tags.error.tooManyRequests': 'Bạn thao tác quá nhanh, vui lòng thử lại sau.',
   'tags.error.internal': 'Máy chủ đang gặp sự cố, vui lòng thử lại sau.',
   'tags.error.unknown': 'Đã có lỗi xảy ra, vui lòng thử lại.',
+  'navigation.attendanceReviews': 'Kiểm duyệt điểm danh',
+  'pages.attendanceReviews.description':
+    'Rà soát và chốt các lượt điểm danh cần xác minh.',
+  'attendanceReview.pageTitle': 'Kiểm duyệt điểm danh',
+  'attendanceReview.pageDescription':
+    'Rà soát các tín hiệu bất thường trước khi chốt kết quả điểm danh.',
+  'attendanceReview.selectedSession': 'Đang kiểm duyệt: {title}',
+  'attendanceReview.session': 'Phiên cần kiểm duyệt',
+  'attendanceReview.loadingSessions': 'Đang tải các phiên cần kiểm duyệt...',
+  'attendanceReview.emptySessions':
+    'Chưa có phiên điểm danh nào để kiểm duyệt.',
+  'attendanceReview.tabs.label': 'Chế độ kiểm duyệt',
+  'attendanceReview.tabs.current': 'Phiên hiện tại',
+  'attendanceReview.tabs.history': 'Lịch sử của tôi',
+  'attendanceReview.current.emptyTitle': 'Không có phiên hiện tại',
+  'attendanceReview.current.emptyDescription':
+    'Không có phiên sắp diễn ra hoặc đang trong thời gian kiểm duyệt.',
+  'attendanceReview.history.description':
+    'Các quyết định kiểm duyệt do chính bạn đã thực hiện.',
+  'attendanceReview.history.loading': 'Đang tải lịch sử kiểm duyệt...',
+  'attendanceReview.history.loadError':
+    'Không thể tải lịch sử kiểm duyệt của bạn.',
+  'attendanceReview.history.emptyTitle': 'Chưa có lịch sử kiểm duyệt',
+  'attendanceReview.history.emptyDescription':
+    'Các quyết định bạn thực hiện sẽ xuất hiện tại đây.',
+  'attendanceReview.history.participant': 'Người tham gia',
+  'attendanceReview.history.session': 'Phiên điểm danh',
+  'attendanceReview.history.decision': 'Quyết định',
+  'attendanceReview.history.signals': 'Tín hiệu',
+  'attendanceReview.history.note': 'Ghi chú',
+  'attendanceReview.history.resolvedAt': 'Thời gian xử lý',
+  'attendanceReview.history.approved': 'Đã duyệt',
+  'attendanceReview.history.rejected': 'Đã từ chối',
 } as const;
