@@ -40,7 +40,7 @@ export class UserAuthController {
   async login(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ApiResponse<LoginResponse>> {
-    if (user.role !== 'student') {
+    if (user.role !== 'participant') {
       throw new UnauthorizedException({
         code: AuthErrorCode.ROLE_NOT_ALLOWED,
         message: 'Tài khoản không được phép đăng nhập bằng user endpoint',

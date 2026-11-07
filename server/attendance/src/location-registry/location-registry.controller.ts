@@ -30,7 +30,7 @@ export class LocationRegistryController {
   constructor(private readonly locationRegistryService: LocationRegistryService) {}
 
   @ApiOperation({ summary: 'Danh sách khuôn viên trường' })
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Get('campuses')
   async listCampuses(): Promise<
     ApiResponse<Awaited<ReturnType<LocationRegistryService['listCampuses']>>>
@@ -40,7 +40,7 @@ export class LocationRegistryController {
   }
 
   @ApiOperation({ summary: 'Danh sách địa điểm trong Location Registry' })
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Get('buildings')
   async listBuildings(
     @Query('includeInactive') includeInactive?: string,
@@ -84,7 +84,7 @@ export class LocationRegistryController {
   }
 
   @ApiOperation({ summary: 'Danh sách phòng học và Building đã liên kết' })
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Get('rooms')
   async listRooms(
     @Query('includeInactive') includeInactive?: string,

@@ -28,6 +28,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^6.0.1",
     "@nestjs/swagger": "^11.4.6",
     "@nestjs/throttler": "^6.4.0",
     "@prisma/adapter-pg": "^7.10.0",
@@ -86,6 +87,22 @@
     ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
+    "moduleNameMapper": {
+      "^#account/(.*)$": "<rootDir>/account/$1",
+      "^#attendance-check-in/(.*)$": "<rootDir>/attendance-check-in/$1",
+      "^#attendance-record/(.*)$": "<rootDir>/attendance-record/$1",
+      "^#attendance-sessions/(.*)$": "<rootDir>/attendance-sessions/$1",
+      "^#attendance-validation/(.*)$": "<rootDir>/attendance-validation/$1",
+      "^#auth/(.*)$": "<rootDir>/auth/$1",
+      "^#tag/(.*)$": "<rootDir>/tags/$1",
+      "^#units/(.*)$": "<rootDir>/units/$1",
+      "^#common/(.*)$": "<rootDir>/common/$1",
+      "^#geo/(.*)$": "<rootDir>/geo/$1",
+      "^#prisma/(.*)$": "<rootDir>/prisma/$1",
+      "^#user/(.*)$": "<rootDir>/users/$1",
+      "^#redis/(.*)$": "<rootDir>/redis/$1",
+      "^#job-scheduler/(.*)$": "<rootDir>/job-scheduler/$1"
+    },
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },

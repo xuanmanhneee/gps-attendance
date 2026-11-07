@@ -68,6 +68,49 @@ export class PrismaAttendanceRecordRepository
     ]);
   }
 
+  async upsertRecords(
+    records: Omit<AttendanceRecord, 'updatedAt'>[],
+  ): Promise<void> {
+    const batchSize = 100;
+    for (let start = 0; start < records.length; start += batchSize) {
+      const batch = records.slice(start, start + batchSize);
+      await this.prisma.$transaction(
+        batch.map((record) =>
+          this.prisma.attendanceRecord.upsert({
+            where: {
+              sessionId_userId: {
+                sessionId: record.sessionId,
+                userId: record.userId,
+              },
+            },
+            update: {
+              status: record.status,
+              deviceId: record.deviceId,
+              checkedInAt: record.checkedInAt,
+              latitude: record.latitude,
+              longitude: record.longitude,
+              accuracy: record.accuracy,
+              distanceMeters: record.distanceMeters,
+              updatedBy: record.updateBy,
+            },
+            create: {
+              sessionId: record.sessionId,
+              userId: record.userId,
+              status: record.status,
+              deviceId: record.deviceId,
+              checkedInAt: record.checkedInAt,
+              latitude: record.latitude,
+              longitude: record.longitude,
+              accuracy: record.accuracy,
+              distanceMeters: record.distanceMeters,
+              updatedBy: record.updateBy,
+            },
+          }),
+        ),
+      );
+    }
+  }
+
   async findByUser(userId: number): Promise<AttendanceRecord[]> {
     const records = await this.prisma.attendanceRecord.findMany({
       where: { userId },

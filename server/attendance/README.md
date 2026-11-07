@@ -36,7 +36,8 @@ Mọi thứ trong `server/attendance/` thuộc backend này: `src/` (Nest module
 - Global filter: `ApiExceptionFilter` → `{ success: false, code, message }`
 - CORS allowlist: localhost defaults cộng các origin trong `CORS_ORIGIN` (comma-separated)
 - `ValidationPipe` (`whitelist`, `transform`)
-- Swagger: `http://localhost:3000/api-docs` (Bearer)
+- Local dev qua `pnpm dev:attendance`: API chạy ở cổng `3001` và ngrok forward đúng cổng này để tránh nhầm với service khác đang dùng `3000`
+- Swagger local: `http://localhost:3001/api-docs` (Bearer); Compose vẫn expose API tại `http://localhost:3000/api-docs`
 - Listen `0.0.0.0`, cổng `PORT` hoặc `3000`
 
 `src/app.module.ts` import: Config, Throttler, Database/Prisma, Redis, Auth/Account, Users/Units/Tags, AttendanceSessions/Records/CheckIn/Validation, LocationRegistry, DeviceTrust, Logging và Health.

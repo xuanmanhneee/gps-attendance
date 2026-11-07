@@ -23,6 +23,7 @@ import { UnitOfWorkModule } from './common/unit-of-work/unit-of-work.module';
 import { UnitModule } from './units/units.module';
 import { LocationRegistryModule } from './location-registry/location-registry.module';
 import { DeviceTrustModule } from './device-trust/device-trust.module';
+import { JobSchedulerModule } from './job-scheduler/job-scheduler.module';
 
 const loadTestMode =
   process.env.NODE_ENV === 'test' && process.env.LOAD_TEST_MODE === 'true';
@@ -40,6 +41,7 @@ const loadTestMode =
     DatabaseModule,
     PrismaModule,
     RedisModule,
+    JobSchedulerModule,
     TagModule,
     UnitOfWorkModule,
     UnitModule,

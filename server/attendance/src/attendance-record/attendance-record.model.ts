@@ -12,6 +12,9 @@ export interface AttendanceRecord {
   distanceMeters: number | null;
   updatedAt: Date;
   updateBy: number | null;
+  reasons?: string[];
+  reviewRequested?: boolean;
+  note?: string;
 }
 
 export interface MarkPresentInput {
@@ -24,5 +27,6 @@ export interface MarkPresentInput {
   updateBy: number;
   deviceId?: string | null;
   distanceMeters?: number | null;
+  validationStatus?: 'VALID' | 'REVIEW';
+  reasons?: string[];
 }
-

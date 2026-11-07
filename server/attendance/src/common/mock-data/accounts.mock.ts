@@ -14,7 +14,7 @@ export const mockAccounts: Account[] = [
   {
     id: 2,
     userId: 2,
-    username: 'lecturer',
+    username: 'organizer',
     passwordHash:
       '$2b$10$regQBliOdhAY5xeTe.bw.OpgVU3MOfWhZdBf80aM79GT/BQV66mgm',
     status: 'active',

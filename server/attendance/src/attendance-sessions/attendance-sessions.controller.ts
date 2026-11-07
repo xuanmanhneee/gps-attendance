@@ -44,7 +44,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Tạo session điểm danh mới (lecturer)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer', 'admin')
+  @Roles('organizer', 'admin')
   @Post()
   async create(
     @Body() dto: CreateAttendanceSessionDto,
@@ -84,7 +84,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Danh sách lớp và lịch được giảng viên phụ trách' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer', 'admin')
+  @Roles('organizer', 'admin')
   @Get('teaching-sections')
   async getTeachingSections(
     @CurrentUser() user: AuthenticatedUser,
@@ -131,7 +131,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Danh sách sinh viên đang ghi danh trong lớp học phần (admin)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Get('sections/:sectionId/roster')
   async getSectionRoster(
     @Param('sectionId', ParseIntPipe) sectionId: number,
@@ -226,7 +226,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Danh sách session do chính tôi tạo (lecturer)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer', 'admin')
+  @Roles('organizer', 'admin')
   @Get('created-by-me')
   async findMyCreated(
     @CurrentUser() user: { userId: number },
@@ -239,7 +239,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Thống kê chuyên cần và sinh viên cần quan tâm' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('lecturer', 'admin')
+  @Roles('organizer', 'admin')
   @Get('analytics')
   async getAnalytics(
     @CurrentUser() user: AuthenticatedUser,
@@ -266,7 +266,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Danh sách toàn bộ session' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Get()
   async findAll(
     @CurrentUser() user: AuthenticatedUser,
@@ -280,7 +280,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Giảng viên duyệt hoặc từ chối lượt điểm danh cần xem xét' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Post(':id/attempts/:attemptId/review')
   async reviewAttempt(
     @Param('id', ParseIntPipe) id: number,
@@ -302,7 +302,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Xóa session và toàn bộ dữ liệu điểm danh liên quan' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Delete(':id')
   async delete(
     @Param('id', ParseIntPipe) id: number,
@@ -314,7 +314,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Đóng phiên điểm danh sớm' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Post(':id/close')
   async close(
     @Param('id', ParseIntPipe) id: number,
@@ -326,7 +326,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Hủy phiên điểm danh chưa kết thúc' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Patch(':id/cancel')
   async cancel(
     @Param('id', ParseIntPipe) id: number,
@@ -353,7 +353,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Chi tiết 1 session (kèm danh sách sinh viên)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Get(':id/detail')
   async getDetail(
     @Param('id', ParseIntPipe) id: number,
@@ -368,7 +368,7 @@ export class AttendanceSessionsController {
 
   @ApiOperation({ summary: 'Lấy thông tin cơ bản 1 session theo id' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Get(':id')
   async getById(
     @Param('id', ParseIntPipe) id: number,

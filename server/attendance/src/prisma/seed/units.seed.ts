@@ -26,9 +26,9 @@ export async function seedUnits(prisma: PrismaClient) {
     },
   });
 
-  const cnttLecturers = await prisma.unit.create({
+  const cnttOrganizers = await prisma.unit.create({
     data: {
-      name: 'Giảng viên',
+      name: 'Người tổ chức',
       parentId: cntt.id,
       level: 2,
     },
@@ -42,9 +42,9 @@ export async function seedUnits(prisma: PrismaClient) {
     },
   });
 
-  const suPhamLecturers = await prisma.unit.create({
+  const suPhamOrganizers = await prisma.unit.create({
     data: {
-      name: 'Giảng viên',
+      name: 'Người tổ chức',
       parentId: suPham.id,
       level: 2,
     },
@@ -122,9 +122,9 @@ export async function seedUnits(prisma: PrismaClient) {
     dalatUniversity,
     adminUnit,
     cntt,
-    cnttLecturers,
+    cnttOrganizers,
     suPham,
-    suPhamLecturers,
+    suPhamOrganizers,
     cnttK45,
     cnttK46,
     suPhamK45,

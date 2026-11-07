@@ -92,6 +92,8 @@ describe('AttendanceRecordsService.getMySummary', () => {
     const service = new AttendanceRecordsService(
       mockRepository as any,
       loggerFactory as any,
+      { findByUser: jest.fn().mockResolvedValue([]) } as any,
+      { onJob: jest.fn() } as any,
     );
 
     const summary = await service.getMySummary(42);
@@ -146,6 +148,8 @@ describe('AttendanceRecordsService.getMySummary', () => {
     const service = new AttendanceRecordsService(
       repository as any,
       loggerFactory as any,
+      { findByUser: jest.fn().mockResolvedValue([]) } as any,
+      { onJob: jest.fn() } as any,
     );
 
     const summary = await service.getMySummary(42);

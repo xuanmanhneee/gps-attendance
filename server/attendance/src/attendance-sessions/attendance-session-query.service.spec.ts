@@ -32,7 +32,7 @@ describe('AttendanceSessionQueryService', () => {
     };
     const service = makeService(prisma);
 
-    const result = await service.getSectionRoster(4, { userId: 9, role: 'lecturer' });
+    const result = await service.getSectionRoster(4, { userId: 9, role: 'organizer' });
 
     expect(result.students).toEqual([{
       id: 101,
@@ -59,7 +59,7 @@ describe('AttendanceSessionQueryService', () => {
     const service = makeService(prisma);
 
     await expect(
-      service.getSectionRoster(4, { userId: 9, role: 'lecturer' }),
+      service.getSectionRoster(4, { userId: 9, role: 'organizer' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(prisma.classEnrollment.findMany).not.toHaveBeenCalled();
   });
@@ -182,8 +182,8 @@ describe('AttendanceSessionQueryService', () => {
       courseSection: { findUnique: jest.fn().mockResolvedValue({ id: 4, capacity: 5 }) },
       user: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 10, code: 'S001', role: 'student', fullname: 'Student One', account: { username: 'S001' } },
-          { id: 11, code: 'S002', role: 'student', fullname: 'Student Two', account: { username: 'S002' } },
+          { id: 10, code: 'S001', role: 'participant', fullname: 'Student One', account: { username: 'S001' } },
+          { id: 11, code: 'S002', role: 'participant', fullname: 'Student Two', account: { username: 'S002' } },
         ]),
       },
       account: { findMany: jest.fn().mockResolvedValue([]) },
@@ -231,7 +231,7 @@ describe('AttendanceSessionQueryService', () => {
       courseSection: { findUnique: jest.fn().mockResolvedValue({ id: 4, capacity: 1 }) },
       user: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 11, code: 'S002', role: 'student', fullname: 'Student Two', account: { username: 'S002' } },
+          { id: 11, code: 'S002', role: 'participant', fullname: 'Student Two', account: { username: 'S002' } },
         ]),
       },
       account: { findMany: jest.fn().mockResolvedValue([]) },
@@ -256,7 +256,7 @@ describe('AttendanceSessionQueryService', () => {
     const students = Array.from({ length: 301 }, (_, index) => ({
       id: index + 1,
       code: `S${String(index + 1).padStart(3, '0')}`,
-      role: 'student',
+      role: 'participant',
       fullname: `Student ${index + 1}`,
       account: { username: `S${String(index + 1).padStart(3, '0')}` },
     }));
@@ -331,7 +331,7 @@ describe('AttendanceSessionQueryService', () => {
     const createCall = tx.user.create.mock.calls[0][0];
     expect(createCall.data).toMatchObject({
       code: 'SV025',
-      role: 'student',
+      role: 'participant',
       fullname: 'Nguyễn Văn An',
       email: 'SV025@dlu.edu.vn',
       dateOfBirth: '2005-01-31',
@@ -396,7 +396,7 @@ describe('AttendanceSessionQueryService', () => {
         findMany: jest.fn().mockResolvedValue([{
           id: 26,
           code: 'SV026',
-          role: 'student',
+          role: 'participant',
           fullname: 'Tên cũ',
           email: 'old@example.com',
           account: { username: 'sv026' },
@@ -551,7 +551,7 @@ describe('AttendanceSessionQueryService', () => {
     };
     const service = makeService(prisma);
 
-    await service.reviewAttempt(12, 8, 7, 'lecturer', 'APPROVED', 'Đã xác minh tại lớp');
+    await service.reviewAttempt(12, 8, 7, 'organizer', 'APPROVED', 'Đã xác minh tại lớp');
 
     expect(tx.attendanceAttempt.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -607,7 +607,7 @@ describe('AttendanceSessionQueryService', () => {
     };
     const service = makeService(prisma);
 
-    await service.reviewAttempt(12, 8, 7, 'lecturer', 'REJECTED', 'Vị trí không hợp lệ');
+    await service.reviewAttempt(12, 8, 7, 'organizer', 'REJECTED', 'Vị trí không hợp lệ');
 
     expect(tx.attendanceRecord.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -637,7 +637,7 @@ describe('AttendanceSessionQueryService', () => {
     const service = makeService(prisma);
 
     await expect(
-      service.reviewAttempt(12, 8, 7, 'lecturer', 'REJECTED', 'Đã xác minh'),
+      service.reviewAttempt(12, 8, 7, 'organizer', 'REJECTED', 'Đã xác minh'),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });

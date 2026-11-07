@@ -1,703 +1,304 @@
-# GPS Attendance System
+# GPS Attendance
 
-**Người biên soạn và phụ trách tài liệu: Phạm Nguyễn Ngọc Phước**
+Monorepo cho hệ thống điểm danh theo GPS, gồm API NestJS, ứng dụng mobile Expo, admin dashboard và package TypeScript dùng chung. README này mô tả mã nguồn hiện có và các lần kiểm thử đã thực hiện; không xem kết quả local là cam kết SLA production.
 
-> README này mô tả hệ thống theo mã nguồn hiện có trong repository: mục tiêu, thành phần, sơ đồ, use case, cách cấu hình, chạy, kiểm thử và các giới hạn đã biết. Tài liệu không thay thế API Swagger hoặc hướng dẫn chi tiết của từng package.
+## 1. Mục tiêu và vai trò
 
-## Mục lục
+Hệ thống hỗ trợ mở phiên điểm danh theo lớp học phần, nhận check-in từ mobile, đánh giá vị trí/thiết bị, lưu kết quả và cung cấp công cụ quản lý/duyệt trên web.
 
-1. [Giới thiệu tổng quan](#1-giới-thiệu-tổng-quan)
-2. [Cấu trúc hệ thống](#2-cấu-trúc-hệ-thống)
-3. [Sơ đồ tổng quan](#3-sơ-đồ-tổng-quan)
-4. [Sơ đồ user flow](#4-sơ-đồ-user-flow)
-5. [Sơ đồ use case theo chức năng](#5-sơ-đồ-use-case-theo-chức-năng)
-6. [Chức năng theo vai trò](#6-chức-năng-theo-vai-trò)
-7. [Công nghệ và dữ liệu](#7-công-nghệ-và-dữ-liệu)
-8. [Cài đặt và thực thi](#8-cài-đặt-và-thực-thi)
-  - [8.7. Benchmark tải chức năng check-in](#87-benchmark-tải-chức-năng-check-in)
-9. [API, cấu hình và vận hành](#9-api-cấu-hình-và-vận-hành)
-10. [Bảo mật, giới hạn và lưu ý](#10-bảo-mật-giới-hạn-và-lưu-ý)
-11. [Tài liệu liên quan](#11-tài-liệu-liên-quan)
-
----
-
-## 1. Giới thiệu tổng quan
-
-GPS Attendance là hệ thống điểm danh cho môi trường học tập. Ứng dụng gồm mobile cho sinh viên, dashboard web cho giảng viên/quản trị viên và backend API dùng chung. Dữ liệu nghiệp vụ được lưu bằng PostgreSQL thông qua Prisma.
-
-Mỗi phiên điểm danh gắn với lớp học phần, giảng viên, lịch học, thời gian mở/đóng và vị trí/tòa nhà đã cấu hình. Sinh viên được phân bổ vào phiên sẽ gửi vị trí GPS cùng thông tin thiết bị để backend đánh giá lượt điểm danh. Kết quả có thể là hợp lệ, cần xem xét hoặc bị từ chối.
-
-| Vai trò | Giao diện chính | Nhiệm vụ |
+| Vai trò trong hệ thống | Client chính | Nhiệm vụ |
 |---|---|---|
-| Sinh viên (`student`) | Mobile Expo | Đăng nhập, xem lịch và phiên được phân công, điểm danh GPS, xem lịch sử/thông báo, cập nhật hồ sơ |
-| Giảng viên (`lecturer`) | Dashboard web; một số luồng đăng nhập cũng có trên mobile | Xem lớp được phân công, tạo/quản lý phiên của mình, xem roster và kết quả, xử lý lượt cần xem xét |
-| Quản trị viên (`admin`) | Dashboard web | Quản lý phiên, lớp học phần, roster, lịch học, địa điểm/tòa nhà/phòng và độ tin cậy thiết bị |
+| `participant` | Mobile Expo | Xem phiên được phân công, gửi check-in, xem lịch sử và hồ sơ |
+| `organizer` | Admin dashboard | Quản lý phiên được phân quyền, theo dõi kết quả và duyệt trường hợp cần xem xét |
+| `admin` | Admin dashboard | Quản trị người dùng, địa điểm, học vụ, roster, thiết bị và phiên |
 
-### Phạm vi nghiệp vụ hiện có
+`Role` hiện dùng ba giá trị trung tính `admin`, `organizer`, `participant`; không dùng `student` hoặc `lecturer` làm giá trị role trong schema hiện tại. Tên “sinh viên” và “giảng viên” vẫn xuất hiện trong giao diện/nghiệp vụ học vụ.
 
-- Đăng nhập bằng username/password; backend kiểm tra mật khẩu đã băm bằng bcrypt và phân quyền qua JWT.
-- Quản lý hồ sơ người dùng, đơn vị (`Unit`), thẻ (`Tag`) và các tiêu chí chọn sinh viên.
-- Tạo lớp học phần, học kỳ, ghi danh và lịch học định kỳ hoặc buổi học theo ngày cụ thể.
-- Nhập danh mục học phần và danh sách sinh viên từ CSV/XLSX. Roster cập nhật hồ sơ, email theo MSSV, ngày sinh, giới tính, lớp/khóa; tài khoản mới mặc định dùng MSSV làm username nếu file thiếu username và dùng MSSV làm mật khẩu. Với roster chi tiết, mật khẩu các tài khoản sinh viên đã có trong danh sách cũng được đặt lại thành MSSV.
-- Quản lý Location Registry gồm campus, building và room; chỉ dùng vị trí building đã xác minh khi tạo phiên.
-- Điểm danh GPS với khoảng cách Haversine, kiểm tra mock location, thiết bị trùng, giới hạn số lần thử và đánh giá integrity evidence.
-- Xem lịch sử, thống kê, chi tiết bản ghi/attempt; giảng viên/quản trị viên có thể duyệt hoặc từ chối lượt cần xem xét.
-- Audit log, device trust, health check, logging, rate limit và API Swagger.
-- Ghi nhớ phiên đăng nhập trên mobile: nếu được chọn, app giữ token/user trong SecureStore (native) hoặc localStorage (web); ứng dụng không lưu mật khẩu.
-
----
-
-## 2. Cấu trúc hệ thống
-
-Đây là monorepo pnpm. Backend, các client và package chia sẻ contract dùng workspace root. Presentation Slidev là workspace riêng.
+## 2. Cấu trúc và công nghệ
 
 ```text
-gps-attendance-main/
-├── README.md
-├── package.json                    # Lệnh chạy/build ở root
-├── pnpm-workspace.yaml
-├── pnpm-lock.yaml
-├── docker-compose.yml              # PostgreSQL, Redis, backend, dashboard
-├── client/
-│   ├── admin-dashboard/            # React/Vite: giảng viên và quản trị viên
-│   │   ├── src/
-│   │   │   ├── api/                # API client
-│   │   │   ├── components/         # Modal, bảng, điều hướng và UI dùng chung
-│   │   │   ├── context/            # Trạng thái đăng nhập web
-│   │   │   ├── hooks/
-│   │   │   └── pages/              # Login, dashboard, phiên, địa điểm, lớp học phần
-│   │   ├── Dockerfile
-│   │   └── nginx.conf
-│   └── mobile-client/              # Expo/React Native: app sinh viên
-│       └── src/
-│           ├── app/                # Expo Router: tabs, login, profile, attendance
-│           ├── api/
-│           ├── components/
-│           ├── context/
-│           ├── hooks/
-│           └── services/           # Session/token, device ID và storage
-├── packages/
-│   └── shared/                     # Types, API response, HTTP client, error codes
-├── server/
-│   └── attendance/                 # NestJS API
-│       ├── prisma/
-│       │   ├── schema.prisma
-│       │   ├── migrations/
-│       │   └── seed.ts
-│       ├── src/
-│       │   ├── auth/ account/ users/
-│       │   ├── attendance-sessions/
-│       │   ├── attendance-check-in/
-│       │   ├── attendance-validation/
-│       │   ├── attendance-record/
-│       │   ├── location-registry/ device-trust/
-│       │   ├── health/ common/ prisma/ redis/
-│       │   └── units/ tags/ geo/
-│       └── test/                   # E2E tests
-├── docs/
-│   └── SYSTEM.md                   # Mô tả kỹ thuật hệ thống
-└── presentation/                   # Slidev; workspace/lockfile riêng
+client/
+  admin-dashboard/     React + Vite dashboard
+  mobile-client/       Expo Router / React Native
+packages/
+  shared/              API contracts, DTOs, error codes, HTTP client
+server/
+  attendance/          NestJS API, Prisma, PostgreSQL, Redis
 ```
 
-### Trách nhiệm theo package
-
-| Package | Vai trò |
+| Thành phần | Công nghệ / trách nhiệm |
 |---|---|
-| `server/attendance` (`@gps-attendance/attendance`) | REST API, xác thực/phân quyền, nghiệp vụ điểm danh, Prisma, migration và seed |
-| `client/admin-dashboard` (`@gps-attendance/admin-dashboard`) | Dashboard quản lý và theo dõi phiên, roster, lịch học, địa điểm |
-| `client/mobile-client` (`@gps-attendance/mobile-client`) | Ứng dụng di động, GPS check-in, lịch, lịch sử, thông báo và hồ sơ |
-| `packages/shared` (`@gps-attendance/shared`) | Contract TypeScript dùng chung giữa backend và client |
-| `presentation/` | Slidev presentation, cài và chạy độc lập với workspace root |
+| Workspace | pnpm workspaces; Node.js `>=20`; pnpm `11.x` |
+| Shared | TypeScript; `ApiResponse<T>`, DTO, error code, `FetchHttpClient` |
+| API | NestJS 11, Passport/JWT, class-validator, Swagger, Winston |
+| Lưu trữ | PostgreSQL, Prisma 7; Redis cho buffer điểm danh, rate/device/attempt và scheduler |
+| Mobile | Expo SDK 54, React Native 0.81, Expo Router |
+| Dashboard | React 19, Vite 8, React Router 7, Tailwind CSS 4 |
+| Hiệu năng | Docker Compose stack riêng, Nginx, PostgreSQL, Redis, k6 |
 
----
-
-## 3. Sơ đồ tổng quan
-
-```mermaid
-flowchart LR
-  Student[ Sinh viên ] --> Mobile[Mobile Expo]
-  Staff[Giảng viên] --> Dashboard[Admin Dashboard]
-  Admin[Quản trị viên] --> Dashboard
-
-  Mobile -->|REST API và JWT| API[Backend NestJS]
-  Dashboard -->|REST API và JWT| API
-  Shared[Shared types và API contracts] -. dùng chung .-> Mobile
-  Shared -. dùng chung .-> Dashboard
-  Shared -. dùng chung .-> API
-
-  API -->|Prisma| DB[(PostgreSQL)]
-  API -->|Token blacklist và dữ liệu vận hành| Redis[(Redis)]
-  Mobile -->|GPS, thiết bị, phiên đăng nhập| Device[Thiết bị di động]
-  Dashboard -->|CSV và XLSX| Files[File import/export]
-```
-
-### Hạ tầng khi chạy bằng Docker Compose
-
-| Thành phần | Cổng mặc định | Công dụng |
-|---|---:|---|
-| PostgreSQL 16 | `5432` | Lưu tài khoản, lớp, lịch, phiên và dữ liệu điểm danh |
-| Redis 7 | `6379` | Hỗ trợ blacklist/thu hồi token và dữ liệu vận hành |
-| Backend NestJS | `3000` | REST API, health endpoint, Swagger |
-| Nginx dashboard | `8080` trên host | Phục vụ web dashboard đã build |
-| Mobile Expo | Không chạy trong Compose | Chạy riêng; kết nối backend qua LAN hoặc HTTPS tunnel |
-
-Sơ đồ thể hiện luồng logic. Mobile và dashboard không kết nối trực tiếp PostgreSQL/Redis; mọi thao tác nghiệp vụ đi qua backend API.
-
----
-
-## 4. Sơ đồ user flow
-
-```mermaid
-flowchart TD
-  Start([Bắt đầu]) --> Choose{Vai trò đăng nhập}
-
-  Choose -->|Sinh viên| StudentLogin[Đăng nhập trên mobile]
-  StudentLogin --> StudentAuth{Thông tin hợp lệ}
-  StudentAuth -->|Không| LoginError[Hiện lỗi đăng nhập]
-  LoginError --> StudentLogin
-  StudentAuth -->|Có| StudentHome[Trang điểm danh]
-  StudentHome --> ViewSchedule[Xem lịch và phiên được giao]
-  ViewSchedule --> SelectSession[Chọn phiên đang mở]
-  SelectSession --> GetLocation[Xin quyền và lấy GPS]
-  GetLocation --> SendCheckin[Gửi vị trí, thiết bị và evidence]
-  SendCheckin --> Evaluate[Backend kiểm tra phiên, roster, GPS và rủi ro]
-  Evaluate --> Result{Kết quả}
-  Result -->|VALID| MarkPresent[Ghi nhận điểm danh]
-  Result -->|REVIEW| NeedsReview[Đưa vào danh sách cần xem xét]
-  Result -->|REJECTED| Rejected[Hiện lý do từ chối]
-  MarkPresent --> HistoryStudent[Xem lịch sử và thông báo]
-  NeedsReview --> HistoryStudent
-  Rejected --> SelectSession
-  StudentHome --> EditProfile[Cập nhật hồ sơ]
-  StudentHome --> LogoutStudent[Đăng xuất]
-
-  Choose -->|Giảng viên hoặc quản trị| StaffLogin[Đăng nhập dashboard]
-  StaffLogin --> StaffAuth{Thông tin và quyền hợp lệ}
-  StaffAuth -->|Không| StaffLoginError[Hiện lỗi đăng nhập]
-  StaffLoginError --> StaffLogin
-  StaffAuth -->|Có| StaffDashboard[Dashboard]
-  StaffDashboard --> PrepareData[Chuẩn bị lớp, roster, lịch và địa điểm]
-  PrepareData --> CreateSession[Tạo phiên điểm danh]
-  CreateSession --> SessionActive[Theo dõi phiên và sinh viên]
-  SessionActive --> ReviewAttempts[Duyệt attempt cần xem xét]
-  SessionActive --> ExportReport[Xuất báo cáo CSV]
-  StaffDashboard --> ManageLocation[Quản lý building, room và xác minh]
-  StaffDashboard --> LogoutStaff[Đăng xuất]
-```
-
-Luồng chính từ khâu chuẩn bị học phần đến điểm danh:
-
-1. Quản trị viên tạo học phần/lớp, gán giảng viên, nhập roster và thiết lập lịch học.
-2. Quản trị viên đăng ký và xác minh vị trí building; phòng được liên kết với building phù hợp.
-3. Giảng viên chọn lớp/lịch đã sẵn sàng và tạo phiên.
-4. Backend snapshot enrollment active thành các attendance record ban đầu.
-5. Sinh viên mở phiên trên mobile, gửi GPS/device evidence trong khung giờ hợp lệ.
-6. Giảng viên/quản trị viên theo dõi kết quả, xử lý lượt review và xuất báo cáo.
-
----
-
-## 5. Sơ đồ use case theo chức năng
-
-Các sơ đồ use case dưới đây được biểu diễn bằng Mermaid flowchart để hoạt động trong GitHub/Markdown preview; mỗi sơ đồ gom các hành động người dùng theo một miền chức năng.
-
-### 5.1. Tài khoản và hồ sơ
-
-```mermaid
-flowchart LR
-  Student[ Sinh viên ] --> LoginStudent((Đăng nhập student))
-  Student --> Remember((Ghi nhớ phiên đăng nhập))
-  Student --> ReadProfile((Xem hồ sơ cá nhân))
-  Student --> UpdateProfile((Cập nhật hồ sơ))
-  Student --> LogoutStudent((Đăng xuất))
-
-  Lecturer[Giảng viên] --> LoginStaff((Đăng nhập staff))
-  Admin[Quản trị viên] --> LoginStaff
-  LoginStaff --> CheckRole((Kiểm tra role và cấp JWT))
-  LoginStudent --> CheckRole
-  CheckRole --> AccountService[Auth và Account service]
-  ReadProfile --> UserService[Users service]
-  UpdateProfile --> UserService
-  LogoutStudent --> RevokeToken((Thu hồi token))
-  RevokeToken --> Redis[(Redis)]
-```
-
-### 5.2. Học phần, lớp, roster và lịch học
-
-```mermaid
-flowchart LR
-  Admin[Quản trị viên] --> ImportCourses((Nạp danh mục học phần))
-  Admin --> CreateSection((Tạo lớp học phần))
-  Admin --> ImportRoster((Nạp roster CSV hoặc XLSX))
-  Admin --> UpdateStudent((Cập nhật hồ sơ và tài khoản sinh viên))
-  Admin --> SetCapacity((Đặt sức chứa lớp tối đa 300))
-  Admin --> CreateTimetable((Tạo lịch định kỳ hoặc lịch theo ngày))
-  Admin --> EditTimetable((Sửa hoặc xóa lịch))
-  Lecturer[Giảng viên] --> ViewSections((Xem lớp được phân công))
-  Lecturer --> ViewRoster((Xem roster lớp))
-
-  ImportCourses --> CourseService[Course và CourseSection service]
-  CreateSection --> CourseService
-  ImportRoster --> EnrollmentService[Import và ClassEnrollment]
-  UpdateStudent --> EnrollmentService
-  SetCapacity --> EnrollmentService
-  CreateTimetable --> TimetableService[TimetableSlot service]
-  EditTimetable --> TimetableService
-  ViewSections --> CourseService
-  ViewRoster --> EnrollmentService
-```
-
-### 5.3. Phiên điểm danh, check-in và kết quả
-
-```mermaid
-flowchart LR
-  Lecturer[Giảng viên] --> CreateSession((Tạo phiên từ lớp và lịch))
-  Lecturer --> MonitorSession((Theo dõi phiên))
-  Lecturer --> ReviewAttempt((Duyệt hoặc từ chối attempt))
-  Admin[Quản trị viên] --> CreateSession
-  Admin --> MonitorSession
-  Admin --> ReviewAttempt
-  Admin --> CloseSession((Đóng hoặc hủy phiên))
-  Student[Sinh viên] --> ViewAssigned((Xem phiên được giao))
-  Student --> GPSCheckin((Gửi điểm danh GPS))
-  Student --> ViewHistory((Xem lịch sử và thống kê))
-
-  CreateSession --> SessionService[Attendance Sessions]
-  ViewAssigned --> SessionService
-  GPSCheckin --> CheckinService[Check-in và anti-fraud]
-  CheckinService --> Validation[GPS, mock location và integrity]
-  Validation --> Record[(Attendance Record)]
-  ReviewAttempt --> SessionService
-  ViewHistory --> RecordService[Attendance Records]
-  CloseSession --> SessionService
-  MonitorSession --> SessionService
-```
-
-### 5.4. Địa điểm, thiết bị và xác minh
-
-```mermaid
-flowchart LR
-  Admin[Quản trị viên] --> CampusUse((Xem campus))
-  Admin --> BuildingUse((Tạo hoặc cập nhật building))
-  Admin --> VerifyBuilding((Cập nhật GPS và xác minh building))
-  Admin --> RoomUse((Tạo hoặc liên kết room))
-  Admin --> TrustDevice((Trust hoặc block thiết bị))
-  Lecturer[Giảng viên] --> ViewLocations((Xem địa điểm))
-  Lecturer --> VerifyOwnLocation((Gửi bằng chứng vị trí giảng viên))
-  Student[Sinh viên] --> SubmitDevice((Gửi thông tin thiết bị khi check-in))
-
-  CampusUse --> Registry[Location Registry]
-  BuildingUse --> Registry
-  VerifyBuilding --> Registry
-  RoomUse --> Registry
-  ViewLocations --> Registry
-  VerifyOwnLocation --> Verification[Lecturer Location Verification]
-  SubmitDevice --> DeviceTrust[Device Trust và integrity]
-  TrustDevice --> DeviceTrust
-```
-
-### 5.5. Vận hành, báo cáo và bảo trì
-
-```mermaid
-flowchart LR
-  Admin[Quản trị viên] --> Analytics((Xem thống kê chuyên cần))
-  Admin --> Export((Xuất báo cáo CSV))
-  Admin --> Health((Kiểm tra sức khỏe API))
-  Admin --> Audit((Tra cứu lịch sử thao tác))
-  Lecturer[Giảng viên] --> Analytics
-  Lecturer --> Export
-  Lecturer --> ReviewHistory((Xem attempt và history))
-  Developer[Nhà phát triển] --> Migrate((Quản lý migration))
-  Developer --> Seed((Nạp dữ liệu development))
-  Developer --> Tests((Chạy test và build))
-
-  Analytics --> AttendanceAPI[Attendance API]
-  Export --> Dashboard[Admin Dashboard]
-  ReviewHistory --> AttendanceAPI
-  Health --> Monitoring[Health và Monitoring]
-  Audit --> AuditLog[(AuditLog)]
-  Migrate --> Prisma[Prisma]
-  Seed --> Prisma
-  Tests --> CI[Build và test scripts]
-```
-
----
-
-## 6. Chức năng theo vai trò
-
-### Sinh viên — mobile
-
-- Đăng nhập qua `POST /v0/user/auth/login`.
-- Có thể bật **Ghi nhớ đăng nhập** để khôi phục phiên khi mở app lại; không lưu mật khẩu.
-- Xem phiên/lịch được phân bổ, lấy vị trí hiện tại và thực hiện check-in.
-- Xem lịch sử, thống kê chuyên cần, notification/reminder trong app.
-- Xem và cập nhật hồ sơ cá nhân.
-- Đăng xuất; app xóa phiên local và backend hỗ trợ thu hồi token.
-
-### Giảng viên — dashboard
-
-- Đăng nhập qua `POST /v0/admin/auth/login`; backend chỉ chấp nhận `lecturer` hoặc `admin` ở endpoint này.
-- Xem lớp được phân công và roster active.
-- Tạo phiên từ lớp/lịch học đã cấu hình, theo dõi trạng thái phiên và kết quả điểm danh.
-- Xem attempts, duyệt/từ chối kết quả cần xem xét; đóng, hủy hoặc xóa phiên theo quyền.
-- Xem thống kê và xuất bảng điểm danh CSV.
-- Gửi xác minh vị trí giảng viên theo endpoint được bảo vệ.
-
-### Quản trị viên — dashboard
-
-- Quản lý danh mục môn/lớp học phần, giảng viên và phòng theo các luồng hiện có.
-- Import danh sách học phần và roster CSV/XLSX; nâng capacity lớp hiện có tối đa 300.
-- Tạo/sửa/xóa lịch định kỳ theo thứ hoặc một buổi học cụ thể theo ngày.
-- Quản lý campus/building/room; cập nhật tọa độ, radius, accuracy, trạng thái xác minh.
-- Quản lý phiên và xử lý attempt theo quyền; xem analytics, lịch sử và audit.
-- Cập nhật trust/block cho thiết bị.
-
-### Quy trình check-in ở backend
-
-1. Xác nhận phiên tồn tại và đang mở.
-2. Kiểm tra sinh viên đã được phân bổ vào phiên và chưa điểm danh thành công.
-3. Ghi attempt; giới hạn số lần thử và kiểm tra device trùng.
-4. Tính khoảng cách đến tâm geofence bằng Haversine; xét accuracy, mock location và integrity evidence.
-5. Trả `VALID`, `REVIEW` hoặc `REJECTED` cùng lý do; lượt được chấp nhận được ghi nhận để hiển thị trong lịch sử/chi tiết phiên.
-
-> Integrity evidence hiện được đánh giá ở backend; việc có trường token không tự chứng minh chữ ký Play Integrity/App Attest đã được xác minh với dịch vụ provider.
-
----
-
-## 7. Công nghệ và dữ liệu
-
-### Công nghệ
-
-| Lớp | Công nghệ |
-|---|---|
-| Backend | Node.js 20+, NestJS 11, TypeScript, Passport, JWT, bcrypt |
-| Dữ liệu | Prisma 7, PostgreSQL 16, Redis |
-| Web | React 19, Vite 8, React Router, Tailwind CSS |
-| Mobile | Expo SDK 54, React Native 0.81, Expo Router, expo-location, expo-secure-store |
-| Shared | TypeScript package `@gps-attendance/shared` |
-| Công cụ | pnpm 11, Jest, Swagger, Winston, Docker Compose, Nginx |
-
-### Các miền dữ liệu chính
-
-| Miền | Model/nhóm dữ liệu |
-|---|---|
-| Danh tính | `Account`, `User`, `Unit`, `Tag`, `UserTag` |
-| Học vụ | `Course`, `AcademicTerm`, `CourseSection`, `ClassEnrollment`, `TimetableSlot` |
-| Địa điểm | `Campus`, `Building`, `Room` |
-| Điểm danh | `AttendanceSession`, `AttendanceRecord`, `AttendanceAttempt`, `AttendanceHistoryEvent` |
-| Bảo mật/vận hành | `RegisteredDevice`, `DeviceIntegrityCheck`, `LecturerLocationVerification`, `AuditLog` |
-| Thông báo | `Notification`, `UserNotificationState`, `PushToken` |
-
-`schema.prisma` và các migration trong `server/attendance/prisma/` là nguồn xác định field, relation và constraint hiện tại. Mật khẩu không lưu dạng rõ; seed chỉ áp dụng cho môi trường development.
-
----
-
-## 8. Cài đặt và thực thi
-
-Các lệnh dưới đây dành cho PowerShell trên Windows từ thư mục gốc `gps-attendance-main`.
-
-### 8.1. Yêu cầu
-
-- Node.js `>= 20`
-- pnpm `11.x` (repository chỉ định `pnpm@11.12.0`)
-- PostgreSQL 16 và Redis 7 (local hoặc Docker Compose)
-- Expo Go hoặc thiết bị phù hợp để kiểm thử GPS mobile
-- Ngrok chỉ cần khi dùng script/tunnel ngrok
-
-### 8.2. Cài dependencies và cấu hình môi trường
+Lệnh gốc được khai báo trong [package.json](./package.json):
 
 ```powershell
-pnpm.cmd install
-
-Copy-Item server\attendance\.env.example server\attendance\.env
-Copy-Item client\admin-dashboard\.env.example client\admin-dashboard\.env
-Copy-Item client\mobile-client\.env.example client\mobile-client\.env
+pnpm install
+pnpm build:shared
+pnpm build:attendance
+pnpm build:admin
+pnpm dev:attendance
+pnpm dev:admin
+pnpm dev:mobile
 ```
 
-Điền giá trị local phù hợp:
-
-- Backend: `DATABASE_URL`, `JWT_SECRET`, `REFRESH_TOKEN_SECRET`, `CORS_ORIGIN`, Redis host/port và mật khẩu seed admin/giảng viên nếu cần.
-- Dashboard: `VITE_API_BASE_URL`.
-- Mobile: `EXPO_PUBLIC_API_URL`. Trên điện thoại thật, dùng IP LAN hoặc URL HTTPS; không dùng `localhost` của máy phát triển.
-
-Không commit các file `.env` hoặc secret thực. Không dùng secret mặc định của Compose ngoài môi trường local an toàn.
-
-### 8.3. Khởi động PostgreSQL/Redis và thiết lập schema
-
-Sau khi cấu hình container engine, từ root:
+`pnpm dev:attendance` chạy script kiểm tra/khởi động ngrok trước khi chạy API. Nếu chỉ phát triển trong máy/mạng LAN, có thể chạy API trực tiếp:
 
 ```powershell
-docker compose up -d postgres redis
-```
-
-Kiểm tra `DATABASE_URL` trỏ đúng database. Chạy migration đã có:
-
-```powershell
-pnpm.cmd --filter @gps-attendance/attendance exec prisma migrate deploy
-pnpm.cmd --filter @gps-attendance/attendance exec prisma migrate status
-```
-
-Khi phát triển schema trên database development và cần tạo migration mới, dùng `prisma migrate dev` theo hướng dẫn trong [README Prisma](server/attendance/src/prisma/README.md). **Không chạy `prisma migrate reset` trên database chứa dữ liệu cần giữ.**
-
-Nạp dữ liệu mẫu development:
-
-```powershell
-pnpm.cmd seed:attendance
-```
-
-Seed được cấu hình trong `server/attendance/prisma/seed.ts`, chỉ chạy development. Tài khoản sinh viên mẫu dùng MSSV làm mật khẩu; admin/giảng viên có thể cấu hình qua `SEED_ADMIN_PASSWORD` và `SEED_LECTURER_PASSWORD`. Không dùng credentials mẫu ngoài môi trường development.
-
-### 8.4. Chạy các ứng dụng ở chế độ phát triển
-
-Mở các terminal riêng tại root:
-
-```powershell
-pnpm.cmd dev:attendance
-pnpm.cmd dev:admin
-pnpm.cmd dev:mobile
-```
-
-- `dev:attendance` build shared, gọi script ngrok rồi chạy NestJS watch. Cần cài và xác thực ngrok. Nếu không cần tunnel, chạy local trực tiếp:
-
-  ```powershell
-  pnpm.cmd build:shared
-  pnpm.cmd --filter @gps-attendance/attendance dev
-  ```
-
-- `dev:admin` build shared rồi chạy Vite dashboard, thường tại `http://localhost:5173`.
-- `dev:mobile` build shared rồi khởi chạy Expo.
-- `pnpm.cmd dev:shared` bật watch build shared.
-- `pnpm.cmd dev:ngrok` chỉ chạy script cấu hình/cập nhật tunnel.
-
-### 8.5. Build, kiểm thử và công cụ package
-
-```powershell
-pnpm.cmd build:shared
-pnpm.cmd build:attendance
-pnpm.cmd build:admin
-pnpm.cmd build
-
-pnpm.cmd --filter @gps-attendance/attendance test
-pnpm.cmd --filter @gps-attendance/attendance test:e2e
-pnpm.cmd --filter @gps-attendance/mobile-client exec tsc --noEmit
-```
-
-Root `pnpm build` build shared, backend và dashboard; mobile được khởi chạy/build riêng bởi Expo.
-
-Một số lệnh riêng:
-
-```powershell
-pnpm.cmd dev:mobile:clear
-pnpm.cmd dev:mobile:offline
-pnpm.cmd --filter @gps-attendance/attendance test:watch
-pnpm.cmd --filter @gps-attendance/attendance test:cov
-pnpm.cmd --filter @gps-attendance/attendance lint
-pnpm.cmd --filter @gps-attendance/mobile-client lint
-```
-
-Lưu ý: script lint backend hiện chạy ESLint với `--fix`, tức có thể sửa file nguồn.
-
-### 8.6. Chạy toàn bộ stack bằng Compose
-
-Khi đã có Docker/Compose và đã cấu hình environment:
-
-```powershell
-docker compose up --build -d
-docker compose ps
-docker compose logs -f backend
-```
-
-Dashboard được phục vụ tại `http://localhost:8080`; API tại `http://localhost:3000`; health tại `http://localhost:3000/v0/health`; Swagger tại `http://localhost:3000/api-docs`. Mobile không phải service Compose và vẫn cần chạy Expo riêng.
-
-### 8.7. Benchmark tải chức năng check-in
-
-#### Mục tiêu
-
-Đo khả năng xử lý của `POST /v0/attendance/check-in` khi nhiều tài khoản sinh viên mô phỏng cùng gửi một lượt điểm danh. Benchmark giúp tìm mức tải đã kiểm chứng đạt SLA và quan sát điểm latency bắt đầu tăng mạnh; đây không phải phép đo người dùng thật hay cam kết năng lực production.
-
-| Chỉ số đánh giá | Ngưỡng benchmark |
-|---|---:|
-| p95 latency của check-in | `< 1.000 ms` |
-| Lỗi kỹ thuật (transport/status 0 hoặc HTTP 5xx) | `< 1%` |
-| Check-in được chấp nhận | Đủ một lượt cho mỗi VU |
-| HTTP 429 | `0` |
-| Từ chối nghiệp vụ trong fixture hợp lệ | `0` |
-
-#### Vai trò và thành phần
-
-| Thành phần/vai trò | Trách nhiệm |
-|---|---|
-| Người vận hành | Dùng database test riêng, khởi động dịch vụ, chọn số VU và theo dõi health/tài nguyên |
-| Seeder | Tạo 350 tài khoản student mô phỏng, session đang mở, attendance records, JWT và payload fixture |
-| k6 | Mỗi VU dùng một fixture/tài khoản và gửi đúng một request check-in |
-| Backend NestJS | Xác thực JWT, kiểm tra session/record, GPS/device/integrity và ghi attendance/attempt |
-| PostgreSQL | Lưu user, account, session, attendance record và evidence của lượt thử |
-| Redis | Phục vụ các phần token/runtime của backend |
-
-Mã nguồn chính: [checkin-burst.js](tests/load/checkin-burst.js), [load-seed.ts](server/attendance/test/load-seed.ts), [hướng dẫn tải](tests/load/README.md).
-
-#### Input
-
-| Input | Mô tả |
-|---|---|
-| `BASE_URL` | URL API, benchmark local dùng `http://127.0.0.1:3000` |
-| `CHECKIN_FIXTURES` | JSON có ít nhất `MAX_VUS` fixture; mỗi fixture có JWT và payload riêng |
-| `MAX_VUS` | Mức concurrent VU cần thử; không lớn hơn số fixture |
-| `RAMP_VUS`, `RAMP_DURATION` | Mức tải khởi đầu và thời gian ramp, mặc định 10 VU/15 giây |
-| `SPIKE_DURATION`, `HOLD_DURATION`, `COOLDOWN_DURATION` | Thời gian tăng tới target, giữ tải và hạ tải; mặc định 10/30/10 giây |
-| `P95_MS`, `TECHNICAL_ERROR_RATE` | Ngưỡng SLA, mặc định 1.000 ms và 0,01 |
-
-Mỗi fixture theo đúng DTO backend: `sessionId` là số nguyên; `location` có latitude, longitude, accuracy, epoch timestamp, `isMockLocation`; `device` có `deviceId`, platform, model; `integrity.integrityToken` có thể null. Seeder tạo tọa độ nằm trong geofence, thiết bị khác nhau cho từng tài khoản và JWT hợp lệ. Không dùng chung token/device giữa các VU.
-
-#### Output
-
-- `checkin_accepted`: số kết quả `VALID` hoặc `REVIEW`; phải bằng hoặc lớn hơn số VU mục tiêu.
-- `checkin_latency`: phân bố latency của request check-in, đặc biệt p95.
-- `checkin_technical_error_rate`: tỷ lệ transport error/HTTP 5xx; không gộp lỗi nghiệp vụ vào lỗi kỹ thuật.
-- `checkin_rate_limited` và `checkin_business_rejected`: phải bằng 0 trong bài đo capacity với fixture hợp lệ.
-- `http_reqs`/`http_req_duration`: tổng request, throughput trung bình và độ trễ theo báo cáo k6.
-- `--summary-export`: ghi báo cáo JSON local; fixture và kết quả `*.local.json` đã được Git ignore.
-
-Không dùng `iterations` làm số check-in: sau request đầu tiên, mỗi VU sleep và không gửi lại POST. Chỉ số request/accepted phản ánh số lượt điểm danh thực tế.
-
-#### Điều kiện và cách hoạt động
-
-- Dùng k6 `v2.3.0`, API NestJS local, PostgreSQL/Redis Docker và database riêng `gps_attendance_loadtest`; database này đã được migrate 19 migration.
-- Rate limit chỉ được nới/bỏ guard khi đồng thời có `NODE_ENV=test`, `LOAD_TEST_MODE=true` và database đúng tên `gps_attendance_loadtest`. Bootstrap từ chối bật chế độ này với database khác. Không giả mạo IP, không seed hoặc chạy benchmark vào production.
-- Profile mặc định: ramp lên 10 VU trong 15 giây, ramp tiếp tới `MAX_VUS` trong 10 giây, giữ 30 giây, rồi ramp về 0 trong 10 giây. Mỗi VU gửi một check-in khi bắt đầu; thời điểm gửi được phân bố theo ramp, không phải tất cả trong cùng một mili-giây.
-- Một lượt đo kéo dài khoảng 65,7 giây. RPS trong bảng là trung bình trên toàn lượt gồm ramp-up/ramp-down; đây không phải peak RPS của riêng đoạn spike.
-- Seeder tạo session mới mỗi lần chạy và không xóa dữ liệu cũ. Sau khi xác nhận database test, dùng lại session mới cho mỗi lượt để tránh check-in trùng; giữ fixture/summary để đối chiếu.
-
-#### Quy trình thực hiện
-
-1. Cài Docker/Compose và k6; cấu hình `server/attendance/.env` với JWT secret local không phải placeholder.
-2. Mở **Terminal A** tại thư mục gốc, khởi động PostgreSQL/Redis, tạo database test lần đầu, sau đó migrate, seed và chạy API bằng biến môi trường test.
-3. Chờ API sẵn sàng tại `http://127.0.0.1:3000/v0/health`; xác nhận database connected và migration applied.
-4. Mở **Terminal B** tại thư mục gốc, đặt biến k6 và chạy profile ở mức VU cần đo.
-5. Đọc summary: trước hết xét `checkin_accepted`, p95, lỗi kỹ thuật, 429 và business rejection; sau đó đối chiếu health/RAM/CPU/DB. Tăng VU theo nấc, tạo session mới cho từng lượt.
-6. Sau benchmark, dừng API bằng `Ctrl+C` và dừng Redis nếu đã khởi động riêng. Không xóa database/attendance evidence để “reset” kết quả.
-
-#### Số liệu thực tế
-
-| VU | Accepted | p95 | Trung bình req/s | Kết quả SLA |
-|---:|---:|---:|---:|---|
-| 50 | 50 | 146,77 ms | 0,76 | Đạt |
-| 100 | 100 | 106,66 ms | 1,52 | Đạt |
-| 200 | 200 | 37,45 ms | 3,04 | Đạt |
-| 300 | 300 | 530,18 ms | 4,56 | Đạt |
-| 312 | 312 | 40,00 ms | 4,75 | Đạt |
-| 313 | 313 | 32,48 ms | 4,76 | Đạt |
-| 315 | 315 | 1,13 s | 4,79 | Trượt p95 |
-| 318 | 318 | 1,14 s | 4,84 | Trượt p95 |
-| 325 | 325 | 3,81 s | 4,94 | Trượt p95 |
-| 350 | 350 | 7,82 s | 5,32 | Trượt p95 |
-
-Tất cả các nấc trong bảng có 0 lỗi kỹ thuật, 0 HTTP 429 và 0 từ chối nghiệp vụ. Ở 350 VU, backend vẫn nhận đủ check-in nhưng latency vượt SLA.
-
-**Kết luận:** mức cao nhất đã xác nhận đạt trong các nấc đo là 313 VU; 315 VU là nấc đầu tiên trong dải gần đó bị trượt. 314 VU chưa đo, do đó đây không phải cực đại chính xác hay cam kết production. Kết quả p95 biến động đáng kể giữa một số nấc; nên benchmark lại trên staging gần production và lặp nhiều lần trước khi công bố capacity ổn định.
-
-#### Tài nguyên và lưu ý kết quả
-
-- Snapshot sau nấc 350 ghi nhận health `ok`, PostgreSQL `connected`, API RSS khoảng `251 MB`, heap `106 MB`, RAM hệ thống sử dụng `92%` so với khoảng `87%` ban đầu. Đây là snapshot sau test, không phải biểu đồ mức dùng RAM/CPU theo thời gian; CPU time-series và peak RPS chưa được thu thập.
-- Lượt 350 đầu tiên có lỗi script `sleep is not defined`; p95 `291,35 ms` ở log đó **không dùng làm kết quả**. Sau khi sửa import `sleep`, lượt 350 hợp lệ có p95 `7,82 s` như bảng.
-- Summary JSON và fixture local nằm dưới `tests/load/` với hậu tố `.local.json` và được Git ignore. Seeder không xóa dữ liệu; mỗi lần chạy tạo session/evidence mới. Dữ liệu database `gps_attendance_loadtest` được giữ lại để đối chiếu, không phải dữ liệu production.
-- Kết quả tải còn phụ thuộc cấu hình máy, PostgreSQL, Redis, load generator và phiên bản runtime; không ngoại suy trực tiếp thành capacity của hệ thống production.
-
-#### Lệnh thực thi PowerShell
-
-Chạy phần chuẩn bị trong **Terminal A**. Lệnh `createdb` chỉ chạy lần đầu; nếu database đã tồn tại thì giữ nguyên, không drop/reset.
-
-```powershell
-docker compose up -d postgres redis
-$pgUser = (docker compose exec -T postgres printenv POSTGRES_USER | Out-String).Trim()
-docker compose exec -T postgres createdb -U $pgUser gps_attendance_loadtest
-
-$env:NODE_ENV = 'test'
-$env:LOAD_TEST_MODE = 'true'
-$env:DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/gps_attendance_loadtest'
-pnpm --filter @gps-attendance/attendance exec prisma migrate deploy
-pnpm --filter @gps-attendance/attendance exec tsx test/load-seed.ts
+pnpm build:shared
 pnpm --filter @gps-attendance/attendance dev
 ```
 
-Nếu thông tin PostgreSQL local khác mặc định Compose, sửa user/password trong `DATABASE_URL` cho khớp. Khi API đã chạy, đặt `MAX_VUS` không vượt quá 350 và chạy trong **Terminal B**. Ví dụ benchmark mức cao nhất đã xác nhận đạt:
+Root `pnpm build` build shared, backend và dashboard; không bao gồm build native mobile.
+
+## 3. Thành phần hệ thống đang có
+
+### 3.1 Shared package
+
+- Chuẩn response API dạng `ApiResponse<T>` và mã lỗi dùng chung.
+- Types/DTO cho xác thực, người dùng, phiên, check-in và attendance.
+- `FetchHttpClient` gửi Bearer token nếu có, timeout 30 giây, chuyển lỗi API thành `ApiError`.
+
+### 3.2 Backend API
+
+- Đăng nhập user/admin, JWT access/refresh, logout/revoke theo service.
+- Quản lý tài khoản/hồ sơ, units/tags và quyền theo role.
+- Quản lý session, lớp học phần, lịch học, roster và attendance records.
+- Location Registry: campus, building/facility và room; admin hiệu chuẩn/vận hành cấu hình địa điểm.
+- Check-in gồm xác thực session/roster, attempt/device, GPS, mock-location, integrity, audit và quyết định `VALID`, `REVIEW` hoặc `REJECTED`.
+- Redis write-behind attendance buffer; scheduler flush dữ liệu theo batch về PostgreSQL.
+- Health endpoint, request ID, JSON logging, exception filter, Swagger và health/metrics.
+
+API chạy với prefix `/v0`. Một số lệnh hữu ích:
+
+| Method / path | Mục đích |
+|---|---|
+| `GET /v0/health` | Health API, database và runtime |
+| `POST /v0/user/auth/login` | Đăng nhập participant |
+| `POST /v0/admin/auth/login` | Đăng nhập organizer/admin |
+| `GET/PATCH /v0/users/me` | Đọc/cập nhật hồ sơ hiện tại |
+| `/v0/attendance-sessions` | Tạo, liệt kê, xem chi tiết, đóng/hủy phiên; course/roster/timetable |
+| `POST /v0/attendance/check-in` | Gửi check-in |
+| `/v0/attendance/records/...` | Lịch sử, summary và event điểm danh |
+| `/v0/location-registry/...` | Đọc/quản lý cấu hình địa điểm |
+
+Quyền cụ thể được áp dụng tại controller/service; xem Swagger tại `/api-docs` khi API đang chạy.
+
+### 3.3 Mobile
+
+Các tab hiện tại là Điểm danh, Lịch học, Lịch sử và Thông tin. Route điểm danh chính là `src/app/(tabs)/index.tsx`; các màn hình chi tiết phiên, vị trí, hồ sơ, thông báo và dev GPS nằm ở các route riêng. Không còn tab Home trùng danh sách phiên/luồng check-in với tab Điểm danh.
+
+Mobile thu thập GPS, accuracy/mock flag, device ID và integrity payload; gọi API check-in và hiển thị kết quả. Native token storage dùng SecureStore; web dùng localStorage. GPS thực tế và quyền vị trí cần được kiểm tra trên thiết bị phù hợp.
+
+### 3.4 Admin dashboard
+
+Dashboard hiện có các trang tổng quan/phiên, chi tiết attendance và attempt, Location Registry, lớp học phần/roster/thời khóa biểu, thiết bị và các trang quản trị. Có thể nhập dữ liệu học vụ qua CSV/XLSX ở các luồng được hỗ trợ. UI không thay thế kiểm tra quyền ở backend.
+
+### 3.5 Database và xử lý tải
+
+- PostgreSQL/Prisma lưu accounts, refresh sessions, users, units, tags, sessions, records, audit, course/roster/timetable, registry location, registered devices và integrity evidence.
+- Attendance record có tính duy nhất theo session/user; check-in đồng thời được bảo vệ ở luồng buffer/device.
+- Redis Lua scripts thực hiện các thao tác buffer nguyên tử; job scheduler quản lý công việc flush/retry.
+- Flush khóa/chụp buffer, upsert batch vào PostgreSQL rồi hoàn tất flush. Check-in và các thao tác nghiệp vụ khác vẫn có truy vấn/cập nhật database; không phải mọi thao tác đều chạy riêng trong Redis.
+
+## 4. Luồng nghiệp vụ check-in
+
+1. Người có JWT gửi `sessionId`, tọa độ/accuracy/timestamp/mock flag, device và integrity payload.
+2. API kiểm tra session đang mở và người dùng đã được phân vào roster.
+3. API ghi nhận attempt, kiểm tra giới hạn lần thử và thiết bị, đồng thời tạo audit/integrity evidence.
+4. Validation đánh giá GPS theo geofence, mock signal, accuracy, integrity và vị trí giảng viên nếu có dữ liệu. Trường hợp không rõ có thể được chuyển `REVIEW`, không đồng nghĩa là đã được chấp nhận tự động.
+5. Kết quả được ghi vào attendance buffer; API trả trạng thái/kết quả cho client.
+6. Scheduler flush buffer sang PostgreSQL theo vòng đời phiên; API lịch sử hợp nhất dữ liệu đã persist và dữ liệu còn trong buffer.
+
+Integrity hiện được kiểm tra theo logic ứng dụng/payload mà code nhận được. Không nên mô tả như xác minh online đầy đủ với provider Apple/Google nếu chưa triển khai xác minh provider tương ứng.
+
+## 5. Thiết lập local
+
+### 5.1 Cấu hình môi trường
+
+Tạo `server/attendance/.env` dựa trên `.env.example`, sau đó điền `DATABASE_URL`, `JWT_SECRET` và `REFRESH_TOKEN_SECRET` bằng giá trị local riêng, không dùng placeholder. Không commit file `.env` hoặc secret thật.
+
+Các biến quan trọng:
+
+| Biến | Ý nghĩa |
+|---|---|
+| `PORT` | Port API; mặc định `3000` |
+| `DATABASE_URL` | PostgreSQL URL |
+| `REDIS_HOST`, `REDIS_PORT` | Redis connection |
+| `JWT_SECRET`, `REFRESH_TOKEN_SECRET` | Secret riêng cho token |
+| `CORS_ORIGIN` | Danh sách origin, phân cách dấu phẩy |
+| `VITE_API_BASE_URL` | API URL cho dashboard |
+| `EXPO_PUBLIC_API_URL` | API URL cho mobile |
+
+Backend bật CORS cho các localhost origins dev mặc định và cộng thêm origin từ `CORS_ORIGIN`. Điện thoại thật phải dùng địa chỉ backend truy cập được từ mạng thiết bị, không dùng `127.0.0.1` của điện thoại. Khởi động lại Vite/Expo sau khi đổi biến `VITE_`/`EXPO_PUBLIC_`.
+
+### 5.2 Chạy database và API
+
+Từ thư mục gốc:
 
 ```powershell
-$env:BASE_URL = 'http://127.0.0.1:3000'
-$env:CHECKIN_FIXTURES = 'checkin-fixtures.local.json'
-$env:MAX_VUS = '313'
-$env:RAMP_VUS = '10'
-$env:RAMP_DURATION = '15s'
-$env:SPIKE_DURATION = '10s'
-$env:HOLD_DURATION = '30s'
-$env:COOLDOWN_DURATION = '10s'
-$env:P95_MS = '1000'
-$env:TECHNICAL_ERROR_RATE = '0.01'
-k6 run tests/load/checkin-burst.js --summary-export=tests/load/result-spike-313vu.local.json
+docker compose up -d postgres redis
+pnpm install
+pnpm build:shared
+pnpm --filter @gps-attendance/attendance exec prisma migrate deploy
+pnpm --filter @gps-attendance/attendance dev
 ```
 
----
+Nếu cần dữ liệu demo, kiểm tra database URL đang trỏ đúng database local rồi chạy `pnpm seed:attendance`. Seed chỉ dành cho development; không dùng tài khoản/mật khẩu seed ngoài local.
 
-## 9. API, cấu hình và vận hành
+Mặc định compose root dùng PostgreSQL `5432`, Redis `6379`, API `3000` và dashboard container `8080`. Dashboard dev chạy bằng `pnpm dev:admin` (Vite); mobile chạy bằng `pnpm dev:mobile` (Expo). Docker compose root không chạy mobile.
 
-### API chính
+## 6. Lịch sử Git và nội dung từ `main`
 
-Các API nghiệp vụ được version dưới `/v0`. Xem endpoint, DTO, role guard và response cụ thể trong [README backend](server/attendance/README.md) hoặc Swagger runtime.
+Thông tin dưới đây dựa trên Git refs/commit hiện có; “đã merge” chỉ áp dụng cho merge commit lịch sử, không suy ra từ một lần fetch.
 
-| Nhóm | Một số endpoint | Vai trò chính |
-|---|---|---|
-| Auth | `POST /v0/user/auth/login`, `POST /v0/admin/auth/login`, refresh/logout tương ứng | Student hoặc lecturer/admin |
-| Profile | `GET/PATCH /v0/users/me` | Người dùng đã xác thực |
-| Session | `/v0/attendance-sessions` và các route `/:id`, `/mine`, `/me`, `/analytics` | Student, lecturer, admin theo quyền |
-| Course/roster/timetable | `/v0/attendance-sessions/sections/...`, `/courses/import` | Chủ yếu admin; roster xem theo quyền lớp |
-| Check-in | `POST /v0/attendance/check-in` | Student |
-| Attendance history | `/v0/attendance/records/...` | Người dùng đã xác thực và phạm vi dữ liệu |
-| Location | `/v0/location-registry/...` | Lecturer/admin xem; admin thay đổi cấu hình |
-| Device trust | `/v0/admin/devices/:id/trust` | Admin |
-| Health | `GET /v0/health` | Health/monitoring |
+### 6.1 Merge `origin/main` lịch sử đã có trong branch
 
-### Cấu hình mạng
+Commit `1fb7f69` là merge commit có parent thứ hai `9c08eb3` trên lịch sử `origin/main`. Các commit từ `main` nằm trong nhánh đó bổ sung/đưa vào các phần sau:
 
-- Dashboard đọc `VITE_API_BASE_URL`.
-- Mobile đọc `EXPO_PUBLIC_API_URL`; khởi động lại Metro/Expo sau khi đổi env.
-- Backend đọc `PORT`, `DATABASE_URL`, `CORS_ORIGIN`, JWT secrets, Redis config và các biến seed.
-- Khi dùng ngrok, client phải trỏ đúng URL tunnel và backend/database phía sau tunnel phải là môi trường muốn dùng.
-
-### Quan sát và chẩn đoán
-
-- Backend ghi log JSON qua Winston và gắn request ID.
-- `GET /v0/health` kiểm tra database, migration và tài nguyên hệ thống.
-- Swagger cung cấp schema API đang chạy.
-- PostgreSQL và Redis Compose dùng named volumes. Không xóa volume nếu cần giữ dữ liệu.
-- API trả `401 Invalid credentials` thường có nghĩa là username/password không khớp với database mà chính backend đang sử dụng; kiểm tra đúng `DATABASE_URL` và đúng server trước khi chạy seed.
-
----
-
-## 10. Bảo mật, giới hạn và lưu ý
-
-- Backend phân biệt endpoint student và admin/staff; quyền cuối cùng do guard/service backend kiểm soát, không chỉ do giao diện.
-- Password được hash bằng bcrypt; access/refresh token được lưu an toàn trên mobile native qua SecureStore. Checkbox “Ghi nhớ đăng nhập” lưu phiên chứ không lưu password.
-- Mật khẩu MSSV chỉ thuận tiện cho tài khoản sinh viên development/import theo yêu cầu nghiệp vụ, dễ đoán; người dùng nên đổi sang mật khẩu riêng khi có luồng đổi mật khẩu phù hợp.
-- Mobile cần quyền vị trí để check-in. Giả lập GPS, sai số, khoảng cách ngoài geofence, device reuse và số attempt đều có thể ảnh hưởng kết quả.
-- Integrity token được đánh giá bởi logic ứng dụng hiện tại; không ghi nhận là xác minh chữ ký provider nếu chưa tích hợp xác minh đó.
-- Một số API phụ/legacy cần được đánh giá quyền trước khi expose vào môi trường không tin cậy; xem phần security trong README backend.
-- Tạo phiên cần dữ liệu lớp, roster, lịch và building đã cấu hình/xác minh phù hợp.
-- Migration/seed chỉ tác động database theo `DATABASE_URL`. Nếu mobile dùng URL ngrok trỏ tới backend khác, seed database local sẽ không đổi mật khẩu trên backend từ xa đó.
-- Hệ thống không chạy mobile trong Docker Compose. GPS thực tế nên được kiểm thử trên thiết bị và môi trường địa điểm phù hợp.
-
----
-
-## 11. Tài liệu liên quan
-
-| Tài liệu | Nội dung |
+| Thành phần được đưa vào từ chuỗi commit `main` | Nội dung cụ thể và dấu vết trong repository |
 |---|---|
-| [README backend](server/attendance/README.md) | Module NestJS, API, database, seed, migration, test và giới hạn backend |
-| [README dashboard](client/admin-dashboard/README.md) | Trang/component web, thao tác quản lý lớp, roster, phiên và địa điểm |
-| [README mobile](client/mobile-client/README.md) | Route Expo, GPS, auth, token storage và lệnh mobile |
-| [README shared](packages/shared/README.md) | Types, API contracts và error codes |
-| [README Prisma](server/attendance/src/prisma/README.md) | Schema, migration và seed |
-| [SYSTEM.md](docs/SYSTEM.md) | Mô tả kiến trúc, domain, API và quy tắc nghiệp vụ chi tiết |
-| [README presentation](presentation/README.md) | Slidev presentation và workspace riêng |
+| Redis job scheduler | Thêm `server/attendance/src/job-scheduler/` với interface, Nest module/token, Redis provider, kiểu job và `redis-job-scheduler.service.ts`; có `scripts/test-scheduler.ts` để kiểm tra scheduler. Scheduler được dùng cho công việc flush session. |
+| Redis service và cấu hình chạy | Mở rộng `server/attendance/src/redis/redis.service.ts` cùng `redis.module.ts`; thêm `ioredis` vào `server/attendance/package.json`/lockfile, chỉnh `server/attendance/tsconfig.json` và `docker-compose.yml` để hỗ trợ Redis. Các thao tác Redis được bổ sung gồm hash, sorted set và set-if-absent. |
+| Check-in attempt/device tracking | Thêm `attendance-check-in/infra/redis/redis-attendance-checkin-attempt.repository.ts` và `redis-attendance-checkin-device-usage.repository.ts`; sửa module, repository interface và in-memory store để luồng check-in dùng repository tracking phù hợp. Mục tiêu của commit là chuyển attempt/device usage sang Redis và xử lý race condition. |
+| Attendance write-behind buffer | Thêm `attendance-record/attendance-record.buffer.ts`, `infra/redis/redis-attendance-record-buffer.ts` và repository Redis/PostgreSQL; cập nhật `attendance-records.service.ts`, module, token, repository interface và in-memory repository. Luồng này ghi/đọc buffer Redis, flush theo session và upsert records về PostgreSQL. |
+| Attendance session persistence và API | Thêm `attendance-sessions/infra/prisma/prisma-attendance-session.repository.ts`; cập nhật session repository, service, module và controller để dùng persistence PostgreSQL, hỗ trợ hủy session và các thay đổi API liên quan. |
+| Tiêu chí chọn participant | Thêm `attendance-sessions/dto/user-filter-criteria.dto.ts`, cập nhật `create-attendance-session.dto.ts` và logic service để validate participant criteria lồng nhau; các kiểu filter tương ứng được cập nhật trong shared package. |
+| Schema/migration và shared types | Cập nhật `server/attendance/prisma/schema.prisma`, thêm migration `20260927103055_update_session_status_enum`; cập nhật shared attendance record/session types và user filter types, gồm các trạng thái `late` và `cancelled`. |
+| Dọn session seed cũ | Xóa `attendance-sessions/attendance-session.seeder.ts`; commit `9c08eb3` ghi nhận việc bỏ seed data session cũ. |
 
----
+Danh sách trên mô tả phạm vi file của commit range từ merge-base `6fd913c` tới parent `main` `9c08eb3` (41 file thay đổi, khoảng 1.105 dòng thêm và 135 dòng xóa theo Git). Đây là những gì chuỗi commit `main` đã đóng góp vào merge lịch sử; không có nghĩa từng dòng code vẫn giữ nguyên hình thức hiện tại, vì các file tiếp tục được sửa/di chuyển trong các commit sau đó. Các commit nguồn đáng chú ý: `29e8d8b`, `6432c9c`, `d3bd3f3`, `018f050`, `4a1e03e` và `9c08eb3`.
 
-**Tài liệu được biên soạn và duy trì bởi Phạm Nguyễn Ngọc Phước.**
+Đây là các đóng góp lịch sử từ chuỗi commit đã được merge; code hiện tại đã tiếp tục thay đổi sau merge. Nguồn xác minh: merge commit `1fb7f69`, parent main `9c08eb3` và commit range từ merge-base `6fd913c`.
+
+### 6.2 Trạng thái tip `origin/main` mới nhất
+
+Đối chiếu reflog, cấu hình upstream và `.git/FETCH_HEAD` cho thấy cần phân biệt thao tác đồng bộ sáng 07/11/2026 với việc nhập code:
+
+- Branch hiện tại: `2312718_PhamNguyenNgocPhuoc_KiemThu`, HEAD `5bb193f`.
+- Ref `origin/main`: `77e238a`.
+- HEAD hiện tại có 24 commit không nằm trên `origin/main`; `origin/main` có 48 commit không nằm trên HEAD.
+- Reflog HEAD không có thao tác pull/merge nào trong sáng 07/11; HEAD vẫn ở commit `5bb193f` từ 05/11.
+- `.git/FETCH_HEAD` được cập nhật lúc khoảng 11:55 ngày 07/11 và có dòng `origin/main` tại `77e238a` được đánh dấu `not-for-merge`. Dòng được chọn để merge là branch hiện tại `2312718_PhamNguyenNgocPhuoc_KiemThu` tại `5bb193f`; branch này cũng là upstream của branch đang checkout.
+- Vì vậy, bằng chứng Git trong working copy cho thấy sáng nay đã fetch các ref, bao gồm `origin/main`, nhưng **không pull/merge code của `main` vào branch hiện tại**. Có thể kiểm tra bằng `git reflog`, `git branch -vv` và `.git/FETCH_HEAD`.
+- Các lần nhập `main` có trong lịch sử trước đó: reflog ghi `pull origin main: Fast-forward` ngày 10/09 khi branch `main` được checkout; sau đó branch feature có các merge commit ngày 12/09, 27/09 và 02/10. Merge ngày 02/10 là `1fb7f69`, được liệt kê ở mục 6.1.
+
+Kết luận: các thành phần được nhập qua merge lịch sử là những mục tại 6.1. Lần fetch sáng nay chỉ cập nhật thông tin ref; không có đối tượng code nào từ tip `77e238a` được nhập vào working branch. Không thực hiện merge trong lần cập nhật README này.
+
+## 7. Những lỗi/vấn đề đã xử lý và giới hạn còn lại
+
+### Đã có thay đổi trong source
+
+- **Trạng thái role không đồng nhất:** schema hiện dùng `admin`/`organizer`/`participant`; migration `20261024000000_neutral_user_roles` và migration reconcile tiếp theo ánh xạ role cũ `lecturer`/`student`. Database đang chạy chỉ được chuyển đổi sau khi migration được áp dụng đúng database.
+- **Ghi attendance burst:** Redis buffer/Lua và scheduler/flush được đưa vào luồng; các kiểm thử gần đây xác nhận record ở Redis trước flush và ở PostgreSQL sau flush.
+- **Check-in hot path:** một số I/O độc lập trong service được chạy song song; `markPresent` không đọc lại record Redis sau khi buffer đã ghi thành công. Backend build và các test mục tiêu đã qua trong lần tối ưu gần nhất.
+- **Tab mobile trùng chức năng:** route Home trùng luồng với tab Điểm danh đã được bỏ; tab chuyên biệt tiếp tục giữ lịch học, lịch sử và hồ sơ. Build Android thực tế không được kết luận chỉ từ việc TypeScript/web export thành công.
+- **Dashboard AuthProvider:** `main.tsx` bọc `App` bên trong `AuthProvider`, để các trang dùng `useAuth` có context.
+- **CORS dev:** `main.ts` có cấu hình preflight/origin mặc định và `CORS_ORIGIN`; URL client vẫn phải trỏ đúng backend đang chạy. Sai port/tunnel hoặc origin không có trong cấu hình vẫn có thể gây lỗi CORS.
+
+### Chưa thể xem là đã giải quyết/xác nhận
+
+- Migration role được tạo trong source không tự chạy trên database người dùng; cần xác minh đúng `DATABASE_URL`, backup theo quy trình dự án và áp dụng migration trước khi kết luận lỗi Prisma enum đã hết.
+- Benchmark mới nhất chưa đạt ngưỡng p95 50 ms; xem mục 8. Không tuyên bố đã đạt capacity ổn định 313 VU.
+- Không kết luận xác minh integrity phần cứng chỉ từ payload mock/test.
+- Chưa xác nhận toàn bộ luồng Android trên thiết bị thật trong lần cập nhật tài liệu này.
+
+## 8. Kiểm thử hiệu năng check-in bằng k6
+
+### 8.1 Mục tiêu và phạm vi
+
+Mục tiêu là đo latency/throughput check-in trên stack test cô lập, đồng thời xác nhận attendance không chỉ trả response mà còn được ghi vào Redis buffer rồi flush về PostgreSQL.
+
+| Thành phần | Vai trò trong test |
+|---|---|
+| K6 | Phát request theo constant-arrival-rate và tổng hợp latency/error |
+| Nginx | Load balance các API replicas |
+| NestJS API | Xử lý check-in production path trong cấu hình test |
+| PostgreSQL/Redis | Database và attendance buffer riêng, không dùng service compose mặc định |
+| `prepare-load.ts` | Tạo fixture/session/user/device/token và roster buffer |
+| `check-in.js` | Gửi một request check-in cho mỗi fixture |
+| `verify-load.ts` | Đối chiếu trạng thái buffer trước/sau flush với PostgreSQL |
+
+Stack nằm trong [docker-compose.perf.yml](./docker-compose.perf.yml); hướng dẫn chi tiết ở [server/attendance/perf/README.md](./server/attendance/perf/README.md). Nó publish load balancer trên `127.0.0.1:3100`, có volume/database riêng. API được khởi động với `NODE_ENV=test` và `LOAD_TEST_MODE=true`; bootstrap chỉ cho phép chế độ này khi database là `gps_attendance_loadtest`.
+
+### 8.2 Input và output đo
+
+**Input:** fixture gồm session đang mở, participant user/account, JWT, device ID riêng từng user, tọa độ GPS nằm trong geofence, accuracy 10m, timestamp hiện tại, `isMockLocation=false`, và integrity payload dành cho môi trường test. `prepare-load.ts` tạo sẵn session/Redis roster để cô lập check-in hot path; vì vậy bài đo không tính thời gian tạo session, nhập roster hoặc khởi tạo attendance roster qua các API đó.
+
+**Output/tiêu chí trong script k6:**
+
+- `http_req_duration{endpoint:check-in}`: p95 phải nhỏ hơn `P95_MS` (mặc định 50 ms).
+- `http_req_failed`: dưới 1%; `checks` trên 99%.
+- `dropped_iterations`: bằng 0; `check_in_sent` bằng số fixture.
+- Mỗi response được xem là thành công trong check script khi HTTP 200 và `data.status === 'VALID'`.
+- `verify-load.ts` trước flush yêu cầu mọi user có record `present` trong Redis và chưa có record ở PostgreSQL; sau flush yêu cầu Redis buffer rỗng và đủ record `present` trong PostgreSQL.
+
+### 8.3 Quy trình chạy
+
+Chạy từ root repo trong PowerShell. Cần Docker Compose và k6 service image; mỗi lượt dùng fixture/session mới.
+
+```powershell
+# Stack perf riêng; 3 API replicas và load balancer
+docker compose -f docker-compose.perf.yml up --build -d --scale backend=3 load-balancer
+
+# Ví dụ profile 313 check-in trong 10 giây
+$env:LOAD_USERS = '313'
+$env:LOAD_VUS = '313'
+$env:LOAD_TIME_UNIT = '10s'
+docker compose -f docker-compose.perf.yml run --rm prepare
+docker compose -f docker-compose.perf.yml run --rm load
+
+# Kiểm tra dữ liệu trong Redis trước flush
+$env:VERIFY_PHASE = 'before-flush'
+docker compose -f docker-compose.perf.yml run --rm verify
+
+# Sau khi session đóng và scheduler chạy, xác minh PostgreSQL sau flush
+$env:VERIFY_PHASE = 'after-flush'
+docker compose -f docker-compose.perf.yml run --rm verify
+```
+
+`constant-arrival-rate` phát một iteration cho mỗi fixture trên `timeUnit`; 313 request trong 10 giây tương đương mục tiêu khoảng 31,3 request/giây. Con số này **không** có nghĩa là 313 kết nối đồng thời được duy trì. Nếu đặt session đóng sau 10 phút, cần đợi tới sau `closeAt` và scheduler flush trước bước `after-flush`. Sau khi kiểm thử có thể dừng stack bằng `docker compose -f docker-compose.perf.yml down`; không dùng lệnh xóa volume nếu cần giữ evidence.
+
+### 8.4 Kết quả thực tế
+
+Các kết quả dưới đây là những lượt benchmark đã chạy trong phiên làm việc gần nhất; chúng không cùng profile/phần cứng nên cần xem riêng, không gộp thành một cam kết capacity.
+
+| Lượt | Fixture / tốc độ phát | Accepted | p95 | Lỗi kỹ thuật / dropped | Diễn giải |
+|---|---:|---:|---:|---:|---|
+| Trước tối ưu | 1.000 / 10 giây (~100 req/s) | 1.000 | 14,18 giây | 0 / 0 | Hoàn tất request nhưng trượt xa ngưỡng 50 ms |
+| Trước tối ưu | 313 / 10 giây (~31,3 req/s) | 313 | 768,81 ms | 0 / 0 | Đủ kết quả nghiệp vụ, p95 không đạt |
+| Sau tối ưu, lượt sạch mới nhất | 313 / 10 giây (~31,3 req/s) | 313 | 301,99 ms | 0 / 0 | Đã xác minh 313 record present; vẫn không đạt 50 ms |
+
+Các lượt khác có p95 dao động đáng kể, gồm một lượt 313 fixture đo được 57,62 ms và một lượt chịu nhiễu khi nhiều session flush cùng thời điểm. Kết quả 57,62 ms cũng vượt ngưỡng mặc định 50 ms, và không thay thế lượt sạch mới nhất. Một số lượt 100 fixture/10 giây trước tối ưu đo được p95 516 ms. Điều này cho thấy latency phụ thuộc tải nền, trạng thái database/session, tài nguyên và thời điểm flush.
+
+Ở lượt sạch mới nhất, stack test chạy với giới hạn tài nguyên thấp hơn mặc định do năng lực máy khả dụng: mỗi API replica khoảng 1 CPU/512 MB, PostgreSQL 1,5 CPU/512 MB, Redis 0,5 CPU/256 MB. Đây không phải cấu hình production và không tương đương cấu hình mặc định trong compose. Các lần chạy đã dừng stack test nhưng giữ lại volume/evidence; không xóa dữ liệu attendance để làm sạch kết quả.
+
+**Kết luận kiểm thử:** 313/313 request được xử lý thành công về nghiệp vụ và không có HTTP failure/dropped iteration trong lượt cuối, nhưng p95 301,99 ms cao hơn target 50 ms. Bằng chứng hiện tại **không chứng minh hệ thống đạt SLA p95 50 ms hoặc chịu được 313 VU đồng thời**. Cần profile CPU/DB/Redis, xác nhận pool/concurrency và lặp benchmark trên cấu hình cố định trước khi đưa ra ngưỡng tải an toàn.
+
+## 9. Kiểm thử và xác minh code
+
+Backend có Jest unit tests dưới `server/attendance/src/**/*.spec.ts` và E2E tests dưới `server/attendance/test`.
+
+```powershell
+pnpm --filter @gps-attendance/attendance test
+pnpm --filter @gps-attendance/attendance test:e2e
+pnpm build:attendance
+pnpm build:admin
+```
+
+Các E2E cần database/test environment riêng. Không chạy test hiệu năng vào database production. Benchmark phải xem đồng thời p95, tỷ lệ lỗi kỹ thuật, business rejection, 429/dropped iteration, health và dữ liệu sau flush; “đủ request” không đồng nghĩa đạt latency target.
+
+## 10. Tài liệu liên quan
+
+- [Backend README](./server/attendance/README.md)
+- [Mobile README](./client/mobile-client/README.md)
+- [Admin dashboard README](./client/admin-dashboard/README.md)
+- [Shared README](./packages/shared/README.md)
+- [System overview](./docs/SYSTEM.md)
+- [Performance test README](./server/attendance/perf/README.md)

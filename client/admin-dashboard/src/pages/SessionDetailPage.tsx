@@ -835,7 +835,7 @@ const SessionDetailPage = () => {
                           <span className={attempt.deviceTrustStatus === 'TRUSTED' ? 'text-emerald-700' : attempt.deviceTrustStatus === 'BLOCKED' ? 'text-rose-700' : 'text-amber-700'}>
                             {attempt.deviceTrustStatus ?? 'UNVERIFIED'}
                           </span>
-                          {(user?.role === 'admin' || user?.role === 'lecturer') && attempt.registeredDeviceId && (
+                          {(user?.role === 'admin' || user?.role === 'organizer') && attempt.registeredDeviceId && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {attempt.deviceTrustStatus !== 'TRUSTED' && (
                                 <button

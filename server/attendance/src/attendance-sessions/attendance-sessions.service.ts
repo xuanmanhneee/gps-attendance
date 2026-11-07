@@ -14,6 +14,12 @@ import { AttendanceSession } from './attendance-session.model';
 import { IAttendanceSessionRepository } from './attendance-session.repository';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
 import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
+import { JOB_SCHEDULER } from '../job-scheduler/job-scheduler.token';
+import { IJobScheduler } from '../job-scheduler/job-scheduler.interface';
+
+const SESSION_FLUSH_JOB = 'attendance-session.flush';
+const sessionFlushJobId = (sessionId: number) =>
+  `attendance-session:flush:${sessionId}`;
 
 @Injectable()
 export class AttendanceSessionsService {
@@ -22,6 +28,8 @@ export class AttendanceSessionsService {
     private readonly attendanceSessionRepository: IAttendanceSessionRepository,
     private readonly attendanceRecordsService: AttendanceRecordsService,
     private readonly prisma: PrismaService,
+    @Inject(JOB_SCHEDULER)
+    private readonly jobScheduler: IJobScheduler,
   ) {}
 
   async create(
@@ -39,7 +47,6 @@ export class AttendanceSessionsService {
     }
 
     const resolved = await this.resolveSessionContext(dto, createdBy, creatorRole);
-    const now = new Date();
     const session = await this.attendanceSessionRepository.createWithRecords({
       title: dto.title,
       latitude: resolved.latitude,
@@ -55,9 +62,18 @@ export class AttendanceSessionsService {
       openAt,
       closeAt,
       createdBy,
-      createdAt: now,
-      updatedAt: now,
     }, resolved.userIds);
+
+    await this.attendanceRecordsService.initializeBufferForSession(
+      session.id,
+      resolved.userIds,
+    );
+    await this.jobScheduler.schedule(
+      SESSION_FLUSH_JOB,
+      closeAt,
+      { sessionId: session.id },
+      sessionFlushJobId(session.id),
+    );
 
     return this.withComputedStatus(session);
   }
@@ -274,6 +290,7 @@ export class AttendanceSessionsService {
       );
     }
 
+    await this.jobScheduler.cancel(sessionFlushJobId(id));
     await this.attendanceSessionRepository.delete(id);
   }
 
@@ -300,6 +317,12 @@ export class AttendanceSessionsService {
     }
 
     const updated = await this.attendanceSessionRepository.close(id);
+    await this.jobScheduler.schedule(
+      SESSION_FLUSH_JOB,
+      new Date(),
+      { sessionId: id },
+      sessionFlushJobId(id),
+    );
     return this.withComputedStatus(updated);
   }
 
@@ -331,9 +354,14 @@ export class AttendanceSessionsService {
       });
     }
 
-    return this.withComputedStatus(
-      await this.attendanceSessionRepository.cancel(id),
+    const updated = await this.attendanceSessionRepository.cancel(id);
+    await this.jobScheduler.schedule(
+      SESSION_FLUSH_JOB,
+      new Date(),
+      { sessionId: id },
+      sessionFlushJobId(id),
     );
+    return this.withComputedStatus(updated);
   }
 
   private withComputedStatus(session: AttendanceSession): AttendanceSession {

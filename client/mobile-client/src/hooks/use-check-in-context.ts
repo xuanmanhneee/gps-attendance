@@ -42,3 +42,7 @@ export function useCheckInContext() {
 
   return { ...state, refresh, reset };
 }
+
+// Export để component hiển thị (debug-device-card) nhận dữ liệu qua prop thay
+// vì tự gọi hook — nhờ đó màn hình cha điều khiển được refresh/reset.
+export type CheckInContext = ReturnType<typeof useCheckInContext>;

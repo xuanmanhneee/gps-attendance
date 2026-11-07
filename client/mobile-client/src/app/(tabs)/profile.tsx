@@ -290,9 +290,9 @@ export default function ProfileScreen() {
 
   const profileName = profile?.fullname ?? user?.name ?? 'Sinh viên';
   const profileCode = profile?.code ?? user?.code ?? 'Chưa cập nhật';
-  const roleLabel = (profile?.role ?? user?.role) === 'student'
+  const roleLabel = (profile?.role ?? user?.role) === 'participant'
     ? 'Sinh viên'
-    : (profile?.role ?? user?.role) === 'lecturer'
+    : (profile?.role ?? user?.role) === 'organizer'
       ? 'Giảng viên'
       : 'Quản trị viên';
   const gpsLabel = gpsState === 'granted'

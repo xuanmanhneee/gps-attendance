@@ -34,7 +34,7 @@ export class DeviceTrustController {
   @ApiQuery({ name: 'trustStatus', required: false, enum: DeviceTrustStatus })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Get()
   async listDevices(
     @Query('search') search?: string,
@@ -52,7 +52,7 @@ export class DeviceTrustController {
   }
 
   @ApiOperation({ summary: 'Duyệt (Trust) hoặc chặn (Block) thiết bị' })
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Patch(':id/trust')
   async updateTrust(
     @Param('id', ParseIntPipe) id: number,
@@ -64,7 +64,7 @@ export class DeviceTrustController {
   }
 
   @ApiOperation({ summary: 'Cập nhật/thay thế thiết bị khi sinh viên đổi điện thoại mới' })
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Post(':id/replace')
   async replaceDevice(
     @Param('id', ParseIntPipe) id: number,
@@ -76,7 +76,7 @@ export class DeviceTrustController {
   }
 
   @ApiOperation({ summary: 'Đặt lại (reset/xóa) thiết bị để sinh viên liên kết máy mới' })
-  @Roles('admin', 'lecturer')
+  @Roles('admin', 'organizer')
   @Delete(':id')
   async resetDevice(
     @Param('id', ParseIntPipe) id: number,

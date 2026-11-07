@@ -79,6 +79,16 @@ export interface CheckInRequest {
   integrity: DeviceIntegrity;
 }
 
+export interface AttendanceReviewRequest {
+  sessionId: number;
+  note?: string;
+}
+
+export interface ResolveAttendanceReviewRequest {
+  decision: 'approve' | 'reject';
+  reason?: string;
+}
+
 export type CheckInResponse =
   | {
       status: 'VALID';
@@ -94,4 +104,3 @@ export type DeviceIntegrityPayload = DeviceIntegrity;
 export type AttendanceCheckInResult = CheckInResponse;
 export type CheckInRequestPayload = CheckInRequest;
 export type CheckInResponsePayload = CheckInResponse;
-

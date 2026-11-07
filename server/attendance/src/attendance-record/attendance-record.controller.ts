@@ -90,7 +90,7 @@ export class AttendanceRecordController {
       });
     }
 
-    if (user.role === 'student') {
+    if (user.role === 'participant') {
       const userRecord = await this.attendanceRecordsService.getBySessionAndUser(
         record.sessionId,
         user.userId,

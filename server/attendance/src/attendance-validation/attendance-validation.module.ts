@@ -4,6 +4,7 @@ import { AttendanceValidationService } from './attendance-validation.service';
 import { IntegrityCheck } from './checks/integrity.check';
 import { MockLocationCheck } from './checks/mock-location.check';
 import { LocationCheck } from './checks/location.check';
+import { LocationTimestampCheck } from './checks/location-timestamp.check';
 import { GeoModule } from '../geo/geo.module';
 
 @Module({
@@ -13,6 +14,7 @@ import { GeoModule } from '../geo/geo.module';
     IntegrityCheck,
     MockLocationCheck,
     LocationCheck,
+    LocationTimestampCheck,
   ],
   exports: [AttendanceValidationService],
 })

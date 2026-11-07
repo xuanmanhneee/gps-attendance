@@ -16,7 +16,7 @@ import { saveToken as saveInMemoryToken } from '../services/token';
 export interface User {
   id: number;
   code: string;
-  role: 'student' | 'lecturer' | 'admin';
+  role: 'participant' | 'organizer' | 'admin';
   name: string;
   accountId: number;
 }
@@ -122,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           accountId: 0,
           code: payload.code ?? username,
           name: payload.name ?? username,
-          role: (payload.role as 'student' | 'lecturer' | 'admin') ?? 'student',
+          role: (payload.role as 'participant' | 'organizer' | 'admin') ?? 'participant',
         };
 
         setUser(userData);

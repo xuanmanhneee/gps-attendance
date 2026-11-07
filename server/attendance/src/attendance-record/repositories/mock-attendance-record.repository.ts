@@ -48,6 +48,12 @@ export class MockAttendanceRecordRepository
     }
   }
 
+  async upsertRecords(
+    records: Omit<AttendanceRecord, 'updatedAt'>[],
+  ): Promise<void> {
+    await Promise.all(records.map((record) => this.upsertRecord(record)));
+  }
+
   async findByUser(userId: number): Promise<AttendanceRecord[]> {
     return this.records.filter((r) => r.userId === userId);
   }

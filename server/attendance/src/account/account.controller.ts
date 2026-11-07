@@ -18,6 +18,8 @@ import { CreateAccountWithUserDto } from './dto/create-account-with-user.dto';
 import type { Account } from './account.model';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '#auth/guards/jwt-auth.guard';
+import { RolesGuard } from '#auth/guards/roles.guard';
+import { Roles } from '#auth/decorators/roles.decorator';
 
 // Response trả ra ngoài KHÔNG bao giờ chứa passwordHash
 type SafeAccount = Omit<Account, 'passwordHash'>;
@@ -32,6 +34,9 @@ export class AccountController {
   constructor(private readonly accountService: AccountService) {}
 
   @Post()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() dto: CreateAccountWithUserDto) {
     const existing = await this.accountService.findByUsername(dto.username);

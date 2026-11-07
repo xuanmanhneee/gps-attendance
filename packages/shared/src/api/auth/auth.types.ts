@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'lecturer' | 'student';
+export type Role = 'admin' | 'organizer' | 'participant';
 
 export interface LoginRequest {
   username: string;

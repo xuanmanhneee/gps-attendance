@@ -36,7 +36,7 @@ describe('LecturerLocationVerificationService', () => {
   });
 
   it('records PASS evidence without changing the session center', async () => {
-    const result = await service.verify(9, 7, 'lecturer', {
+    const result = await service.verify(9, 7, 'organizer', {
       ...center,
       accuracy: 5,
       timestamp: new Date().toISOString(),
@@ -54,7 +54,7 @@ describe('LecturerLocationVerificationService', () => {
   });
 
   it('returns WARNING and stores evidence when lecturer GPS is far away', async () => {
-    const result = await service.verify(9, 7, 'lecturer', {
+    const result = await service.verify(9, 7, 'organizer', {
       latitude: center.latitude + 0.001,
       longitude: center.longitude,
       accuracy: 5,
@@ -68,7 +68,7 @@ describe('LecturerLocationVerificationService', () => {
 
   it('rejects stale lecturer GPS evidence', async () => {
     await expect(
-      service.verify(9, 7, 'lecturer', {
+      service.verify(9, 7, 'organizer', {
         ...center,
         accuracy: 5,
         timestamp: new Date(Date.now() - 6 * 60 * 1000).toISOString(),

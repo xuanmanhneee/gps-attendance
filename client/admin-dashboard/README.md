@@ -205,10 +205,10 @@ Load danh sách lúc mount; `createSession` prepend list; `closeSession` set sta
 `.env.example`:
 
 ```env
-VITE_API_BASE_URL=http://127.0.0.1:3000
+VITE_API_BASE_URL=http://127.0.0.1:3001
 ```
 
-Dev: Vite **http://localhost:5173** (`pnpm dev:admin`).
+Local dev: Vite **http://localhost:5173** (`pnpm dev:admin`) gọi backend NestJS tại `http://127.0.0.1:3001`. Nếu dùng ngrok, đặt `VITE_API_BASE_URL` thành URL HTTPS của tunnel rồi khởi động lại Vite để nạp biến môi trường mới.
 
 `vite.config.ts`: plugin React + Tailwind.
 

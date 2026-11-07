@@ -85,6 +85,12 @@ describe('AttendanceCheckInService device trust', () => {
       'REVIEW',
       ['DEVICE_UNVERIFIED'],
     );
+    expect(records.markPresent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        validationStatus: 'REVIEW',
+        reasons: ['DEVICE_UNVERIFIED'],
+      }),
+    );
   });
 
   it('rejects a device explicitly blocked by an administrator', async () => {
@@ -108,5 +114,11 @@ describe('AttendanceCheckInService device trust', () => {
 
     expect(result).toEqual({ status: 'VALID' });
     expect(attemptRepository.completeAttempt).toHaveBeenCalledWith(10, 'APPROVED', []);
+    expect(records.markPresent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        validationStatus: 'VALID',
+        reasons: [],
+      }),
+    );
   });
 });

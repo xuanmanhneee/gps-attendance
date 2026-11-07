@@ -40,12 +40,12 @@ async function main() {
 
   const users = [
     { id: 1, code: 'ADMIN001', role: Role.admin, fullname: 'Quản trị viên' },
-    { id: 2, code: 'GV001', role: Role.lecturer, fullname: 'Trần Nhật Quang' },
-    { id: 3, code: '2312686', role: Role.student, fullname: 'Phan Lê Xuân Mạnh' },
-    { id: 4, code: '2312716', role: Role.student, fullname: 'Mai Quý Phước' },
-    { id: 5, code: '2312718', role: Role.student, fullname: 'Phạm Nguyễn Ngọc Phước' },
-    { id: 6, code: '2312682', role: Role.student, fullname: 'Liêng Hót Ha Luyến' },
-    { id: 7, code: '2312631', role: Role.student, fullname: 'Nguyễn Trần Quỳnh Hương' },
+    { id: 2, code: 'GV001', role: Role.organizer, fullname: 'Trần Nhật Quang' },
+    { id: 3, code: '2312686', role: Role.participant, fullname: 'Phan Lê Xuân Mạnh' },
+    { id: 4, code: '2312716', role: Role.participant, fullname: 'Mai Quý Phước' },
+    { id: 5, code: '2312718', role: Role.participant, fullname: 'Phạm Nguyễn Ngọc Phước' },
+    { id: 6, code: '2312682', role: Role.participant, fullname: 'Liêng Hót Ha Luyến' },
+    { id: 7, code: '2312631', role: Role.participant, fullname: 'Nguyễn Trần Quỳnh Hương' },
   ];
 
   // BƯỚC 1: Tạo/Cập nhật User trước
@@ -120,7 +120,7 @@ async function main() {
   const students = await prisma.user.findMany({
     where: {
       code: { in: ['2312686', '2312716', '2312718', '2312682', '2312631'] },
-      role: Role.student,
+      role: Role.participant,
     },
     select: { id: true },
     orderBy: { code: 'asc' },
@@ -134,7 +134,7 @@ async function main() {
       })
     : [];
 
-  if (!campus || !lecturer || lecturer.role !== Role.lecturer || students.length === 0) {
+  if (!campus || !lecturer || lecturer.role !== Role.organizer || students.length === 0) {
     throw new Error(
       'Không đủ dữ liệu mẫu: cần campus DLU, giảng viên GV001 và ít nhất một sinh viên seed.',
     );

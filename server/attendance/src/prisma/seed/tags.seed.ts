@@ -25,9 +25,9 @@ export async function seedTags(prisma: PrismaClient, users: UserSeed) {
     },
   });
 
-  const studentClub = await prisma.tag.create({
+  const participantGroup = await prisma.tag.create({
     data: {
-      name: 'clb-sinh-vien',
+      name: 'clb-tham-gia',
       ownerId: users.lecturers[0].id,
     },
   });
@@ -43,7 +43,7 @@ export async function seedTags(prisma: PrismaClient, users: UserSeed) {
     jobFairCntt,
     scholarship,
     internship,
-    studentClub,
+    participantGroup,
     event,
   };
 }

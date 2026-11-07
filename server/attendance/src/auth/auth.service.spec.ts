@@ -18,7 +18,7 @@ describe('AuthService', () => {
   const mockUser: AuthenticatedUser = {
     userId: 1,
     username: 'testuser',
-    role: 'student',
+    role: 'participant',
   };
 
   beforeEach(() => {
@@ -74,7 +74,7 @@ describe('AuthService', () => {
       usersService.findById = jest.fn().mockResolvedValue({
         id: 1,
         code: '2312686',
-        role: 'student',
+        role: 'participant',
         fullname: 'Nguyen Van A',
       });
 
@@ -82,7 +82,7 @@ describe('AuthService', () => {
       expect(result).toEqual({
         userId: 1,
         username: 'testuser',
-        role: 'student',
+        role: 'participant',
       });
     });
 
@@ -139,7 +139,7 @@ describe('AuthService', () => {
       jwtService.verify = jest.fn().mockReturnValue({
         sub: 1,
         username: 'testuser',
-        role: 'student',
+        role: 'participant',
       });
 
       const tokens = await authService.refresh('valid-refresh-token');

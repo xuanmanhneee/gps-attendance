@@ -28,7 +28,7 @@ export class LecturerLocationVerificationController {
   @ApiOperation({
     summary: 'Ghi nhận GPS giảng viên để xác minh phụ, không đổi tâm session',
   })
-  @Roles('lecturer', 'admin')
+  @Roles('organizer', 'admin')
   @Post(':id/lecturer-location-verification')
   async verify(
     @Param('id', ParseIntPipe) sessionId: number,

@@ -42,9 +42,10 @@ COPY --from=builder /app/server/attendance/package.json ./server/attendance/
 COPY --from=builder /app/server/attendance/node_modules ./server/attendance/node_modules
 COPY --from=builder /app/server/attendance/dist ./server/attendance/dist
 COPY --from=builder /app/server/attendance/prisma ./server/attendance/prisma
+COPY --from=builder /app/server/attendance/prisma.config.ts ./server/attendance/prisma.config.ts
 
 EXPOSE 3000
 
 WORKDIR /app/server/attendance
 
-CMD ["sh", "-c", "npx prisma db push && node dist/main.js"]
+CMD ["node", "dist/main.js"]

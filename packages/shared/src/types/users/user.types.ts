@@ -37,7 +37,7 @@ export type UserProfileDto = UserProfileResponse;
 
 export interface CreateUserRequest {
   code: string;
-  role: 'admin' | 'lecturer' | 'student';
+  role: Role;
   fullname: string;
   unitId: number;
 }

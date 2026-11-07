@@ -37,11 +37,16 @@ describe('AttendanceSessionsService.cancel', () => {
       repository as unknown as IAttendanceSessionRepository,
       {} as AttendanceRecordsService,
       {} as PrismaService,
+      {
+        schedule: jest.fn().mockResolvedValue(undefined),
+        cancel: jest.fn().mockResolvedValue(undefined),
+        onJob: jest.fn(),
+      },
     );
   });
 
   it('cancels a pending session and persists cancelled status', async () => {
-    const result = await service.cancel(12, { userId: 7, role: 'lecturer' });
+    const result = await service.cancel(12, { userId: 7, role: 'organizer' });
 
     expect(repository.cancel).toHaveBeenCalledWith(12);
     expect(result.status).toBe('cancelled');
@@ -56,7 +61,7 @@ describe('AttendanceSessionsService.cancel', () => {
 
   it('rejects cancellation by a lecturer who does not own the session', async () => {
     await expect(
-      service.cancel(12, { userId: 8, role: 'lecturer' }),
+      service.cancel(12, { userId: 8, role: 'organizer' }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(repository.cancel).not.toHaveBeenCalled();
   });
@@ -69,7 +74,7 @@ describe('AttendanceSessionsService.cancel', () => {
     });
 
     await expect(
-      service.cancel(12, { userId: 7, role: 'lecturer' }),
+      service.cancel(12, { userId: 7, role: 'organizer' }),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(repository.cancel).not.toHaveBeenCalled();
   });
@@ -81,7 +86,7 @@ describe('AttendanceSessionsService.cancel', () => {
     });
 
     await expect(
-      service.cancel(12, { userId: 7, role: 'lecturer' }),
+      service.cancel(12, { userId: 7, role: 'organizer' }),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(repository.cancel).not.toHaveBeenCalled();
   });

@@ -33,6 +33,7 @@ export interface IAttendanceRecordRepository {
   findHistoryEventsByUser(userId: number): Promise<AttendanceHistoryEventDto[]>;
   findById(id: number): Promise<StudentAttendanceHistoryItemDto | null>;
   upsertRecord(record: Omit<AttendanceRecord, 'updatedAt'>): Promise<void>;
+  upsertRecords(records: Omit<AttendanceRecord, 'updatedAt'>[]): Promise<void>;
 }
 
 // Alias tương thích ngược

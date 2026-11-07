@@ -53,6 +53,14 @@ describe('AttendanceSessionsService registry-backed creation', () => {
   const prisma = {
     courseSection: { findUnique: jest.fn() },
   };
+  const attendanceRecordsService = {
+    initializeBufferForSession: jest.fn().mockResolvedValue(undefined),
+  };
+  const jobScheduler = {
+    schedule: jest.fn().mockResolvedValue(undefined),
+    cancel: jest.fn().mockResolvedValue(undefined),
+    onJob: jest.fn(),
+  };
   let service: AttendanceSessionsService;
 
   beforeEach(() => {
@@ -60,8 +68,9 @@ describe('AttendanceSessionsService registry-backed creation', () => {
     prisma.courseSection.findUnique.mockResolvedValue(createRegistrySection());
     service = new AttendanceSessionsService(
       repository as never,
-      {} as AttendanceRecordsService,
+      attendanceRecordsService as unknown as AttendanceRecordsService,
       prisma as unknown as PrismaService,
+      jobScheduler,
     );
   });
 
@@ -78,7 +87,7 @@ describe('AttendanceSessionsService registry-backed creation', () => {
   }) as CreateAttendanceSessionDto;
 
   it('snapshots the building center and assigns active enrollments instead of client coordinates', async () => {
-    await service.create(dto(), 7, 'lecturer');
+    await service.create(dto(), 7, 'organizer');
 
     expect(repository.createWithRecords).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -116,7 +125,7 @@ describe('AttendanceSessionsService registry-backed creation', () => {
         closeAt: '2026-10-14T03:00:00.000Z',
       },
       7,
-      'lecturer',
+      'organizer',
     );
 
     expect(repository.createWithRecords).toHaveBeenCalled();
@@ -144,7 +153,7 @@ describe('AttendanceSessionsService registry-backed creation', () => {
           closeAt: '2026-10-15T03:00:00.000Z',
         },
         7,
-        'lecturer',
+        'organizer',
       ),
     ).rejects.toThrow('Ngày mở session không khớp ngày cụ thể');
     expect(repository.createWithRecords).not.toHaveBeenCalled();
@@ -155,7 +164,7 @@ describe('AttendanceSessionsService registry-backed creation', () => {
       createRegistrySection({ lecturerId: 8 }),
     );
 
-    await expect(service.create(dto(), 7, 'lecturer')).rejects.toBeInstanceOf(
+    await expect(service.create(dto(), 7, 'organizer')).rejects.toBeInstanceOf(
       ForbiddenException,
     );
     expect(repository.createWithRecords).not.toHaveBeenCalled();
@@ -181,7 +190,7 @@ describe('AttendanceSessionsService registry-backed creation', () => {
       }),
     );
 
-    await expect(service.create(dto(), 7, 'lecturer')).rejects.toBeInstanceOf(
+    await expect(service.create(dto(), 7, 'organizer')).rejects.toBeInstanceOf(
       BadRequestException,
     );
     expect(repository.createWithRecords).not.toHaveBeenCalled();
@@ -192,7 +201,7 @@ describe('AttendanceSessionsService registry-backed creation', () => {
       createRegistrySection({ enrollments: [] }),
     );
 
-    await expect(service.create(dto(), 7, 'lecturer')).rejects.toThrow(
+    await expect(service.create(dto(), 7, 'organizer')).rejects.toThrow(
       'Lớp học phần chưa có sinh viên ghi danh active',
     );
     expect(repository.createWithRecords).not.toHaveBeenCalled();
@@ -203,7 +212,7 @@ describe('AttendanceSessionsService registry-backed creation', () => {
       createRegistrySection({ timetable: [] }),
     );
 
-    await expect(service.create(dto(), 7, 'lecturer')).rejects.toThrow(
+    await expect(service.create(dto(), 7, 'organizer')).rejects.toThrow(
       'Lớp học phần chưa có thời khóa biểu',
     );
     expect(repository.createWithRecords).not.toHaveBeenCalled();

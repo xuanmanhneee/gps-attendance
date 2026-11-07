@@ -10,14 +10,14 @@ These k6 scenarios measure API behavior on an explicitly selected local or stagi
 
 ## Read-only API ramp test
 
-The scenario ramps to `MAX_VUS` virtual users and repeatedly calls a role-specific mix of endpoints. `TOKEN` is required. `ROLE` accepts `student`, `lecturer`, or `admin`; `SESSION_ID` adds the session detail endpoint to staff traffic.
+The scenario ramps to `MAX_VUS` virtual users and repeatedly calls a role-specific mix of endpoints. `TOKEN` is required. `ROLE` accepts `participant`, `organizer`, or `admin`; `SESSION_ID` adds the session detail endpoint to staff traffic.
 
 PowerShell example:
 
 ```powershell
 $env:BASE_URL = 'http://localhost:3000'
 $env:TOKEN = '<access-token>'
-$env:ROLE = 'student'
+$env:ROLE = 'participant'
 $env:MAX_VUS = '50'
 $env:P95_MS = '1000'
 $env:ERROR_RATE = '0.01'

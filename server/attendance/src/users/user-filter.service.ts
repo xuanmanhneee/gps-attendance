@@ -16,7 +16,7 @@ export class UserFilterService {
   async resolveUserIds(criteria?: UserFilterCriteria | any): Promise<number[]> {
     if (!criteria) {
       const allUsers = await this.usersService.findAll();
-      return allUsers.filter((u) => u.role === 'student').map((u) => u.id);
+      return allUsers.filter((u) => u.role === 'participant').map((u) => u.id);
     }
 
     const result = new Set<number>();
@@ -25,7 +25,7 @@ export class UserFilterService {
     const legacyCodes: string[] = criteria?.codeFilter?.addCodes ?? [];
     if (legacyCodes.some((c) => c.toUpperCase() === 'ALL')) {
       const allUsers = await this.usersService.findAll();
-      return allUsers.filter((u) => u.role === 'student').map((u) => u.id);
+      return allUsers.filter((u) => u.role === 'participant').map((u) => u.id);
     }
 
     if (legacyCodes.length > 0) {
@@ -73,7 +73,7 @@ export class UserFilterService {
 
     if (result.size === 0 && (!criteria.codeFilter && !criteria.tagFilter && !criteria.unitFilter)) {
       const allUsers = await this.usersService.findAll();
-      return allUsers.filter((u) => u.role === 'student').map((u) => u.id);
+      return allUsers.filter((u) => u.role === 'participant').map((u) => u.id);
     }
 
     return Array.from(result);

@@ -27,27 +27,27 @@ describe('RolesGuard', () => {
 
   it('nên cho phép truy cập khi route không yêu cầu roles cụ thể', () => {
     reflector.getAllAndOverride.mockReturnValue(undefined);
-    const context = createMockContext({ role: 'student' });
+    const context = createMockContext({ role: 'participant' });
 
     expect(guard.canActivate(context)).toBe(true);
   });
 
   it('nên cho phép truy cập khi user có role khớp với requiredRoles', () => {
-    reflector.getAllAndOverride.mockReturnValue(['admin', 'lecturer']);
-    const context = createMockContext({ role: 'lecturer' });
+    reflector.getAllAndOverride.mockReturnValue(['admin', 'organizer']);
+    const context = createMockContext({ role: 'organizer' });
 
     expect(guard.canActivate(context)).toBe(true);
   });
 
   it('nên từ chối khi user có role không nằm trong requiredRoles', () => {
     reflector.getAllAndOverride.mockReturnValue(['admin']);
-    const context = createMockContext({ role: 'student' });
+    const context = createMockContext({ role: 'participant' });
 
     expect(guard.canActivate(context)).toBe(false);
   });
 
   it('nên từ chối khi không có thông tin user trong request', () => {
-    reflector.getAllAndOverride.mockReturnValue(['student']);
+    reflector.getAllAndOverride.mockReturnValue(['participant']);
     const context = createMockContext(undefined);
 
     expect(guard.canActivate(context)).toBe(false);

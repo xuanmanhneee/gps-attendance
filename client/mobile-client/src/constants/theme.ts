@@ -1,5 +1,4 @@
-import { Platform } from 'react-native';
-import { useColorScheme } from '../hooks/use-color-scheme';
+import { Platform, useColorScheme } from 'react-native';
 
 /**
  * Dark mode color scheme (default)
@@ -51,6 +50,24 @@ export const COLORS_LIGHT = {
     primary: '#1E293B',
     secondary: '#64748B',
   },
+};
+
+export const colors = {
+  primary: COLORS.primary,
+  primaryLight: COLORS.primaryLight,
+  primaryDark: COLORS.primaryDark,
+  success: COLORS.success,
+  successLight: '#064E3B',
+  warning: COLORS.warning,
+  warningLight: '#78350F',
+  danger: COLORS.error,
+  background: COLORS.background,
+  surface: COLORS.card,
+  border: COLORS.border,
+  text: COLORS.text.primary,
+  textSecondary: COLORS.text.secondary,
+  textMuted: COLORS.text.secondary,
+  disabled: '#475569',
 };
 
 export const Colors = {

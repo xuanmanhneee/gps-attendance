@@ -1,0 +1,107 @@
+{
+  // Đây là file đặc tả/mẫu, chưa được ứng dụng nạp ở runtime.
+  // Khi triển khai loader: đọc file mặc định trước, deep-merge file override sau;
+  // object được merge theo field, còn array (nếu schema tương lai có) phải bị thay thế toàn bộ.
+  // Field lạ hoặc sai kiểu phải làm ứng dụng fail khi khởi động, không âm thầm bỏ qua.
+  //
+  // Ràng buộc chung cho schemaVersion=1:
+  // - Mọi giá trị Minutes/Seconds là số nguyên không âm.
+  // - maxAttemptsPerWindow là số nguyên >= 1.
+  // - weights là số không âm và có tổng bằng 100.
+  // - 0 <= reviewMinimumScore < validMinimumScore <= 100.
+  // - Các coefficient nằm trong [0, 1].
+  // - timeZone là tên IANA timezone hợp lệ.
+  // - earlyCheckInPolicy chỉ nhận `reject` hoặc `from_start_of_day`.
+  // - lateCheckInPolicy chỉ nhận `reject` hoặc `until_end_of_day`.
+  // - File này không chứa secret, DB/Redis URL hay cấu hình hạ tầng; các giá trị đó ở .env.
+
+  // Phiên bản schema của file cấu hình, không phải phiên bản ứng dụng.
+  // Tăng giá trị này khi thay đổi tên field hoặc ý nghĩa field theo cách không tương thích.
+  "schemaVersion": 1,
+
+  // Quy tắc thời gian dùng chung cho mọi attendance session trong một deployment.
+  // `openAt` và `closeAt` vẫn do organizer hoặc hệ thống tích hợp cấu hình trên từng
+  // session. `timeZone` quyết định ngày local dùng để tính mốc 00:00.
+  "timeWindow": {
+    // IANA timezone dùng để xác định đầu/cuối ngày; không dùng timezone local của máy chủ.
+    "timeZone": "Asia/Bangkok",
+
+    // `reject`: chặn cứng trước session.openAt.
+    // `from_start_of_day`: cho phép từ 00:00 của ngày local chứa session.openAt;
+    // check-in trước openAt vẫn được ghi nhận là `present`.
+    "earlyCheckInPolicy": "reject",
+
+    // `reject`: chặn cứng sau session.closeAt.
+    // `until_end_of_day`: cho phép từ sau closeAt đến trước 00:00 ngày local kế tiếp;
+    // check-in trong khoảng này được ghi nhận là `late`.
+    "lateCheckInPolicy": "reject"
+  },
+
+  "sessionLifecycle": {
+    // Roster phải được khởi tạo trước thời điểm check-in sớm nhất một khoảng này.
+    // effectiveOpenAt = session.openAt khi earlyCheckInPolicy=`reject`, hoặc 00:00
+    // ngày local chứa openAt khi policy=`from_start_of_day`.
+    // rosterInitAt = effectiveOpenAt - rosterInitializationLeadMinutes
+    // Giá trị hiện tại trong codebase là 5 phút.
+    "rosterInitializationLeadMinutes": 5,
+
+    // Giữ claim thiết bị thêm bao nhiêu phút sau thời điểm check-in muộn nhất.
+    // effectiveCloseAt = session.closeAt khi lateCheckInPolicy=`reject`, hoặc 00:00
+    // ngày local kế tiếp (exclusive) khi policy=`until_end_of_day`.
+    // Claim tối thiểu tồn tại đến effectiveCloseAt + giá trị này để không thể dùng
+    // lại cùng thiết bị cho hai participant trong cùng một session.
+    // Giá trị hiện tại trong codebase là 60 phút.
+    "deviceClaimRetentionMinutes": 60
+  },
+
+  "attemptLimit": {
+    // Số lần thử check-in tối đa của một participant trong một cửa sổ giới hạn.
+    // Lần thử vượt giới hạn trả về TOO_MANY_ATTEMPTS.
+    "maxAttemptsPerWindow": 3,
+
+    // Độ dài cửa sổ giới hạn số lần thử, tính bằng giây.
+    "windowSeconds": 120
+  },
+
+  "locationValidation": {
+    // Mẫu GPS cũ hơn giá trị này bị từ chối với INVALID_LOCATION_TIMESTAMP.
+    "maxSampleAgeSeconds": 120,
+
+    // Cho phép timestamp GPS đi trước đồng hồ server tối đa bao nhiêu giây để hấp thụ
+    // sai lệch đồng hồ nhỏ giữa thiết bị và server.
+    "maxFutureClockSkewSeconds": 30,
+
+    // true giữ nguyên nghiệp vụ hiện tại: mock location là hard reject, không đi qua
+    // bước chấm điểm REVIEW.
+    "rejectMockLocation": true,
+
+    // true giữ nguyên công thức hiện tại: distance + accuracy <= session.radius.
+    // Không đặt radius ở file này vì radius là dữ liệu riêng của từng session.
+    "includeReportedAccuracyInRadiusCheck": true
+  },
+
+  "confidenceScoring": {
+    // Trọng số hiện tại có tổng bằng 100. `nonMockLocation` chỉ được cộng khi thiết bị
+    // không báo mock location; với rejectMockLocation=true, mock location đã bị từ chối
+    // trước khi chấm điểm.
+    "weights": {
+      "deviceIntegrity": 35,
+      "nonMockLocation": 25,
+      "withinAllowedRadius": 40
+    },
+
+    // score >= validMinimumScore       => VALID
+    // reviewMinimumScore <= score < validMinimumScore => REVIEW
+    // score < reviewMinimumScore       => REJECTED
+    "validMinimumScore": 80,
+    "reviewMinimumScore": 60,
+
+    // Hệ số tạm đang được IntegrityCheck sử dụng trong lúc chưa verify thật
+    // Play Integrity / App Attest. Khi có verifier thật, thay cả schema lẫn logic này,
+    // không tiếp tục coi việc token có/không là kết quả integrity cuối cùng.
+    "temporaryIntegrityCoefficients": {
+      "tokenPresent": 0.7,
+      "tokenMissing": 0.5
+    }
+  }
+}

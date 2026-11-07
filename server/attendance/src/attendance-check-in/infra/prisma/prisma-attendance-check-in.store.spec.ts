@@ -1,5 +1,39 @@
 import { PrismaAttendanceCheckInStore } from './prisma-attendance-check-in.store';
 
+describe('PrismaAttendanceCheckInStore.isUsed', () => {
+  it('checks both persisted attendance and attempt evidence in parallel', async () => {
+    const prisma = {
+      attendanceRecord: {
+        findFirst: jest.fn().mockResolvedValue({ id: 1 }),
+      },
+      attendanceAttempt: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+    };
+    const store = new PrismaAttendanceCheckInStore(prisma as never);
+
+    await expect(store.isUsed(12, 'device-31', 31)).resolves.toBe(true);
+
+    expect(prisma.attendanceRecord.findFirst).toHaveBeenCalledWith({
+      where: {
+        sessionId: 12,
+        deviceId: 'device-31',
+        status: 'present',
+        userId: { not: 31 },
+      },
+      select: { id: true },
+    });
+    expect(prisma.attendanceAttempt.findFirst).toHaveBeenCalledWith({
+      where: {
+        sessionId: 12,
+        deviceId: 'device-31',
+        userId: { not: 31 },
+      },
+      select: { id: true },
+    });
+  });
+});
+
 describe('PrismaAttendanceCheckInStore.completeAttempt audit trail', () => {
   it('keeps original evidence fields untouched and appends semantic GPS events', async () => {
     const attempt = {

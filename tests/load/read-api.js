@@ -2,7 +2,7 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 
 const baseUrl = (__ENV.BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
-const role = (__ENV.ROLE || 'student').toLowerCase();
+const role = (__ENV.ROLE || 'participant').toLowerCase();
 const token = __ENV.TOKEN;
 const sessionId = __ENV.SESSION_ID;
 const maxVus = Math.max(1, Number(__ENV.MAX_VUS || 50));
@@ -36,13 +36,13 @@ const staffPaths = [
 ];
 
 function getPaths() {
-  if (role === 'student') return studentPaths;
-  if (role === 'lecturer' || role === 'admin') {
+  if (role === 'participant') return studentPaths;
+  if (role === 'organizer' || role === 'admin') {
     return sessionId
       ? [...staffPaths, `/v0/attendance-sessions/${sessionId}/detail`]
       : staffPaths;
   }
-  throw new Error('ROLE must be student, lecturer, or admin');
+  throw new Error('ROLE must be participant, organizer, or admin');
 }
 
 export default function () {

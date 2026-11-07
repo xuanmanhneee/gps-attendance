@@ -1,0 +1,157 @@
+name: gps-attendance-perf
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: perf
+      POSTGRES_PASSWORD: perf
+      POSTGRES_DB: gps_attendance_loadtest
+    volumes:
+      - perf_postgres:/var/lib/postgresql/data
+    cpus: "${PERF_DB_CPUS:-2.0}"
+    mem_limit: "${PERF_DB_MEMORY:-2g}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U perf -d perf"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7.4-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --aof-use-rdb-preamble
+      - "yes"
+      - --maxmemory
+      - "${PERF_REDIS_MAXMEMORY:-384mb}"
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - perf_redis:/data
+    cpus: "${PERF_REDIS_CPUS:-1.0}"
+    mem_limit: "${PERF_REDIS_MEMORY:-512m}"
+    restart: unless-stopped
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  backend:
+    image: gps-attendance-perf-api:local
+    build:
+      context: .
+      dockerfile: server/attendance/Dockerfile.perf
+    environment: &api_environment
+      DATABASE_URL: postgresql://perf:perf@postgres:5432/gps_attendance_loadtest
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      JWT_SECRET: "${PERF_JWT_SECRET:-local-performance-test-secret}"
+      PORT: "3000"
+      DB_POOL_MAX: "${PERF_DB_POOL_MAX:-15}"
+      NODE_ENV: test
+      LOAD_TEST_MODE: "true"
+    cpus: "${PERF_API_CPUS:-2.0}"
+    mem_limit: "${PERF_API_MEMORY:-2g}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    image: gps-attendance-perf-api:local
+    build:
+      context: .
+      dockerfile: server/attendance/Dockerfile.perf
+    command: ["pnpm", "exec", "prisma", "migrate", "deploy"]
+    environment: *api_environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  load-balancer:
+    image: nginx:1.28-alpine
+    ports:
+      - "127.0.0.1:3100:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  prepare:
+    image: gps-attendance-perf-api:local
+    build:
+      context: .
+      dockerfile: server/attendance/Dockerfile.perf
+    profiles: ["tools"]
+    command: ["pnpm", "exec", "tsx", "scripts/prepare-load.ts"]
+    environment:
+      <<: *api_environment
+      LOAD_USERS: "${LOAD_USERS:-1000}"
+      LOAD_SESSION_MINUTES: "${LOAD_SESSION_MINUTES:-10}"
+      LOAD_DATA_PATH: /perf-data/load-data.json
+    volumes:
+      - perf_data:/perf-data
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  verify:
+    image: gps-attendance-perf-api:local
+    build:
+      context: .
+      dockerfile: server/attendance/Dockerfile.perf
+    profiles: ["tools"]
+    command: ["pnpm", "exec", "tsx", "scripts/verify-load.ts"]
+    environment:
+      <<: *api_environment
+      LOAD_DATA_PATH: /perf-data/load-data.json
+      VERIFY_PHASE: "${VERIFY_PHASE:-before-flush}"
+    volumes:
+      - perf_data:/perf-data:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  load:
+    image: grafana/k6:latest
+    profiles: ["load"]
+    entrypoint: ["k6", "run", "/scripts/check-in.js"]
+    environment:
+      API_URL: http://load-balancer
+      LOAD_TIME_UNIT: "${LOAD_TIME_UNIT:-1m}"
+      LOAD_VUS: "${LOAD_VUS:-100}"
+      P95_MS: "${PERF_P95_MS:-50}"
+    volumes:
+      - perf_data:/data:ro
+      - ./server/attendance/perf:/scripts:ro
+    depends_on:
+      load-balancer:
+        condition: service_healthy
+
+volumes:
+  perf_postgres:
+  perf_redis:
+  perf_data:

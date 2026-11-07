@@ -117,7 +117,7 @@ export class AttendanceSessionQueryService {
   async getCourseSectionCreationOptions() {
     const [lecturers, rooms, courses] = await Promise.all([
       this.prisma.user.findMany({
-        where: { role: 'lecturer' },
+        where: { role: 'organizer' },
         select: { id: true, code: true, fullname: true },
         orderBy: { fullname: 'asc' },
       }),
@@ -245,7 +245,7 @@ export class AttendanceSessionQueryService {
             where: { id: input.lecturerId },
             select: { role: true },
           });
-          if (!lecturer || lecturer.role !== 'lecturer') {
+          if (!lecturer || lecturer.role !== 'organizer') {
             throw new BadRequestException('Giảng viên được chọn không hợp lệ.');
           }
         }
@@ -450,7 +450,7 @@ export class AttendanceSessionQueryService {
 
     for (const student of requestedStudents) {
       const existingUser = usersByCode.get(student.studentCode);
-      if (existingUser && existingUser.role !== 'student') {
+      if (existingUser && existingUser.role !== 'participant') {
         conflictingCodes.push(student.studentCode);
         continue;
       }
@@ -575,7 +575,7 @@ export class AttendanceSessionQueryService {
         return transaction.user.create({
           data: {
             code: student.studentCode,
-            role: 'student',
+            role: 'participant',
             ...profile,
             account: {
               create: {

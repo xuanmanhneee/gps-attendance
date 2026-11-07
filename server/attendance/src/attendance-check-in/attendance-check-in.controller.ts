@@ -26,7 +26,7 @@ export class AttendanceCheckInController {
 
   @ApiOperation({ summary: 'Sinh viên thực hiện điểm danh (Check-in GPS)' })
   @UseGuards(JwtAuthGuard, DeviceRateLimitGuard, RolesGuard)
-  @Roles('student')
+  @Roles('participant')
   @Throttle({ default: { limit: checkInThrottleLimit, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @Post('check-in')

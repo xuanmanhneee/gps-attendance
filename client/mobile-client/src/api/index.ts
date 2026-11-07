@@ -7,5 +7,4 @@ export type {
   AttendanceSession,
 } from './attendance.api';
 export * from './user.api';
-export * from './attendance-sessions.api';
 export * from './attendance-check-in.api';

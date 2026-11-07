@@ -154,9 +154,9 @@ export default function PersonalInformationScreen() {
 
   const fullName = profile?.fullname ?? user?.name ?? 'Sinh viên';
   const studentCode = profile?.code ?? user?.code ?? NOT_UPDATED;
-  const roleText = (profile?.role ?? user?.role) === 'student'
+  const roleText = (profile?.role ?? user?.role) === 'participant'
     ? 'Sinh viên'
-    : (profile?.role ?? user?.role) === 'lecturer'
+    : (profile?.role ?? user?.role) === 'organizer'
       ? 'Giảng viên'
       : 'Quản trị viên';
 

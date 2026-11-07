@@ -59,4 +59,8 @@ export class AccountService {
   async findById(id: number): Promise<Account | undefined> {
     return this.accountRepository.findById(id);
   }
+
+  async findByUserId(userId: number): Promise<Account | undefined> {
+    return this.accountRepository.findByUserId(userId);
+  }
 }

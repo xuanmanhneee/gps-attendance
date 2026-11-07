@@ -94,31 +94,27 @@ export class PrismaAttendanceCheckInStore
 
   async isUsed(sessionId: number, deviceId: string, userId?: number): Promise<boolean> {
     // 1. Kiểm tra xem deviceId đã được sử dụng thành công bởi sinh viên khác trong session này chưa
-    const record = await this.prisma.attendanceRecord.findFirst({
-      where: {
-        sessionId,
-        deviceId,
-        status: 'present',
-        ...(userId ? { userId: { not: userId } } : {}),
-      },
-      select: { id: true },
-    });
+    const [record, attempt] = await Promise.all([
+      this.prisma.attendanceRecord.findFirst({
+        where: {
+          sessionId,
+          deviceId,
+          status: 'present',
+          ...(userId ? { userId: { not: userId } } : {}),
+        },
+        select: { id: true },
+      }),
+      this.prisma.attendanceAttempt.findFirst({
+        where: {
+          sessionId,
+          deviceId,
+          ...(userId ? { userId: { not: userId } } : {}),
+        },
+        select: { id: true },
+      }),
+    ]);
 
-    if (record !== null) {
-      return true;
-    }
-
-    // 2. Kiểm tra xem deviceId đã từng được gửi trong các lượt attempt bởi sinh viên khác trong session này chưa
-    const attempt = await this.prisma.attendanceAttempt.findFirst({
-      where: {
-        sessionId,
-        deviceId,
-        ...(userId ? { userId: { not: userId } } : {}),
-      },
-      select: { id: true },
-    });
-
-    return attempt !== null;
+    return record !== null || attempt !== null;
   }
 
   async markUsed(_sessionId: number, _deviceId: string): Promise<void> {

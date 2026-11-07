@@ -1,11 +1,18 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { colors } from '../../theme/';
-import { useCheckInContext } from '@/hooks/use-check-in-context';
+import type { CheckInContext } from '@/hooks/use-check-in-context';
 
-export default function DebugDeviceCard() {
-  const { location, device, integrity, error, reset } = useCheckInContext();
+import { colors } from '../constants/theme';
+
+// Card chỉ để hiển thị: dữ liệu do màn hình cha truyền vào, còn refresh/reset
+// nằm ở các nút của màn hình cha (trang Dev) để tránh 2 nguồn state.
+type Props = {
+  context: Pick<CheckInContext, 'location' | 'device' | 'integrity' | 'error'>;
+};
+
+export default function DebugDeviceCard({ context }: Props) {
+  const { location, device, integrity, error } = context;
 
   const coords = location
     ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
@@ -15,20 +22,8 @@ export default function DebugDeviceCard() {
 
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Thông tin thiết bị</Text>
-          <Text style={styles.subtitle}>Debug</Text>
-        </View>
-
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.resetButton}
-          onPress={reset}
-        >
-          <Text style={styles.resetText}>Reset</Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.title}>Thông tin thiết bị</Text>
+      <Text style={styles.subtitle}>Debug</Text>
 
       <View style={styles.divider} />
 
@@ -106,12 +101,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
   title: {
     fontSize: 15,
     fontWeight: '700',
@@ -124,19 +113,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-
-  resetButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: colors.primaryLight,
-  },
-
-  resetText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.primaryDark,
   },
 
   divider: {

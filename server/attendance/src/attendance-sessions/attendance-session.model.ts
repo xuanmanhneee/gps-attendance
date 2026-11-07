@@ -1,4 +1,4 @@
-import { SessionStatus } from "@gps-attendance/shared";
+import { SessionStatus } from '@gps-attendance/shared';
 
 export interface AttendanceSession {
   id: number;
@@ -38,6 +38,18 @@ export interface CreateAttendanceSessionRecord {
   openAt: Date;
   closeAt: Date;
   createdBy: number;
-  createdAt: Date;
-  updatedAt: Date;
+
 }
+
+export type UpdateAttendanceSessionRecord = Partial<
+  Pick<
+    AttendanceSession,
+    | 'title'
+    | 'latitude'
+    | 'longitude'
+    | 'radius'
+    | 'openAt'
+    | 'closeAt'
+    | 'status'
+  >
+>;
