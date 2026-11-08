@@ -1,20 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { AttendanceRecord, MarkPresentInput } from '../attendance-record.model';
-import { AttendanceReviewCandidate } from '../attendance-review.model';
 import {
   IAttendanceRecordBuffer,
   MarkPresentResult,
-  ResolveReviewResult,
+  ResolveAttendanceReviewRecordResult,
 } from '#attendance-record/attendance-record.buffer';
 
 @Injectable()
 export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
   private recordsBySession = new Map<number, Map<number, AttendanceRecord>>();
   private usedDevicesBySession = new Map<number, Set<string>>();
-  private reviewCandidatesBySession = new Map<
-    number,
-    Map<number, AttendanceReviewCandidate>
-  >();
   private flushingSessions = new Set<number>();
 
   async getRecord(
@@ -70,21 +65,6 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     if (existing.status !== 'absent' || existing.updateBy !== null)
       return 'locked';
 
-    if (input.validationStatus === 'REVIEW') {
-      let candidates = this.reviewCandidatesBySession.get(input.sessionId);
-      if (!candidates) {
-        candidates = new Map();
-        this.reviewCandidatesBySession.set(input.sessionId, candidates);
-      }
-      candidates.set(input.userId, {
-        sessionId: input.sessionId,
-        userId: input.userId,
-        reasons: input.reasons ?? [],
-        createdAt: new Date(),
-      });
-      return 'review';
-    }
-
     let usedDevices = this.usedDevicesBySession.get(input.sessionId);
     if (!usedDevices) {
       usedDevices = new Set<string>();
@@ -92,7 +72,6 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     }
     if (usedDevices.has(deviceId)) return 'device-used';
 
-    this.reviewCandidatesBySession.get(input.sessionId)?.delete(input.userId);
     sessionMap!.set(input.userId, {
       sessionId: input.sessionId,
       userId: input.userId,
@@ -108,48 +87,37 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     return 'present';
   }
 
-  async resolveReview(
+  async resolveReviewRecord(
     sessionId: number,
     userId: number,
     decision: 'approve' | 'reject',
     resolverId: number,
-  ): Promise<ResolveReviewResult> {
+    candidateCreatedAt: Date,
+  ): Promise<ResolveAttendanceReviewRecordResult> {
     if (this.flushingSessions.has(sessionId))
       return { status: 'session-flushing' };
     const record = this.recordsBySession.get(sessionId)?.get(userId);
     if (!record) return { status: 'record-missing' };
-    const candidate = this.reviewCandidatesBySession.get(sessionId)?.get(userId);
-    if (!candidate) return { status: 'not-requested' };
     if (record.updateBy !== null) return { status: 'locked' };
     if (record.status !== 'absent') {
-      return { status: 'not-requested' };
+      return { status: 'locked' };
     }
     const previousStatus = record.status;
     Object.assign(record, {
       status: decision === 'approve' ? 'present' : 'absent',
       ...(decision === 'approve'
         ? {
-            checkedInAt: candidate.createdAt,
+            checkedInAt: candidateCreatedAt,
           }
         : {}),
       updateBy: resolverId,
       updatedAt: new Date(),
     });
-    this.reviewCandidatesBySession.get(sessionId)!.delete(userId);
     return {
       status: 'resolved',
       previousStatus,
       record: { ...record },
-      candidate: { ...candidate },
     };
-  }
-
-  async findReviewCandidates(
-    sessionId: number,
-  ): Promise<AttendanceReviewCandidate[]> {
-    return [
-      ...(this.reviewCandidatesBySession.get(sessionId)?.values() ?? []),
-    ];
   }
 
   async beginSessionFlush(sessionId: number): Promise<AttendanceRecord[]> {
@@ -160,7 +128,6 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
   async completeSessionFlush(sessionId: number): Promise<void> {
     this.recordsBySession.delete(sessionId);
     this.usedDevicesBySession.delete(sessionId);
-    this.reviewCandidatesBySession.delete(sessionId);
     this.flushingSessions.delete(sessionId);
   }
 

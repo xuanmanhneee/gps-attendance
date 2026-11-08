@@ -1,5 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { AuditEntry } from './audit-log.model';
+import type {
+  AuditEntry,
+  AuditLogQuery,
+  AuditLogRecord,
+} from './audit-log.model';
 import type { IAuditLogRepository } from './audit-log.repository';
 import { AUDIT_LOG_REPOSITORY } from './audit-log.repository.token';
 
@@ -15,5 +19,9 @@ export class AuditLogService {
       ...entry,
       reason: entry.reason?.slice(0, 500),
     });
+  }
+
+  find(query: AuditLogQuery): Promise<AuditLogRecord[]> {
+    return this.auditLogRepository.find(query);
   }
 }

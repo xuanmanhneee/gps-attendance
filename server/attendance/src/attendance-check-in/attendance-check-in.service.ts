@@ -9,9 +9,8 @@ import {
   AttendanceReviewDecision,
   AttendanceReviewErrorCode,
   AttendanceReviewCandidateResponse,
+  AttendanceReviewHistoryResponse,
   AttendanceSessionErrorCode,
-  AuditAction,
-  AuditEntityType,
   CheckInResponse,
 } from '@gps-attendance/shared';
 
@@ -19,13 +18,13 @@ import { AttendanceSessionsService } from '../attendance-sessions/attendance-ses
 import { AttendanceValidationService } from '../attendance-validation/attendance-validation.service';
 import { AttendanceRecordsService } from '../attendance-record/attendance-records.service';
 import { UsersService } from '../users/users.service';
-import { AuditLogService } from '../audit-log/audit-log.service';
 import { LOGGER_FACTORY } from '../common/logging/logger.token';
 import type { ILoggerFactory } from '../common/logging/logger.factory';
 import type { ILogger } from '../common/logging/logger.interface';
 import { CheckInRequestDto } from './attendance-check-in.dto';
 import { AttemptCheck } from './checks/attempt.check';
-import { REVIEW_RESOLUTION_WINDOW_MS } from '../attendance-record/attendance-review.constants';
+import { AttendanceReviewService } from '../attendance-review/attendance-review.service';
+import { REVIEW_RESOLUTION_WINDOW_MS } from '../attendance-review/attendance-review.constants';
 
 @Injectable()
 export class AttendanceCheckInService {
@@ -35,9 +34,9 @@ export class AttendanceCheckInService {
     private readonly attendanceSessionsService: AttendanceSessionsService,
     private readonly attendanceValidationService: AttendanceValidationService,
     private readonly attendanceRecordsService: AttendanceRecordsService,
+    private readonly attendanceReviewService: AttendanceReviewService,
     private readonly attemptCheck: AttemptCheck,
     private readonly usersService: UsersService,
-    private readonly auditLogService: AuditLogService,
     @Inject(LOGGER_FACTORY) loggerFactory: ILoggerFactory,
   ) {
     this.logger = loggerFactory.create(AttendanceCheckInService.name);
@@ -102,6 +101,39 @@ export class AttendanceCheckInService {
       return { status: 'REJECTED', reasons: validation.reasons };
     }
 
+    if (validation.status === 'REVIEW') {
+      const reviewResult = await this.attendanceReviewService.requestReview({
+        sessionId: dto.sessionId,
+        userId,
+        reasons: validation.reasons,
+        createdAt: checkedInAt,
+        expiresAt: new Date(
+          session.closeAt.getTime() + REVIEW_RESOLUTION_WINDOW_MS,
+        ),
+      });
+
+      if (reviewResult === 'already-present') {
+        throw new ConflictException({
+          code: AttendanceReviewErrorCode.ALREADY_CHECKED_IN,
+          message: 'Đã điểm danh rồi',
+        });
+      }
+      if (reviewResult === 'record-missing') {
+        throw new BadRequestException({
+          code: AttendanceReviewErrorCode.USER_NOT_IN_SESSION,
+          message: 'User không thuộc session này',
+        });
+      }
+      if (reviewResult === 'locked') {
+        throw new ConflictException({
+          code: AttendanceReviewErrorCode.RECORD_LOCKED,
+          message: 'Kết quả điểm danh đã được giảng viên chốt',
+        });
+      }
+
+      return { status: 'REVIEW', reasons: validation.reasons };
+    }
+
     const deviceTtlSeconds = Math.max(
       3600,
       Math.ceil((session.closeAt.getTime() - Date.now()) / 1000) + 600,
@@ -115,10 +147,6 @@ export class AttendanceCheckInService {
         longitude: dto.location.longitude,
         accuracy: dto.location.accuracy,
         updateBy: userId,
-        validationStatus: validation.status,
-        ...(validation.status === 'REVIEW'
-          ? { reasons: validation.reasons }
-          : {}),
       },
       dto.device.deviceId,
       deviceTtlSeconds,
@@ -152,9 +180,18 @@ export class AttendanceCheckInService {
       });
     }
 
-    return validation.status === 'VALID'
-      ? { status: 'VALID' }
-      : { status: 'REVIEW', reasons: validation.reasons };
+    try {
+      await this.attendanceReviewService.removeCandidate(dto.sessionId, userId);
+    } catch (error) {
+      // Điểm danh VALID đã commit; không báo thất bại giả nếu cleanup candidate
+      // tạm lỗi. Candidate có TTL và record đã khóa nên không thể được duyệt lại.
+      this.logger.error(
+        `Xoá review candidate sau VALID thất bại: sessionId=${dto.sessionId}, userId=${userId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+
+    return { status: 'VALID' };
   }
 
   async listReviewCandidates(
@@ -169,10 +206,7 @@ export class AttendanceCheckInService {
       });
     }
 
-    const records =
-      await this.attendanceRecordsService.findReviewCandidatesBySession(
-        sessionId,
-      );
+    const records = await this.attendanceReviewService.findBySession(sessionId);
     const users = await this.usersService.findByIds(
       records.map((r) => r.userId),
     );
@@ -191,6 +225,49 @@ export class AttendanceCheckInService {
             fullname: student.fullname,
           },
           reasons: record.reasons,
+        },
+      ];
+    });
+  }
+
+  async listReviewHistory(
+    resolverId: number,
+  ): Promise<AttendanceReviewHistoryResponse[]> {
+    const history =
+      await this.attendanceReviewService.findHistoryByResolver(resolverId);
+
+    const [sessions, users] = await Promise.all([
+      this.attendanceSessionsService.findByIds([
+        ...new Set(history.map((item) => item.sessionId)),
+      ]),
+      this.usersService.findByIds([
+        ...new Set(history.map((item) => item.userId)),
+      ]),
+    ]);
+    const sessionsById = new Map(sessions.map((item) => [item.id, item]));
+    const usersById = new Map(users.map((item) => [item.id, item]));
+
+    return history.flatMap((item) => {
+      const { sessionId, userId } = item;
+      const session = sessionsById.get(sessionId);
+      const student = usersById.get(userId);
+
+      // Kiểm tra owner lần nữa để không trả audit cũ nếu dữ liệu lịch sử sai.
+      if (!session || session.createdBy !== resolverId || !student) return [];
+
+      return [
+        {
+          id: item.id,
+          session: { id: session.id, title: session.title },
+          student: {
+            code: student.code,
+            role: student.role,
+            fullname: student.fullname,
+          },
+          decision: item.decision,
+          reasons: item.reasons,
+          reason: item.reason ?? null,
+          resolvedAt: item.resolvedAt.toISOString(),
         },
       ];
     });
@@ -216,7 +293,7 @@ export class AttendanceCheckInService {
       });
     }
 
-    const result = await this.attendanceRecordsService.resolveReview(
+    const result = await this.attendanceReviewService.resolveReview(
       sessionId,
       userId,
       decision,
@@ -227,26 +304,24 @@ export class AttendanceCheckInService {
       return;
     }
 
-    const entry = {
-      entityType: AuditEntityType.ATTENDANCE_RECORD,
-      entityId: `${sessionId}:${userId}`,
-      action: AuditAction.REVIEW_RESOLVED,
-      actorId: resolverId,
+    const historyEntry = {
+      sessionId,
+      userId,
+      resolverId,
+      decision,
+      reasons: result.candidate.reasons,
       reason,
-      oldValue: { status: result.previousStatus },
-      newValue: { status: result.record.status },
-      metadata: {
-        reasons: result.candidate.reasons,
-      },
+      previousStatus: result.previousStatus,
+      resolvedStatus: result.record.status,
     };
 
     try {
-      await this.auditLogService.record(entry);
+      await this.attendanceReviewService.recordHistory(historyEntry);
     } catch (error) {
       // Redis là quyết định thật và không có transaction chung với Postgres.
       // Không hoàn tác quyết định; log đủ entry để có thể truy ngược thủ công.
       this.logger.error(
-        `Ghi audit review thất bại: ${JSON.stringify(entry)}`,
+        `Ghi history review thất bại: ${JSON.stringify(historyEntry)}`,
         error instanceof Error ? error.stack : String(error),
       );
     }
@@ -264,11 +339,7 @@ export class AttendanceCheckInService {
   }
 
   private throwForReviewMutationFailure(
-    result:
-      | 'record-missing'
-      | 'locked'
-      | 'not-requested'
-      | 'session-flushing',
+    result: 'record-missing' | 'locked' | 'not-requested' | 'session-flushing',
   ): void {
     if (result === 'locked') {
       throw new ConflictException({

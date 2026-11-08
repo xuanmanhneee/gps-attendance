@@ -11,8 +11,8 @@ import { AttemptCheck } from './checks/attempt.check';
 import { RedisAttendanceCheckInAttemptRepository } from './infra/redis/redis-attendance-checkin-attempt.repository';
 import { RedisModule } from '../redis/redis.module';
 import { UsersModule } from '../users/users.module';
-import { AuditLogModule } from '../audit-log/audit-log.module';
 import { LoggingModule } from '../common/logging/logging.module';
+import { AttendanceReviewModule } from '../attendance-review/attendance-review.module';
 
 @Module({
   imports: [
@@ -21,8 +21,8 @@ import { LoggingModule } from '../common/logging/logging.module';
     AttendanceRecordModule,
     RedisModule,
     UsersModule,
-    AuditLogModule,
     LoggingModule,
+    AttendanceReviewModule,
   ],
   providers: [
     AttendanceCheckInService,

@@ -4,7 +4,6 @@ import { IJobScheduler } from '#job-scheduler/job-scheduler.interface';
 import { JOB_SCHEDULER } from '#job-scheduler/job-scheduler.token';
 
 import { AttendanceRecord, MarkPresentInput } from './attendance-record.model';
-import { AttendanceReviewCandidate } from './attendance-review.model';
 import { LOGGER_FACTORY } from '../common/logging/logger.token';
 import { ILogger } from '../common/logging/logger.interface';
 import { ILoggerFactory } from '../common/logging/logger.factory';
@@ -121,24 +120,20 @@ export class AttendanceRecordsService {
     );
   }
 
-  resolveReview(
+  resolveReviewRecord(
     sessionId: number,
     userId: number,
     decision: 'approve' | 'reject',
     resolverId: number,
+    candidateCreatedAt: Date,
   ) {
-    return this.attendanceRecordBuffer.resolveReview(
+    return this.attendanceRecordBuffer.resolveReviewRecord(
       sessionId,
       userId,
       decision,
       resolverId,
+      candidateCreatedAt,
     );
-  }
-
-  async findReviewCandidatesBySession(
-    sessionId: number,
-  ): Promise<AttendanceReviewCandidate[]> {
-    return this.attendanceRecordBuffer.findReviewCandidates(sessionId);
   }
 
   // Đọc buffer trước (dữ liệu mới nhất khi session đang mở), fallback sang

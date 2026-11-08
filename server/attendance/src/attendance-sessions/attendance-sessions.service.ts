@@ -32,7 +32,8 @@ import {
   criteriaKeyFor,
   rosterInitializedKeyFor,
 } from './attendance-session-keys';
-import { REVIEW_RESOLUTION_WINDOW_MS } from '../attendance-record/attendance-review.constants';
+import { REVIEW_RESOLUTION_WINDOW_MS } from '../attendance-review/attendance-review.constants';
+import { AttendanceReviewService } from '../attendance-review/attendance-review.service';
 
 const ROSTER_INIT_BUFFER_MS = 5 * 60 * 1000;
 
@@ -58,6 +59,7 @@ export class AttendanceSessionsService {
     private readonly attendanceSessionRepository: IAttendanceSessionRepository,
     private readonly userFilterService: UserFilterService,
     private readonly attendanceRecordsService: AttendanceRecordsService,
+    private readonly attendanceReviewService: AttendanceReviewService,
     private readonly redisService: RedisService,
 
     @Inject(JOB_SCHEDULER)
@@ -226,11 +228,16 @@ export class AttendanceSessionsService {
       }
     }
     if (dto.closeAt) {
-      await this.reschedule(
-        'flush',
-        sessionId,
-        new Date(closeAt.getTime() + REVIEW_RESOLUTION_WINDOW_MS),
+      const reviewExpiresAt = new Date(
+        closeAt.getTime() + REVIEW_RESOLUTION_WINDOW_MS,
       );
+      await Promise.all([
+        this.reschedule('flush', sessionId, reviewExpiresAt),
+        this.attendanceReviewService.updateSessionExpiry(
+          sessionId,
+          reviewExpiresAt,
+        ),
+      ]);
     }
 
     return this.withComputedStatus(updated);
@@ -266,7 +273,10 @@ export class AttendanceSessionsService {
     await this.redisService.del(criteriaKeyFor(sessionId));
 
     if (wasOpen) {
-      await this.attendanceRecordsService.clearSessionBuffer(sessionId);
+      await Promise.all([
+        this.attendanceRecordsService.clearSessionBuffer(sessionId),
+        this.attendanceReviewService.clearSession(sessionId),
+      ]);
     }
 
     return { ...session, status: 'cancelled' };

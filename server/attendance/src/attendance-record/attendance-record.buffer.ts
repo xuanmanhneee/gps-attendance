@@ -1,25 +1,21 @@
 import { AttendanceRecord, MarkPresentInput } from './attendance-record.model';
-import { AttendanceReviewCandidate } from './attendance-review.model';
 
 export type MarkPresentResult =
   | 'present'
-  | 'review'
   | 'already-present'
   | 'locked'
   | 'device-used'
   | 'record-missing'
   | 'session-flushing';
 
-export type ResolveReviewResult =
+export type ResolveAttendanceReviewRecordResult =
   | {
       status: 'resolved';
       record: AttendanceRecord;
-      candidate: AttendanceReviewCandidate;
       previousStatus: AttendanceRecord['status'];
     }
   | {
-      status:
-        'record-missing' | 'locked' | 'not-requested' | 'session-flushing';
+      status: 'record-missing' | 'locked' | 'session-flushing';
     };
 
 export interface IAttendanceRecordBuffer {
@@ -41,13 +37,13 @@ export interface IAttendanceRecordBuffer {
     deviceId: string,
     deviceTtlSeconds: number,
   ): Promise<MarkPresentResult>;
-  resolveReview(
+  resolveReviewRecord(
     sessionId: number,
     userId: number,
     decision: 'approve' | 'reject',
     resolverId: number,
-  ): Promise<ResolveReviewResult>;
-  findReviewCandidates(sessionId: number): Promise<AttendanceReviewCandidate[]>;
+    candidateCreatedAt: Date,
+  ): Promise<ResolveAttendanceReviewRecordResult>;
   // Đóng quyền ghi và lấy snapshot trong cùng một thao tác nguyên tử.
   beginSessionFlush(sessionId: number): Promise<AttendanceRecord[]>;
   // Chỉ xoá buffer sau khi snapshot đã được lưu bền vững.

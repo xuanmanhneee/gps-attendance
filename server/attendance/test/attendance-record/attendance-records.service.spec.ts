@@ -41,8 +41,7 @@ describe('AttendanceRecordsService', () => {
       ),
       upsertRecord: jest.fn(),
       insertRecordIfAbsent: jest.fn(),
-      resolveReview: jest.fn(),
-      findReviewCandidates: jest.fn(),
+      resolveReviewRecord: jest.fn(),
       tryMarkPresentAndClaimDevice: jest.fn(async (input) => {
         if (sessionIsFlushing) return 'session-flushing';
         if (!bufferedRecord) return 'record-missing';
@@ -114,7 +113,6 @@ describe('AttendanceRecordsService', () => {
         longitude: 106,
         accuracy: 5,
         updateBy: 10,
-        validationStatus: 'VALID',
       },
       'device-10',
       3600,

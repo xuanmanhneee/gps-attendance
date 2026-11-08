@@ -2,7 +2,10 @@ import { AuditLogService } from '../../src/audit-log/audit-log.service';
 
 describe('AuditLogService', () => {
   it('cắt reason về tối đa 500 ký tự trước khi append', async () => {
-    const repository = { create: jest.fn().mockResolvedValue(undefined) };
+    const repository = {
+      create: jest.fn().mockResolvedValue(undefined),
+      find: jest.fn().mockResolvedValue([]),
+    };
     const service = new AuditLogService(repository);
 
     await service.record({

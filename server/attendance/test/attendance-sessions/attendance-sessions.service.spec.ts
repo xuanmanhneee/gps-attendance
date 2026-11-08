@@ -35,6 +35,7 @@ describe('AttendanceSessionsService', () => {
     initializeForSession: jest.Mock;
     clearSessionBuffer: jest.Mock;
   };
+  let reviews: { clearSession: jest.Mock; updateSessionExpiry: jest.Mock };
 
   // seed session với trạng thái mong muốn
   const seed = (openAt: Date, closeAt: Date) =>
@@ -82,11 +83,16 @@ describe('AttendanceSessionsService', () => {
       initializeForSession: jest.fn(),
       clearSessionBuffer: jest.fn(),
     };
+    reviews = {
+      clearSession: jest.fn(),
+      updateSessionExpiry: jest.fn(),
+    };
 
     service = new AttendanceSessionsService(
       repo,
       userFilter as never,
       records as never,
+      reviews as never,
       redis as never,
       scheduler as never,
       { create: () => ({ warn: jest.fn() }) } as never,
@@ -265,6 +271,10 @@ describe('AttendanceSessionsService', () => {
         new Date(newClose.getTime() + 10 * 60 * 1000),
         { sessionId: s.id },
         `flush:${s.id}`,
+      );
+      expect(reviews.updateSessionExpiry).toHaveBeenCalledWith(
+        s.id,
+        new Date(newClose.getTime() + 10 * 60 * 1000),
       );
       expect(scheduler.cancel).not.toHaveBeenCalledWith(`init-roster:${s.id}`);
     });

@@ -17,7 +17,10 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ResolveAttendanceReviewDto } from './attendance-review.dto';
-import type { AttendanceReviewCandidateResponse } from '@gps-attendance/shared';
+import type {
+  AttendanceReviewCandidateResponse,
+  AttendanceReviewHistoryResponse,
+} from '@gps-attendance/shared';
 
 @ApiTags('attendance')
 @Controller('v0/attendance')
@@ -39,6 +42,20 @@ export class AttendanceCheckInController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.attendanceCheckInService.checkIn(dto, user.userId);
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Liá»‡t kÃª lá»‹ch sá»­ review do organizer hiá»‡n táº¡i Ä‘Ã£ xá»­ lÃ½',
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('organizer')
+  @Get('reviews/history')
+  async listMyReviewHistory(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AttendanceReviewHistoryResponse[]> {
+    return this.attendanceCheckInService.listReviewHistory(user.userId);
   }
 
   @ApiBearerAuth()

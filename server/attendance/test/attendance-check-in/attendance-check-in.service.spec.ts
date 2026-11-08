@@ -1,7 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import {
   AttendanceReviewErrorCode,
   AttendanceSessionErrorCode,
@@ -10,6 +7,9 @@ import {
 import { AttendanceCheckInService } from '../../src/attendance-check-in/attendance-check-in.service';
 import { CheckInRequestDto } from '../../src/attendance-check-in/attendance-check-in.dto';
 import { InMemoryAttendanceRecordStore } from '../../src/attendance-record/infra/in-memory-attendance-record.repository';
+import { AttendanceReviewService } from '../../src/attendance-review/attendance-review.service';
+import { InMemoryAttendanceReviewRepository } from '../../src/attendance-review/infra/in-memory/in-memory-attendance-review.repository';
+import { InMemoryAttendanceReviewHistoryRepository } from '../../src/attendance-review/infra/in-memory/in-memory-attendance-review-history.repository';
 
 const session = {
   id: 1,
@@ -33,6 +33,7 @@ const requestFor = (deviceId: string): CheckInRequestDto => ({
 describe('AttendanceCheckInService concurrent requests', () => {
   let service: AttendanceCheckInService;
   let records: InMemoryAttendanceRecordStore;
+  let reviews: AttendanceReviewService;
 
   beforeEach(async () => {
     records = new InMemoryAttendanceRecordStore();
@@ -48,23 +49,46 @@ describe('AttendanceCheckInService concurrent requests', () => {
         updateBy: null,
       });
     }
+    const recordsService = {
+      getBySessionAndUser: (sessionId: number, userId: number) =>
+        records.getRecord(sessionId, userId),
+      markPresent: (
+        input: Parameters<
+          InMemoryAttendanceRecordStore['tryMarkPresentAndClaimDevice']
+        >[0],
+        deviceId: string,
+        ttl: number,
+      ) => records.tryMarkPresentAndClaimDevice(input, deviceId, ttl),
+      resolveReviewRecord: (
+        sessionId: number,
+        userId: number,
+        decision: 'approve' | 'reject',
+        resolverId: number,
+        candidateCreatedAt: Date,
+      ) =>
+        records.resolveReviewRecord(
+          sessionId,
+          userId,
+          decision,
+          resolverId,
+          candidateCreatedAt,
+        ),
+    };
+    reviews = new AttendanceReviewService(
+      new InMemoryAttendanceReviewRepository(),
+      new InMemoryAttendanceReviewHistoryRepository(),
+      recordsService as never,
+    );
     service = new AttendanceCheckInService(
-      { findById: jest.fn().mockResolvedValue(session) } as never,
-      { validate: jest.fn().mockReturnValue({ status: 'VALID' }) } as never,
       {
-        getBySessionAndUser: (sessionId: number, userId: number) =>
-          records.getRecord(sessionId, userId),
-        markPresent: (
-          input: Parameters<
-            InMemoryAttendanceRecordStore['tryMarkPresentAndClaimDevice']
-          >[0],
-          deviceId: string,
-          ttl: number,
-        ) => records.tryMarkPresentAndClaimDevice(input, deviceId, ttl),
+        findById: jest.fn().mockResolvedValue(session),
+        findByIds: jest.fn().mockResolvedValue([]),
       } as never,
+      { validate: jest.fn().mockReturnValue({ status: 'VALID' }) } as never,
+      recordsService as never,
+      reviews,
       { evaluate: jest.fn().mockResolvedValue({ isTooMany: false }) } as never,
       { findByIds: jest.fn().mockResolvedValue([]) } as never,
-      { record: jest.fn() } as never,
       {
         create: jest.fn().mockReturnValue({
           log: jest.fn(),
@@ -140,7 +164,7 @@ describe('AttendanceCheckInService concurrent requests', () => {
       status: 'absent',
       updateBy: null,
     });
-    expect(await records.findReviewCandidates(1)).toEqual([
+    expect(await reviews.findBySession(1)).toEqual([
       expect.objectContaining({
         userId: 1,
         reasons: ['LOW_CONFIDENCE_SCORE'],
@@ -155,6 +179,11 @@ describe('AttendanceCheckInService concurrent requests', () => {
     ).resolves.toEqual({
       status: 'VALID',
     });
+
+    await expect(service.checkIn(requestFor('device-1'), 1)).resolves.toEqual({
+      status: 'VALID',
+    });
+    expect(await reviews.findBySession(1)).toHaveLength(0);
   });
 
   it('không ghi buffer khi validation trả REJECTED', async () => {
@@ -170,4 +199,59 @@ describe('AttendanceCheckInService concurrent requests', () => {
     expect(await records.getRecord(1, 1)).toMatchObject({ status: 'absent' });
   });
 
+  it('chỉ trả lịch sử review thuộc organizer hiện tại', async () => {
+    jest.spyOn(reviews, 'findHistoryByResolver').mockResolvedValue([
+      {
+        id: '9',
+        sessionId: 7,
+        userId: 2,
+        resolverId: 10,
+        decision: 'approve',
+        reasons: ['OUT_OF_RANGE'],
+        reason: 'Đã xác minh trực tiếp',
+        previousStatus: 'absent',
+        resolvedStatus: 'present',
+        resolvedAt: new Date('2026-11-07T10:00:00.000Z'),
+      },
+      {
+        id: '10',
+        sessionId: 8,
+        userId: 2,
+        resolverId: 10,
+        decision: 'reject',
+        reasons: ['MOCK_LOCATION'],
+        previousStatus: 'absent',
+        resolvedStatus: 'absent',
+        resolvedAt: new Date('2026-11-07T11:00:00.000Z'),
+      },
+    ]);
+    (service as any).attendanceSessionsService.findByIds.mockResolvedValue([
+      { id: 7, title: 'Phiên của tôi', createdBy: 10 },
+      { id: 8, title: 'Phiên người khác', createdBy: 11 },
+    ]);
+    (service as any).usersService.findByIds.mockResolvedValue([
+      {
+        id: 2,
+        code: 'PAR0002',
+        fullname: 'Trần Minh Anh',
+        role: 'participant',
+      },
+    ]);
+
+    await expect(service.listReviewHistory(10)).resolves.toEqual([
+      {
+        id: '9',
+        session: { id: 7, title: 'Phiên của tôi' },
+        student: {
+          code: 'PAR0002',
+          fullname: 'Trần Minh Anh',
+          role: 'participant',
+        },
+        decision: 'approve',
+        reasons: ['OUT_OF_RANGE'],
+        reason: 'Đã xác minh trực tiếp',
+        resolvedAt: '2026-11-07T10:00:00.000Z',
+      },
+    ]);
+  });
 });

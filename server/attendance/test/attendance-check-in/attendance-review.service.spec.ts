@@ -1,7 +1,7 @@
 import { AttendanceCheckInService } from '../../src/attendance-check-in/attendance-check-in.service';
 
-describe('AttendanceCheckInService review resolution audit', () => {
-  it('giữ quyết định thành công khi ghi audit lỗi và log đủ entry', async () => {
+describe('AttendanceCheckInService review resolution history', () => {
+  it('giữ quyết định thành công khi ghi history lỗi và log đủ entry', async () => {
     const logger = {
       log: jest.fn(),
       warn: jest.fn(),
@@ -9,8 +9,26 @@ describe('AttendanceCheckInService review resolution audit', () => {
       debug: jest.fn(),
       verbose: jest.fn(),
     };
-    const audit = { record: jest.fn().mockRejectedValue(new Error('db down')) };
     const now = Date.now();
+    const reviewService = {
+      resolveReview: jest.fn().mockResolvedValue({
+        status: 'resolved',
+        previousStatus: 'absent',
+        record: {
+          sessionId: 1,
+          userId: 2,
+          status: 'present',
+          updateBy: 99,
+        },
+        candidate: {
+          sessionId: 1,
+          userId: 2,
+          reasons: ['LOW_CONFIDENCE_SCORE'],
+          createdAt: new Date(now),
+        },
+      }),
+      recordHistory: jest.fn().mockRejectedValue(new Error('db down')),
+    };
     const service = new AttendanceCheckInService(
       {
         findById: jest.fn().mockResolvedValue({
@@ -22,45 +40,29 @@ describe('AttendanceCheckInService review resolution audit', () => {
         }),
       } as never,
       {} as never,
-      {
-        resolveReview: jest.fn().mockResolvedValue({
-          status: 'resolved',
-          previousStatus: 'absent',
-          record: {
-            sessionId: 1,
-            userId: 2,
-            status: 'present',
-            updateBy: 99,
-          },
-          candidate: {
-            sessionId: 1,
-            userId: 2,
-            reasons: ['LOW_CONFIDENCE_SCORE'],
-            createdAt: new Date(now),
-          },
-        }),
-      } as never,
+      {} as never,
+      reviewService as never,
       {} as never,
       {} as never,
-      audit as never,
       { create: () => logger } as never,
     );
 
     await expect(
       service.resolveReview(1, 2, 'approve', 99, 'Đã xác nhận'),
     ).resolves.toBeUndefined();
-    expect(audit.record).toHaveBeenCalledWith(
+    expect(reviewService.recordHistory).toHaveBeenCalledWith(
       expect.objectContaining({
-        entityId: '1:2',
-        oldValue: { status: 'absent' },
-        newValue: { status: 'present' },
-        metadata: {
-          reasons: ['LOW_CONFIDENCE_SCORE'],
-        },
+        sessionId: 1,
+        userId: 2,
+        resolverId: 99,
+        decision: 'approve',
+        reasons: ['LOW_CONFIDENCE_SCORE'],
+        previousStatus: 'absent',
+        resolvedStatus: 'present',
       }),
     );
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('"entityId":"1:2"'),
+      expect.stringContaining('"sessionId":1'),
       expect.any(String),
     );
   });
