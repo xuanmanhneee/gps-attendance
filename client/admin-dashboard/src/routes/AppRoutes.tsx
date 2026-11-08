@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { DashboardLayout } from '../components/layout/DashboardLayout';
@@ -6,9 +7,7 @@ import AttendanceReviewsPage from '../pages/AttendanceReviewsPage';
 import DashboardPage from '../pages/DashboardPage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
-import SessionCreatePage from '../pages/SessionCreatePage';
 import SessionDetailPage from '../pages/SessionDetailPage';
-import SessionEditPage from '../pages/SessionEditPage';
 import SessionsPage from '../pages/SessionsPage';
 import StatisticsPage from '../pages/StatisticsPage';
 import TagsPage from '../pages/TagsPage';
@@ -19,6 +18,9 @@ import { useAuth } from '../hooks/useAuth';
 import ProtectedRoute from './ProtectedRoute';
 import { RoleGuard } from './RoleGuard';
 import { ROUTE_PATHS } from './paths';
+
+const SessionCreatePage = lazy(() => import('../pages/SessionCreatePage'));
+const SessionEditPage = lazy(() => import('../pages/SessionEditPage'));
 
 /** `/` đưa người dùng tới trang chủ của vai trò nếu đã đăng nhập, ngược lại về login. */
 const LandingRedirect = () => {
@@ -87,11 +89,19 @@ const AppRoutes = () => (
           />
           <Route
             path={ROUTE_PATHS.attendanceSessionCreate}
-            element={<SessionCreatePage />}
+            element={
+              <Suspense fallback={<LoadingState />}>
+                <SessionCreatePage />
+              </Suspense>
+            }
           />
           <Route
             path={ROUTE_PATHS.attendanceSessionEdit}
-            element={<SessionEditPage />}
+            element={
+              <Suspense fallback={<LoadingState />}>
+                <SessionEditPage />
+              </Suspense>
+            }
           />
         </Route>
 

@@ -62,7 +62,7 @@ export const toLocalDateTimeInput = (date: Date): string => {
 };
 
 /**
- * Giá trị mặc định cho mỗi lần mở modal: phiên mở ở thời điểm hiện tại và đóng
+ * Giá trị mặc định cho form tạo phiên: phiên mở ở thời điểm hiện tại và đóng
  * sau 2 giờ. Tính tại thời điểm mount nên không bị "cũ" như defaultValues giữ
  * trong state.
  */

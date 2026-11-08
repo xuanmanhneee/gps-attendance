@@ -28,8 +28,9 @@ export type NavigationItem = {
 /**
  * Menu theo vai trò.
  *
- * `path` đồng thời là route được phép truy cập, nên menu và route không thể
- * lệch nhau. Route con (vd `/sessions/:id`) kế thừa quyền của route cha.
+ * Quyền truy cập thật do RoleGuard trong AppRoutes.tsx quyết định.
+ * `roles` ở đây chỉ quyết định việc hiển thị mục trên menu sidebar,
+ * hai nơi phải luôn được giữ khớp nhau.
  */
 export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
   {
@@ -64,7 +65,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'navigation.attendanceSessions',
     descriptionKey: 'sessions.page.description',
     path: ROUTE_PATHS.attendanceSessions,
-    roles: ['organizer'],
+    roles: ['admin', 'organizer'],
   },
   {
     id: 'attendanceReviews',
@@ -116,14 +117,3 @@ export const findNavigationItem = (
   pathname: string,
 ): NavigationItem | undefined =>
   NAVIGATION_ITEMS.find((item) => isNavigationItemActive(item.path, pathname));
-
-export const isKnownPath = (pathname: string): boolean =>
-  findNavigationItem(pathname) !== undefined;
-
-export const isPathAllowedForRole = (
-  pathname: string,
-  role: UserRole,
-): boolean =>
-  getNavigationForRole(role).some((item) =>
-    isNavigationItemActive(item.path, pathname),
-  );

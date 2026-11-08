@@ -66,6 +66,10 @@ export const en: Record<TranslationKey, string> = {
   'common.locale.vi': 'Vietnamese',
   'common.locale.en': 'English',
   'common.cancel': 'Cancel',
+  'common.errorBoundaryTitle': 'Something went wrong rendering this page',
+  'common.errorBoundaryBody':
+    'The system encountered an unexpected error while rendering. You can reload the page to try again.',
+  'common.reloadPage': 'Reload',
 
   // ---- Topbar ----
   'topbar.context.admin': 'Operations centre',
@@ -212,7 +216,7 @@ export const en: Record<TranslationKey, string> = {
 
   // ---- Attendance sessions ----
   'sessions.page.description':
-    'Manage the GPS attendance sessions you created and track their status.',
+    'Manage and track GPS attendance sessions.',
   'sessions.total': '{count} attendance sessions',
   'sessions.filter.label': 'Filter by organizer',
   'sessions.filter.allOrganizers': 'All organizers',
@@ -547,4 +551,34 @@ export const en: Record<TranslationKey, string> = {
   'attendanceReview.history.resolvedAt': 'Resolved at',
   'attendanceReview.history.approved': 'Approved',
   'attendanceReview.history.rejected': 'Rejected',
+
+  // ---- Đăng nhập ----
+  'login.title': 'GPS Attendance System',
+  'login.heading': 'Sign in to your account',
+  'login.subtitle': 'Welcome back! Please enter your details.',
+  'login.username.label': 'Username',
+  'login.username.placeholder': 'Enter username or student ID',
+  'login.username.required': 'Please enter username or student ID',
+  'login.password.label': 'Password',
+  'login.password.required': 'Please enter password',
+  'login.password.show': 'Show password',
+  'login.password.hide': 'Hide password',
+  'login.rememberMe': 'Remember this device',
+  'login.forgotPassword': 'Forgot password?',
+  'login.forgotPasswordHint':
+    'Please contact the administrator to reset your password.',
+  'login.submit': 'Sign in',
+  'login.submitting': 'Signing in...',
+  'login.success': 'Signed in successfully!',
+  'login.footer': 'GPS Attendance System',
+  'login.theme.light': 'Light mode',
+  'login.theme.dark': 'Dark mode',
+  'login.theme.toggleToLight': 'Switch to light mode',
+  'login.theme.toggleToDark': 'Switch to dark mode',
+  'login.theme.titleLight': 'Switch to light appearance',
+  'login.theme.titleDark': 'Switch to dark appearance',
+  'login.error.invalidCredentials': 'Invalid username or password',
+  'login.error.accountNotLinked': 'Account not linked',
+  'login.error.roleNotAllowed': 'You do not have permission to access',
+  'login.error.generic': 'Sign in failed',
 } as const;

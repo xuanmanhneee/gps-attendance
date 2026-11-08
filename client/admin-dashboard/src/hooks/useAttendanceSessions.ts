@@ -3,16 +3,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AttendanceSessionResponse } from '@gps-attendance/shared';
 
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
-import {
-  isAttendanceSession,
-  parseAttendanceSessionList,
-} from '../types/attendance-session';
-import type { CreateSessionFormData } from '../types/attendance-session';
+import { parseAttendanceSessionList } from '../types/attendance-session';
 import { createLoadTracker } from '../utils/attendance-sessions/session-filter';
-import {
-  applySessionCreated,
-  toError,
-} from '../utils/attendance-sessions/session-list';
+import { toError } from '../utils/attendance-sessions/session-list';
 
 /**
  * `all` — toàn bộ phiên (route admin, mặc định).
@@ -43,8 +36,6 @@ export const useAttendanceSessions = (
   const [sessions, setSessions] = useState<AttendanceSessionResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const createInFlightRef = useRef<Promise<void> | null>(null);
   /** Chỉ request mới nhất được phép ghi state (chặn stale response). */
   const loadTrackerRef = useRef(createLoadTracker());
   /** Nhận diện phạm vi hiện tại để xoá dữ liệu cũ khi đổi scope/organizer. */
@@ -160,49 +151,12 @@ export const useAttendanceSessions = (
     void reload(false);
   }, [reload, enabled]);
 
-  const createSession = useCallback(
-    async (data: CreateSessionFormData): Promise<void> => {
-      // Chặn submit lặp: nếu request đang chạy thì dùng lại chính request đó
-      // thay vì POST thêm một phiên trùng.
-      const inFlight = createInFlightRef.current;
-
-      if (inFlight) return inFlight;
-
-      const request = (async () => {
-        setIsCreating(true);
-
-        try {
-          const created: unknown = await attendanceSessionsApi.create(data);
-
-          if (!isAttendanceSession(created)) {
-            throw new Error('Unexpected attendance session response');
-          }
-
-          setSessions((previous) => applySessionCreated(previous, created));
-        } finally {
-          setIsCreating(false);
-        }
-      })();
-
-      createInFlightRef.current = request;
-
-      try {
-        await request;
-      } finally {
-        createInFlightRef.current = null;
-      }
-    },
-    [],
-  );
-
   return {
     sessions,
     // Bộ lọc chưa hợp lệ thì coi như không loading: suy ra từ `enabled` thay vì
     // setState trong effect.
     isLoading: enabled ? isLoading : false,
     error,
-    isCreating,
-    createSession,
     reload,
   };
 };

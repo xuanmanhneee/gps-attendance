@@ -50,8 +50,9 @@ pnpm --filter @gps-attendance/admin-dashboard test
 
 - Không có state library (Redux/Zustand/TanStack Query…). Dữ liệu server được giữ bằng `useState`
   trong từng hook, kèm các guard chống race viết tay (xem mục 6).
-- Không có `ErrorBoundary`, không dùng `React.lazy`/`Suspense`; mọi page nằm trong bundle chính
-  (kể cả Leaflet). Xem mức P1 ở mục 8.
+- Đã có `ErrorBoundary` bọc `<Outlet />` trong `DashboardLayout` (kèm nút tải lại, reset theo `pathname`),
+  `SessionCreatePage` và `SessionEditPage` được lazy load bằng `React.lazy` + `Suspense` (Leaflet tách
+  thành chunk riêng ~163 kB). Xem mức P1 ở mục 8.
 - Backend là nơi quyết định quyền thật; guard phía client chỉ để UX (xem mục 5).
 
 ## 2. Kiến trúc tầng và luồng dữ liệu
@@ -115,7 +116,7 @@ Quy ước "state injection" đáng chú ý: `UnitsPage` truyền `unitsState = 
 | Route constants | `src/routes/paths.ts` | `ROUTE_PATHS` — nguồn duy nhất của chuỗi route (không hard-code rải rác) + `buildSessionDetailPath(id)` |
 | Auth gate | `src/routes/ProtectedRoute.tsx` | `isLoading` → `LoadingState` toàn màn hình; chưa có user → `Navigate('/login')` |
 | Role gate | `src/routes/RoleGuard.tsx` | Nhận `allowedRoles`; role không nằm trong danh sách → `Navigate(DEFAULT_ROUTE_BY_ROLE[role])` (hiện cả hai role đều về `/dashboard`) |
-| Nav config | `src/config/navigation.ts` | `NAVIGATION_ITEMS` (id, `labelKey`, `descriptionKey`, `path`, `roles`), `getNavigationForRole`, `isNavigationItemActive`, `findNavigationItem`, `DEFAULT_ROUTE_BY_ROLE`, `NAVIGATION_GROUP_LABEL_KEYS`. `isKnownPath` / `isPathAllowedForRole` hiện **không ai dùng** (xem mục 8) |
+| Nav config | `src/config/navigation.ts` | `NAVIGATION_ITEMS` (id, `labelKey`, `descriptionKey`, `path`, `roles`), `getNavigationForRole`, `isNavigationItemActive`, `findNavigationItem`, `DEFAULT_ROUTE_BY_ROLE`, `NAVIGATION_GROUP_LABEL_KEYS`. Hai hàm thừa `isKnownPath` / `isPathAllowedForRole` đã xoá ở P04-07.1 |
 | Session status config | `src/config/session-status.ts` | `SESSION_STATUS_ORDER` (open → pending → closed), `SESSION_STATUS_LABEL_KEYS`, `SESSION_STATUS_DOT_CLASS` (màu chỉ là lớp nhấn, nhãn chữ mới là nguồn thông tin) |
 | Attendance status config | `src/config/attendance-status.ts` | Label key + tone class cho trạng thái participant (`present/absent/late/excused`) và `PARTICIPANT_ROLE_LABEL_KEYS` |
 | Design token / CSS toàn cục | `src/index.css` | Token trong `@theme` (font, màu `oklch`, `--shadow-panel`) sinh utility `bg-surface`, `text-ink`…; dark theme ghi đè cùng bộ token trong `[data-theme='dark']`; `@layer base` cho `body`, `:focus-visible`, heading; fix `.leaflet-container img { max-width: none }` cho preflight Tailwind |
@@ -218,7 +219,7 @@ Nhóm này là "hợp đồng hình thức" của dashboard: chỉ nhận props 
 | Xác thực | `hooks/useAuth.ts` | `useContext(AuthContext)`, throw nếu dùng ngoài `AuthProvider` |
 | Vai trò | `hooks/useRole.ts` | `resolveUserRole(user?.role)` — read-only, không giữ state nên refresh không thể tạo role giả |
 | i18n / locale / theme | `hooks/useTranslation.ts`, `hooks/useLocale.ts`, `hooks/useTheme.ts` | Context hook tương ứng, đều throw khi thiếu provider |
-| Phiên điểm danh | `hooks/useAttendanceSessions.ts` | Hook phức tạp nhất: 3 scope `all` / `created-by-me` / `created-by`, option `enabled` (lọc chưa hợp lệ thì **không gọi API**, `isLoading` suy ra từ `enabled`), `createLoadTracker` chặn stale response, `scopeKeyRef` xoá dữ liệu khi đổi phạm vi, `parseAttendanceSessionList` kiểm shape trước khi ghi state. Có `createSession`/`isCreating` nhưng hiện **không nơi nào dùng** (xem mục 8) |
+| Phiên điểm danh | `hooks/useAttendanceSessions.ts` | Hook phức tạp nhất: 3 scope `all` / `created-by-me` / `created-by`, option `enabled` (lọc chưa hợp lệ thì **không gọi API**, `isLoading` suy ra từ `enabled`), `createLoadTracker` chặn stale response, `scopeKeyRef` xoá dữ liệu khi đổi phạm vi, `parseAttendanceSessionList` kiểm shape trước khi ghi state. Các biến/hàm chết `createSession`/`isCreating`/`createInFlightRef` đã xoá ở P04-07.6 (hook chuyên tâm đọc danh sách) |
 | Tags | `hooks/useTags.ts` | `reload` (tải đầu/tải tay: lỗi ⇒ danh sách rỗng + `error`) tách khỏi `refresh` (sau mutation: lỗi ⇒ giữ danh sách cũ + `refreshError`), mutation qua `runTagMutation` |
 | Gán user cho tag | `hooks/useTagAssignment.ts` | `selectedTag`, `assignedUserIds`, `directory` + `directoryError`, `pendingUserIds`; race guard bằng `createRequestScope` (`isCurrent(token)` trước mọi commit), `normalizeDirectory` tự chuẩn hoá payload thừa field |
 | Đơn vị | `hooks/useUnits.ts` | Danh sách và cây có `isLoading`/`error` **riêng** để UI không báo "thành công giả" khi một trong hai nguồn còn tải/lỗi; `createUnit`/`updateUnit` chỉ success khi response có `id` hợp lệ rồi reload cả list + tree |
@@ -233,7 +234,7 @@ Nhóm này là "hợp đồng hình thức" của dashboard: chỉ nhận props 
 | Users | `api/users.api.ts` | `GET /v0/users/me` (khôi phục phiên), `GET /v0/users` (directory cho dropdown organizer + panel gán tag) |
 | Attendance sessions | `api/attendance-sessions.api.ts` | `create`, `getAll`, `getCreatedByMe` (backend yêu cầu role organizer), `getCreatedBy(userId)` (backend yêu cầu role admin), `getDetail`; `assertSessionId` chặn id không hợp lệ trước khi ghép URL |
 | Tags | `api/tags.api.ts` | `getAll`/`create`/`remove` + `getAssignedUserIds`/`assignUser`/`unassignUser`; validate name (`validateTagName`) và id; **không có update** vì backend chưa expose `PATCH /tags/:id` |
-| Units | `api/units.api.ts` | `getAll`, `getTree`, `getById` (hiện chưa dùng), `create`, `update`. `update` dùng hàm `patchUnit` tự viết bằng `fetch` vì `httpClient` của shared chưa expose `patch` — có comment giải thích, và giữ nguyên shape `{ success, data }` + `ApiError` |
+| Units | `api/units.api.ts` | `getAll`, `getTree`, `create`, `update`. `unitsApi.getById` đã xoá ở P04-07.6 vì không dùng. `update` dùng hàm `patchUnit` tự viết bằng `fetch` vì `httpClient` của shared chưa expose `patch` — có comment giải thích, và giữ nguyên shape `{ success, data }` + `ApiError` |
 
 ### 3.8 Types, utils, i18n, services, context
 
@@ -391,15 +392,13 @@ state riêng, không lưu localStorage, nên không thể tồn tại "role gi�
 | `/users` | `admin` | `['admin']` | khớp |
 | `/units` | `admin` | `['admin']` | khớp |
 | `/tags` | `admin` | `['admin']` | khớp |
-| `/sessions` | **`organizer`** | `['admin','organizer']` | admin vào được bằng URL nhưng **không có mục menu** ⇒ `AdminSessionsView` (bộ lọc theo organizer) không thể mở từ UI |
+| `/sessions` | `admin`, `organizer` | `['admin','organizer']` | khớp; admin mở `AdminSessionsView` (bộ lọc theo organizer), organizer mở `OrganizerSessionsView` (P04-07.1) |
 | `/attendance-records` | `admin`, `organizer` | `['admin','organizer']` | khớp; organizer chỉ đọc phiên do mình tạo (backend kiểm tra ownership) |
-| `/statistics` | **`organizer`** | `['admin','organizer']` | như trên |
+| `/statistics` | **`organizer`** | `['admin','organizer']` | menu chỉ cho organizer (trang placeholder); admin có thể vào bằng URL nếu cần |
 | `/sessions/new` | không có mục menu (đi từ CTA "Tạo phiên") | `['organizer']` | khớp |
 | `/sessions/:id` | không có mục menu (đi từ bảng phiên) | `['admin','organizer']` | khớp |
 
-Hai nguồn quyền này (`NAVIGATION_ITEMS[].roles` và `RoleGuard allowedRoles`) là hai khai báo độc lập,
-nên có thể lệch nhau — comment trong `config/navigation.ts` ("menu và route không thể lệch nhau") hiện
-không còn đúng. Chi tiết và đề xuất ở mục 8 (P1).
+Menu và route đã được đối chiếu và đồng bộ ở P04-07.1: `/sessions` đã thêm role `admin` vào `NAVIGATION_ITEMS`, hai hàm dead code `isKnownPath` và `isPathAllowedForRole` đã xoá khỏi `config/navigation.ts`, và comment giải thích vai trò của `RoleGuard` ở tầng route đã được làm rõ.
 
 ## 6. Các mẫu thiết kế đáng học
 
@@ -407,7 +406,7 @@ không còn đúng. Chi tiết và đề xuất ở mục 8 (P1).
 
 Mọi quy tắc nghiệp vụ phức tạp nằm trong `utils/` hoặc file `*.utils.ts`, không import React, nên test
 được bằng `node:test` + `--experimental-strip-types` (không cần jsdom, không cần thư viện test).
-16 file test / 115 test case hiện có phủ: form tạo phiên, bộ lọc phiên, trạng thái danh sách, bản ghi
+120 test case / 44 test suite hiện có phủ: form tạo phiên, bộ lọc phiên, trạng thái danh sách, bản ghi
 điểm danh, tag, pending assignment, request scope, focus trap, shape guard của type, config trạng thái.
 
 Ví dụ điển hình: `resolveTabTrapIndex` (focus trap) và `resolveSessionListState` (chọn state hiển thị)
@@ -513,48 +512,24 @@ bằng cách truyền state giả. `onToastSuccess` cũng là callback từ page
 - Lưu ý: file này cũng là nơi duy nhất còn hard-code vài chuỗi CSS màu (`hover:bg-[oklch(45%_0.17_220)]`)
   trong khi phần còn lại dùng token; khi tách file có thể thay bằng token tương ứng.
 
-**P1.2 Hai nguồn quyền có thể lệch nhau: menu (`NAVIGATION_ITEMS[].roles`) vs route (`RoleGuard`).**
+**P1.2 [ĐÃ XONG — P04-07.1] Hai nguồn quyền đã được đồng bộ: menu (`NAVIGATION_ITEMS[].roles`) vs route (`RoleGuard`).**
 
-Bằng chứng (đã kiểm tra bằng tìm kiếm trong `src/`):
+- Đã thêm role `'admin'` vào mục `/sessions` trong `NAVIGATION_ITEMS` (`config/navigation.ts`) để admin mở được `AdminSessionsView` (bộ lọc theo organizer) trực tiếp từ sidebar menu.
+- `/statistics` giữ nguyên menu chỉ cho `organizer` vì hiện tại vẫn là `PlaceholderPage`.
+- Đã xoá hai hàm dead code `isKnownPath` và `isPathAllowedForRole` trong `config/navigation.ts`.
+- Đã cập nhật comment trong `config/navigation.ts` để làm rõ vai trò bảo vệ route của `RoleGuard`.
 
-- `config/navigation.ts` vẫn khai `/sessions`, `/statistics` là `['organizer']`, trong khi
-  `AppRoutes.tsx` cho cả `admin` và `organizer` vào hai route này. `/attendance-records` đã dùng chung
-  `['admin','organizer']` ở menu và route.
-- Hệ quả 1: `SessionsPage.AdminSessionsView` (bộ lọc theo organizer) **không thể mở từ menu** vì admin
-  không có mục "Phiên điểm danh"; muốn dùng phải gõ URL `/sessions`.
-- Hệ quả 2: `/statistics` hiện `PlaceholderPage` cho admin qua URL, nhưng admin không biết là có trang đó.
-- Hệ quả 3: `isPathAllowedForRole` và `isKnownPath` trong `config/navigation.ts` **không có nơi nào dùng**
-  (dead code) trong khi chúng chính là thứ sẽ gom hai nguồn quyền về một chỗ.
-- Comment trong `config/navigation.ts` ("`path` đồng thời là route được phép truy cập, nên menu và route
-  không thể lệch nhau") đã không còn đúng ⇒ dễ khiến người sau tin sai.
-- Đề xuất (theo hướng nhỏ → lớn): (a) sửa `NAVIGATION_ITEMS[].roles` cho đúng ý định sản phẩm rồi để
-  route lấy từ config; (b) hoặc gom về một nguồn: tạo map `path → allowedRoles` và cho `AppRoutes` +
-  `SidebarNav` cùng đọc nó, xoá helper đang chết. Nên chọn (a) nếu muốn giữ thay đổi nhỏ.
+**P1.3 [ĐÃ XONG — P04-07.2, P04-07.3] `pages/LoginPage.tsx` đã chuẩn hoá theo design system và dọn code chết.**
 
-**P1.3 `pages/LoginPage.tsx` lệch khỏi design system và còn code chết.**
+- Đã refactor toàn bộ sang token màu hệ thống (`bg-surface`, `text-ink`, `accent-strong`, border, input, panel) theo theme xanh đồng bộ với dashboard.
+- Toàn bộ chuỗi giao diện và thông báo lỗi API đi qua `t()` (hỗ trợ đầy đủ `vi` và `en`, map từ `AuthErrorCode`).
+- Đã xoá nút Google chết (không có handler) và bỏ nhận diện riêng của trường ĐH Đà Lạt (DLU), chuyển thành giao diện chuẩn đăng nhập hệ thống điểm danh GPS.
 
-- Hard-code màu/khung ngoài token: `bg-black`, `bg-gray-800`, `bg-green-600`, `text-[#ddd]`,
-  `shadow-slate-500` — không dùng `bg-surface`/`text-ink`/`accent-strong` như phần còn lại, nên login
-  không đổi theo theme và trông như một app khác.
-- Chuỗi tiếng Việt hard-code (`'Sai username hoặc password'`, `'Đăng nhập thành công!'`,
-  `'Đang đăng nhập...'`, label `Username`/`Password`, `Or`) thay vì đi qua `t()` ⇒ trang login không
-  dịch được dù đã có `en.ts`.
-- Nút Google là **control chết**: có `<img src="/google-icon.png">` nhưng không có `onClick`, không có
-  handler, không có i18n/aria-label ⇒ người dùng bấm không có gì xảy ra.
-- Không dùng `PageHeading`/`Panel`/`PrimaryButton` như các page khác.
-- Đề xuất: đưa page về đúng hệ thống (token + `t()` + UI kit), xoá nút Google nếu chưa có luồng OAuth
-  (kể cả `public/google-icon.png`), và chuyển map `AuthErrorCode → message` vào i18n key như
-  `session-errors.ts`/`tag-errors.ts` đang làm.
+**P1.4 [ĐÃ XONG — P04-07.4, P04-07.5, P04-07.5b] Đã có `ErrorBoundary` và code-splitting (lazy load).**
 
-**P1.4 Không có `ErrorBoundary` và không code-split.**
-
-- Tìm trong `src/` không có `ErrorBoundary`/`componentDidCatch` (0 kết quả) và không có
-  `React.lazy`/`Suspense` (0 kết quả) ⇒ một lỗi render ở bất kỳ page nào làm trắng toàn app, và
-  **Leaflet + react-leaflet** (`SessionLocationMap`, dùng ở đúng một page) nằm trong bundle chính.
-- Đề xuất tối thiểu: thêm một `ErrorBoundary` bọc `<Outlet />` trong `DashboardLayout` (kèm nút "Tải
-  lại"), và `React.lazy` cho `SessionCreatePage` — vì route này đã có `RoleGuard ['organizer']` nên
-  admin không bao giờ tải map, tách ra là lợi rõ ràng và chỉ tốn một `Suspense` với `LoadingState`.
-- Lưu ý: sau khi tách lazy, kiểm tra lại `build` để chắc chunk Leaflet không lọt vào entry.
+- Đã có `ErrorBoundary` bọc `<Outlet />` trong `DashboardLayout` kèm fallback UI chuẩn token hệ thống và nút tải lại, tự động reset theo `pathname` (`resetKey={location.pathname}`).
+- Đã tách code-split (`React.lazy` + `Suspense`) cho cả `SessionCreatePage` và `SessionEditPage` trong `AppRoutes.tsx`.
+- Thư viện Leaflet / `SessionLocationPickerModal` đã được Rollup tách hẳn thành chunk riêng (`SessionLocationPickerModal-*.js` ~163 kB), giảm kích thước entry chunk chính (`index-*.js`) từ 631 kB xuống 459 kB, đảm bảo admin không tải trước Leaflet khi không vào trang tạo/sửa phiên.
 
 ### P2 — nên làm khi có thời gian (chất lượng code)
 
@@ -583,7 +558,7 @@ một kiểu: `createLoadTracker`, `loadIdRef`, `scopeKeyRef`, `createRequestSco
 
 **P2.3 Test chỉ phủ tầng logic thuần (0 component test).**
 
-- 115 test case đều ở `utils/`, `types/`, `config/`, `*.utils.ts` — không có test cho component/page.
+- 120 test case / 44 test suite đều ở `utils/`, `types/`, `config/`, `*.utils.ts` — không có test cho component/page.
   Đây là **đánh đổi có chủ đích** (không cần jsdom) và phù hợp đồ án, nhưng nghĩa là các quy tắc chỉ tồn
   tại trong JSX (disable control khi pending, thứ tự focus, banner stale, wizard step) không được
   kiểm chứng tự động.
@@ -595,13 +570,13 @@ một kiểu: `createLoadTracker`, `loadIdRef`, `scopeKeyRef`, `createRequestSco
 
 | Vấn đề | Bằng chứng | Đề xuất |
 |---|---|---|
-| `createSession`/`isCreating` không dùng | `hooks/useAttendanceSessions.ts` (khai báo + return) nhưng `SessionCreatePage` gọi thẳng `attendanceSessionsApi.create` | Xoá khỏi hook để hook chỉ còn một việc là đọc danh sách |
-| i18n key chết `sessions.form.close` | chỉ còn `i18n/translations/vi.ts`, `en.ts` | Xoá ở cả hai dictionary (di sản của modal tạo phiên cũ) |
-| Comment đã cũ nói về "modal" | `types/attendance-session.ts` (khối `CreateSessionFormData`) trong khi UI hiện là trang `/sessions/new` | Sửa comment |
-| `unitsApi.getById` không dùng | chỉ định nghĩa trong `api/units.api.ts` | Xoá, hoặc giữ nếu sắp có màn hình chi tiết đơn vị |
+| `createSession`/`isCreating` không dùng | `hooks/useAttendanceSessions.ts` | **Đã xoá** ở P04-07.6; hook chuyên tâm đọc danh sách phiên |
+| i18n key `sessions.form.close` | dùng ở `SessionLocationPickerModal.tsx:208` | **Đang dùng** (aria-label nút đóng bản đồ); không phải code chết; cân nhắc đổi nhãn thành "Đóng bản đồ" |
+| Comment đã cũ nói về "modal" | `types/attendance-session.ts`, `session-form.ts` | **Đã sửa** ở P04-07.6 |
+| `unitsApi.getById` không dùng | `api/units.api.ts` | **Đã xoá** ở P04-07.6 |
 | `PrimaryButton` thiếu `disabled`/trạng thái chờ | `components/ui/PrimaryButton.tsx` không có prop `disabled` ⇒ `SessionCreatePage`, `DataState`, `SessionTable`, `SessionDetailPage` phải tự viết `<button>` và lặp class | Thêm `disabled` (+ `isLoading` nếu cần) rồi thay các `<button>` trùng kiểu |
 | `README.md` vẫn là template Vite | nội dung "React + TypeScript + Vite" | Viết lại: mục đích, biến môi trường, script, liên kết `ARCHITECTURE.md`/`PLAN.md` |
-| Không có script `lint` | `eslint.config.js` đã có (tseslint + react-hooks + react-refresh) nhưng `package.json` chỉ có `dev/build/test/clean` | Thêm `"lint": "eslint ."` (và `"typecheck": "tsc -b"` nếu muốn tách khỏi `build`) |
+| Script `lint` và `typecheck` | `package.json` | **Đã thêm** `"typecheck": "tsc -b"` và `"lint": "eslint ."` ở P04-07.7. Hiện lint có 6 vấn đề (4 lỗi, 2 cảnh báo) ở file của người khác |
 | Dependency có thể thừa | không có `import` nào của `xlsx` trong `src/`; `axios` chỉ dùng gián tiếp qua shared | Rà lại `package.json`, xoá nếu thật sự không dùng để giảm bề mặt cài đặt |
 | Asset không ai import | `src/assets/hero.png`, `src/assets/react.svg`, `src/assets/vite.svg` | Xoá cùng lúc với việc dọn asset thừa |
 | `DEFAULT_USER_ROLE = 'admin'` là lưới an toàn khá rộng | `types/user-role.ts`: role lạ (vd `participant`) bị quy về `admin` ⇒ menu admin hiện ra nhưng API sẽ 403 | Cân nhắc trạng thái "role không hỗ trợ" (màn hình thông báo) thay vì mặc định admin |
@@ -620,16 +595,13 @@ một kiểu: `createLoadTracker`, `loadIdRef`, `scopeKeyRef`, `createRequestSco
 - Khi thực hiện các việc ở mục 8, ghi lại quyết định vào `PLAN.md` của package theo thói quen đang dùng
   (việc đã xong / quyết định / còn lại).
 
-### 9.2 Thứ tự đề xuất cho các việc nhỏ, ít rủi ro
+### 9.2 Các việc đã hoàn thành trong đợt dọn dẹp P04-07
 
-1. Sửa `NAVIGATION_ITEMS[].roles` + comment sai trong `config/navigation.ts` (P1.2) — chỉ sửa dữ liệu
-   config, không đụng cấu trúc.
-2. Xoá dead code: `createSession`/`isCreating`, key `sessions.form.close`, `unitsApi.getById`, asset
-   thừa, comment "modal" (P3).
-3. Thêm script `lint`/`typecheck` rồi chạy một lần để biết nợ lint thật (P3).
-4. Đưa `LoginPage` về design system (P1.3) — có thể làm từng bước: token trước, i18n sau, xoá nút Google cuối.
-5. Tách `SessionCreatePage` và `React.lazy` (P1.1, P1.4) — việc lớn hơn, nên làm sau khi đã có `lint` và
-   test đang xanh để dễ phát hiện hồi quy.
+1. Sửa `NAVIGATION_ITEMS[].roles` + comment trong `config/navigation.ts`, xoá `isKnownPath` và `isPathAllowedForRole` (P04-07.1, P04-07.1b) — **ĐÃ XONG**.
+2. Đưa `LoginPage` về design system token, chuỗi qua `t()`, xoá nút Google chết và bỏ nhận diện DLU (P04-07.2, P04-07.3) — **ĐÃ XONG**.
+3. Thêm `ErrorBoundary` bọc `<Outlet />` trong `DashboardLayout` và lazy load `SessionCreatePage`, `SessionEditPage` để tách Leaflet (P04-07.4, P04-07.5, P04-07.5b) — **ĐÃ XONG**.
+4. Dọn dead code: `createSession`/`isCreating`, `unitsApi.getById`, comment "modal"; xác nhận `sessions.form.close` đang dùng (P04-07.6) — **ĐÃ XONG**.
+5. Thêm script `typecheck` và `lint`, ghi nhận 6 vấn đề lint ở file của đồng đội (P04-07.7) — **ĐÃ XONG**.
 
 ### 9.3 Khi nào phải cập nhật tài liệu này
 

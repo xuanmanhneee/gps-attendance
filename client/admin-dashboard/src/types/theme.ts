@@ -9,3 +9,7 @@ export const DEFAULT_THEME_MODE: ThemeMode = 'light';
 
 export const isThemeMode = (value: unknown): value is ThemeMode =>
   typeof value === 'string' && (THEME_MODES as readonly string[]).includes(value);
+
+export const toggleResolvedTheme = (
+  theme: ResolvedTheme,
+): ResolvedTheme => (theme === 'dark' ? 'light' : 'dark');
