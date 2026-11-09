@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 
 import { IAttendanceCheckInAttemptRepository } from '../../repositories/attendance-check-in-attempt.repository';
 import { IAttendanceCheckInDeviceUsageRepository } from '../../repositories/attendance-check-in-device-usage.repository';
@@ -11,10 +12,9 @@ export class InMemoryAttendanceCheckInStore
 {
   private readonly attemptTimestamps = new Map<string, number[]>();
   private readonly attempts = new Map<
-    number,
+    string,
     { sessionId: number; userId: number; result?: string; reasons?: string[] }
   >();
-  private nextAttemptId = 1;
 
   private readonly deviceUsageBySession = new Map<number, Set<string>>();
 
@@ -46,8 +46,8 @@ export class InMemoryAttendanceCheckInStore
   async createAttempt(input: {
     sessionId: number;
     userId: number;
-  }): Promise<{ id: number; count: number }> {
-    const id = this.nextAttemptId++;
+  }): Promise<{ id: string; count: number }> {
+    const id = randomUUID();
     const count =
       (await this.getAttemptCount(input.sessionId, input.userId)) + 1;
     this.attempts.set(id, { ...input });
@@ -55,7 +55,7 @@ export class InMemoryAttendanceCheckInStore
   }
 
   async completeAttempt(
-    id: number,
+    id: string,
     result: string,
     reasons: string[],
   ): Promise<void> {
@@ -71,6 +71,16 @@ export class InMemoryAttendanceCheckInStore
       (attempt) =>
         attempt.sessionId === sessionId && attempt.userId === userId,
     ).length;
+  }
+
+  async setAttestationResult(): Promise<void> {}
+
+  async getDeviceTrustStatus(
+    _userId: number,
+    _deviceId: string,
+    loadFromDatabase: () => Promise<string>,
+  ): Promise<string> {
+    return loadFromDatabase();
   }
 
   // --- IAttendanceCheckInDeviceUsageRepository ---

@@ -47,24 +47,5 @@ export async function checkDeviceSecurity(): Promise<DeviceSecurityCheckResult> 
  * Tuân thủ cấu trúc Play Integrity / App Attest để backend thẩm định an toàn mà không cần trả phí Google.
  */
 export async function getIntegrity(_nonce?: string): Promise<DeviceIntegrity> {
-  const security = await checkDeviceSecurity();
-
-  const payload = {
-    appLicensingVerdict: 'LICENSED',
-    deviceRecognitionVerdict: security.isSafe
-      ? ['MEETS_DEVICE_INTEGRITY', 'MEETS_BASIC_INTEGRITY']
-      : ['MEETS_NO_INTEGRITY'],
-    securityChecks: {
-      isRealDevice: security.isRealDevice,
-      isRooted: security.isRooted,
-      offlineAttestation: true,
-      timestamp: Date.now(),
-      brand: Device.brand ?? 'unknown',
-      modelName: Device.modelName ?? 'unknown',
-    },
-  };
-
-  return {
-    integrityToken: JSON.stringify(payload),
-  };
+  return { integrityToken: null };
 }

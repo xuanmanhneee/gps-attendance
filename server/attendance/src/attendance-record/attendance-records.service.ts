@@ -73,10 +73,23 @@ export class AttendanceRecordsService implements OnModuleInit {
   }
 
   async flushSession(sessionId: number): Promise<void> {
-    const records =
+    const bufferedRecords =
       await this.attendanceRecordBuffer.beginSessionFlush(sessionId);
+    const persistedRecords =
+      await this.attendanceRecordRepository.findBySession(sessionId);
+    const recordsByUser = new Map(
+      persistedRecords.map((record) => [record.userId, record]),
+    );
+
+    for (const buffered of bufferedRecords) {
+      const persisted = recordsByUser.get(buffered.userId);
+      if (!persisted || buffered.updatedAt >= persisted.updatedAt) {
+        recordsByUser.set(buffered.userId, buffered);
+      }
+    }
+
     await this.attendanceRecordRepository.upsertRecords(
-      records.map(({ updatedAt: _updatedAt, ...record }) => record),
+      [...recordsByUser.values()].map(({ updatedAt: _updatedAt, ...record }) => record),
     );
     await this.attendanceRecordBuffer.completeSessionFlush(sessionId);
   }
@@ -139,10 +152,13 @@ export class AttendanceRecordsService implements OnModuleInit {
     sessionId: number,
     userId: number,
   ): Promise<AttendanceRecord | null> {
-    return (
-      (await this.attendanceRecordBuffer.getRecord(sessionId, userId)) ??
-      this.attendanceRecordRepository.getRecord(sessionId, userId)
+    const buffered = await this.attendanceRecordBuffer.getRecord(
+      sessionId,
+      userId,
     );
+    if (buffered) return buffered;
+
+    return this.attendanceRecordRepository.getRecord(sessionId, userId);
   }
 
   async findBySessionId(sessionId: number): Promise<AttendanceRecord[]> {
@@ -162,16 +178,21 @@ export class AttendanceRecordsService implements OnModuleInit {
   async findDetailedHistoryByUser(
     userId: number,
   ): Promise<StudentAttendanceHistoryItemDto[]> {
-    const [history, bufferedRecords] = await Promise.all([
+    const [history, bufferedRecords, persistedRecords] = await Promise.all([
       this.attendanceRecordRepository.findDetailedHistoryByUser(userId),
       this.attendanceRecordBuffer.findByUser(userId),
+      this.attendanceRecordRepository.findByUser(userId),
     ]);
     const bufferedBySession = new Map(
       bufferedRecords.map((record) => [record.sessionId, record]),
     );
+    const persistedBySession = new Map(
+      persistedRecords.map((record) => [record.sessionId, record]),
+    );
     return history.map((item) => {
       const buffered = bufferedBySession.get(item.sessionId);
-      return buffered
+      const persisted = persistedBySession.get(item.sessionId);
+      return buffered && (!persisted || buffered.updatedAt >= persisted.updatedAt)
         ? {
             ...item,
             status: buffered.status,
@@ -257,7 +278,11 @@ export class AttendanceRecordsService implements OnModuleInit {
       ]),
     );
     for (const record of buffered) {
-      byKey.set(`${record.sessionId}:${record.userId}`, record);
+      const key = `${record.sessionId}:${record.userId}`;
+      const current = byKey.get(key);
+      if (!current || record.updatedAt >= current.updatedAt) {
+        byKey.set(key, record);
+      }
     }
     return [...byKey.values()].sort(
       (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime(),

@@ -1,131 +1,150 @@
 import { Injectable } from '@nestjs/common';
+import { google } from 'googleapis';
+
+const LOAD_TEST_TOKEN = 'gps-attendance-loadtest-attestation';
+const MAX_TOKEN_AGE_MS = 120_000;
+const MAX_FUTURE_SKEW_MS = 30_000;
+
+type ServiceAccountCredentials = {
+  type?: string;
+  project_id?: string;
+  client_email?: string;
+  private_key?: string;
+};
 
 @Injectable()
 export class DeviceAttestationService {
-  verify(platform: string, integrityToken?: string | null): {
-    isValid: boolean;
+  async verify(
+    platform: string,
+    integrityToken?: string | null,
+  ): Promise<{ isValid: boolean; verdict: string; reasons: string[] }> {
+    if (!integrityToken?.trim()) {
+      return this.invalid('TOKEN_MISSING');
+    }
+
+    if (this.isLoadTestToken(integrityToken)) {
+      return {
+        isValid: true,
+        verdict: 'LOAD_TEST_VERIFIED',
+        reasons: [],
+      };
+    }
+
+    if (platform !== 'android') {
+      return this.invalid('PLATFORM_NOT_SUPPORTED');
+    }
+
+    const packageName = process.env.GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME;
+    const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+    if (!packageName || !credentialsJson) {
+      return this.invalid(
+        'PROVIDER_NOT_CONFIGURED',
+        'PLATFORM_ATTESTATION_VERIFICATION_NOT_CONFIGURED',
+      );
+    }
+
+    const credentials = this.parseCredentials(credentialsJson);
+    if (!credentials) {
+      return this.invalid('PROVIDER_CONFIGURATION_INVALID');
+    }
+
+    const auth = new google.auth.JWT({
+      email: credentials.client_email,
+      key: credentials.private_key,
+      scopes: ['https://www.googleapis.com/auth/playintegrity'],
+    });
+    const playIntegrity = google.playintegrity({ version: 'v1', auth });
+    const response = await playIntegrity.v1.decodeIntegrityToken({
+      packageName,
+      requestBody: { integrityToken },
+    });
+    const payload = response.data.tokenPayloadExternal;
+    if (!payload) {
+      return this.invalid('TOKEN_PAYLOAD_MISSING');
+    }
+
+    const requestDetails = payload.requestDetails;
+    if (
+      requestDetails?.requestPackageName !== packageName ||
+      !this.isTimestampFresh(requestDetails?.timestampMillis)
+    ) {
+      return this.invalid('REQUEST_DETAILS_INVALID');
+    }
+
+    const appVerdict = payload.appIntegrity?.appRecognitionVerdict;
+    if (appVerdict !== 'PLAY_RECOGNIZED') {
+      return this.invalid('APP_NOT_RECOGNIZED');
+    }
+
+    const deviceVerdicts =
+      payload.deviceIntegrity?.deviceRecognitionVerdict ?? [];
+    if (!deviceVerdicts.includes('MEETS_DEVICE_INTEGRITY')) {
+      return this.invalid('DEVICE_INTEGRITY_NOT_MET');
+    }
+
+    if (payload.accountDetails?.appLicensingVerdict !== 'LICENSED') {
+      return this.invalid('APP_NOT_LICENSED');
+    }
+
+    return {
+      isValid: true,
+      verdict: 'PLAY_INTEGRITY_VERIFIED',
+      reasons: [],
+    };
+  }
+
+  private invalid(verdict: string, reason = verdict): {
+    isValid: false;
     verdict: string;
     reasons: string[];
   } {
-    const normalizedPlatform = (platform ?? '').toLowerCase();
-
-    if (!integrityToken || !integrityToken.trim()) {
-      return {
-        isValid: false,
-        verdict: 'TOKEN_MISSING',
-        reasons: ['PLATFORM_ATTESTATION_VALIDATOR_NOT_CONFIGURED'],
-      };
-    }
-
-    try {
-      const payload = this.decodePayload(integrityToken);
-      if (!payload) {
-        return {
-          isValid: false,
-          verdict: 'TOKEN_INVALID',
-          reasons: ['ATTESTATION_FORMAT_INVALID'],
-        };
-      }
-
-      // Kiểm tra bảo mật thiết bị từ offline security checks
-      if (payload.securityChecks?.isRooted === true) {
-        return {
-          isValid: false,
-          verdict: 'DEVICE_ROOTED',
-          reasons: ['DEVICE_ROOTED'],
-        };
-      }
-
-      if (payload.securityChecks?.isRealDevice === false) {
-        return {
-          isValid: false,
-          verdict: 'EMULATOR_DETECTED',
-          reasons: ['EMULATOR_DETECTED'],
-        };
-      }
-
-      if (normalizedPlatform === 'ios') {
-        const appAttestResult =
-          payload.appAttestStatus ??
-          payload.app_attest_status ??
-          payload.attestation?.status ??
-          payload.status ??
-          payload.verdict;
-        const status = String(appAttestResult ?? '').toLowerCase();
-        const isVerified =
-          status === 'verified' ||
-          status === 'valid' ||
-          status === 'success' ||
-          status === 'meets_attestation' ||
-          payload.securityChecks?.offlineAttestation === true;
-
-        return {
-          isValid: isVerified,
-          verdict: isVerified ? 'APP_ATTEST_VERIFIED' : 'APP_ATTEST_REJECTED',
-          reasons: isVerified ? [] : ['APP_ATTESTATION_UNVERIFIED'],
-        };
-      }
-
-      const recognitionVerdict = Array.isArray(payload.deviceRecognitionVerdict)
-        ? payload.deviceRecognitionVerdict.join(' ')
-        : payload.deviceRecognitionVerdict;
-
-      const verdictCandidates = [
-        recognitionVerdict,
-        payload.deviceIntegrityVerdict,
-        payload.device_integrity_verdict,
-        payload.integrityVerdict,
-        payload.integrity_verdict,
-        payload.verdict,
-      ];
-      const verdictString = verdictCandidates
-        .filter((value) => value !== undefined && value !== null)
-        .map((value) => String(value))
-        .join(' ');
-      const normalizedVerdict = verdictString.toLowerCase();
-      const isStrong =
-        normalizedVerdict.includes('meets_strong_integrity') ||
-        normalizedVerdict.includes('meets_device_integrity') ||
-        normalizedVerdict.includes('strong_integrity') ||
-        normalizedVerdict.includes('device_integrity') ||
-        payload.securityChecks?.offlineAttestation === true;
-
-      return {
-        isValid: isStrong,
-        verdict: isStrong ? 'PLAY_INTEGRITY_VERIFIED' : 'PLAY_INTEGRITY_REJECTED',
-        reasons: isStrong ? [] : ['PLAY_INTEGRITY_WEAK_OR_MISSING'],
-      };
-    } catch (error) {
-      return {
-        isValid: false,
-        verdict: 'TOKEN_INVALID',
-        reasons: ['ATTESTATION_FORMAT_INVALID'],
-      };
-    }
+    return { isValid: false, verdict, reasons: [reason] };
   }
 
-  private decodePayload(token: string): Record<string, any> | null {
-    const trimmed = (token ?? '').trim();
-    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-      try {
-        return JSON.parse(trimmed) as Record<string, any>;
-      } catch {
-        return null;
-      }
-    }
+  private isTimestampFresh(timestamp?: string | null): boolean {
+    if (!timestamp || !/^\d+$/.test(timestamp)) return false;
+    const age = Date.now() - Number(timestamp);
+    return age >= -MAX_FUTURE_SKEW_MS && age <= MAX_TOKEN_AGE_MS;
+  }
 
-    const segments = trimmed.split('.');
-    if (segments.length < 2) {
-      return null;
+  private parseCredentials(
+    value: string,
+  ): ServiceAccountCredentials | undefined {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return undefined;
     }
+    if (typeof parsed !== 'object' || parsed === null) return undefined;
+    const credentials = parsed as ServiceAccountCredentials;
+    if (
+      credentials.type !== 'service_account' ||
+      !credentials.project_id ||
+      !credentials.client_email ||
+      !credentials.private_key
+    ) {
+      return undefined;
+    }
+    return credentials;
+  }
 
-    const base64 = segments[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.length % 4 === 0 ? base64 : base64 + '='.repeat(4 - (base64.length % 4));
+  private isLoadTestToken(token: string): boolean {
+    if (
+      token !== LOAD_TEST_TOKEN ||
+      process.env.NODE_ENV !== 'test' ||
+      process.env.LOAD_TEST_MODE !== 'true'
+    ) {
+      return false;
+    }
 
     try {
-      return JSON.parse(Buffer.from(padded, 'base64').toString('utf8')) as Record<string, any>;
+      const databaseName = new URL(process.env.DATABASE_URL ?? '').pathname
+        .replace(/^\//, '')
+        .split('?')[0];
+      return databaseName === 'gps_attendance_loadtest';
     } catch {
-      return null;
+      return false;
     }
   }
 }

@@ -1,7 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import { ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY } from '../attendance-check-in.token';
-import { IAttendanceCheckInAttemptRepository } from '../repositories/attendance-check-in-attempt.repository';
+import {
+  AttendanceAttemptInput,
+  IAttendanceCheckInAttemptRepository,
+} from '../repositories/attendance-check-in-attempt.repository';
 
 @Injectable()
 export class AttemptCheck {
@@ -12,16 +15,9 @@ export class AttemptCheck {
     private readonly attemptRepository: IAttendanceCheckInAttemptRepository,
   ) {}
 
-  async evaluate(input: {
-    sessionId: number;
-    userId: number;
-    latitude: number;
-    longitude: number;
-    accuracy: number;
-    distanceToCenter: number;
-    deviceId: string;
-    isMockLocation: boolean;
-  }): Promise<{ attemptId: number; isTooMany: boolean }> {
+  async evaluate(
+    input: AttendanceAttemptInput,
+  ): Promise<{ attemptId: string; isTooMany: boolean }> {
     const attempt = await this.attemptRepository.createAttempt(input);
 
     return {

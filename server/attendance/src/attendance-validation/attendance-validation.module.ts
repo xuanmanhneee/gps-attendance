@@ -16,6 +16,6 @@ import { GeoModule } from '../geo/geo.module';
     LocationCheck,
     LocationTimestampCheck,
   ],
-  exports: [AttendanceValidationService],
+  exports: [AttendanceValidationService, LocationTimestampCheck],
 })
 export class AttendanceValidationModule {}

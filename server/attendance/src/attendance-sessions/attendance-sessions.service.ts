@@ -4,7 +4,9 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { AttendanceSessionErrorCode, SessionStatus } from '@gps-attendance/shared';
 
@@ -16,13 +18,39 @@ import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
 import { CreateAttendanceSessionDto } from './dto/create-attendance-session.dto';
 import { JOB_SCHEDULER } from '../job-scheduler/job-scheduler.token';
 import { IJobScheduler } from '../job-scheduler/job-scheduler.interface';
+import { REVIEW_RESOLUTION_WINDOW_MS } from '../attendance-record/attendance-review.constants';
+import { RedisService } from '../redis/redis.service';
+import {
+  attendanceSessionCacheKey,
+  lecturerVerificationCacheKey,
+} from './attendance-session-cache';
 
 const SESSION_FLUSH_JOB = 'attendance-session.flush';
+const SESSION_CACHE_TTL_SECONDS = 86_400;
+const LECTURER_VERIFICATION_CACHE_TTL_SECONDS = 300;
 const sessionFlushJobId = (sessionId: number) =>
   `attendance-session:flush:${sessionId}`;
 
+const UPDATE_LATEST_LECTURER_VERIFICATION_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+local next = cjson.decode(ARGV[1])
+if not raw then
+  redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+  return 1
+end
+local current = cjson.decode(raw)
+if current.verifiedAt == nil or current.verifiedAt == cjson.null or
+   next.verifiedAt > current.verifiedAt then
+  redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[2])
+  return 1
+end
+return 0
+`;
+
 @Injectable()
 export class AttendanceSessionsService {
+  private readonly logger = new Logger(AttendanceSessionsService.name);
+
   constructor(
     @Inject(ATTENDANCE_SESSION_REPOSITORY)
     private readonly attendanceSessionRepository: IAttendanceSessionRepository,
@@ -30,6 +58,7 @@ export class AttendanceSessionsService {
     private readonly prisma: PrismaService,
     @Inject(JOB_SCHEDULER)
     private readonly jobScheduler: IJobScheduler,
+    @Optional() private readonly redisService?: RedisService,
   ) {}
 
   async create(
@@ -70,12 +99,14 @@ export class AttendanceSessionsService {
     );
     await this.jobScheduler.schedule(
       SESSION_FLUSH_JOB,
-      closeAt,
+      new Date(closeAt.getTime() + REVIEW_RESOLUTION_WINDOW_MS),
       { sessionId: session.id },
       sessionFlushJobId(session.id),
     );
 
-    return this.withComputedStatus(session);
+    const result = this.withComputedStatus(session);
+    await this.cacheSession(result);
+    return result;
   }
 
   private async resolveSessionContext(
@@ -218,11 +249,81 @@ export class AttendanceSessionsService {
   }
 
   async findById(id: number): Promise<AttendanceSession> {
+    const cached = await this.getCachedSession(id);
+    if (cached) return this.withComputedStatus(cached);
+
     const session = await this.attendanceSessionRepository.findById(id);
     if (!session) {
       throw new NotFoundException(`Không tìm thấy session id=${id}`);
     }
+    if (this.redisService) {
+      await this.redisService.set(
+        attendanceSessionCacheKey(id),
+        JSON.stringify(session),
+        { ttlSec: SESSION_CACHE_TTL_SECONDS, ifNotExists: true },
+      );
+    }
     return this.withComputedStatus(session);
+  }
+
+  async findLatestLecturerVerification(sessionId: number): Promise<{
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    verifiedAt: Date;
+  } | null> {
+    if (this.redisService) {
+      const cached = await this.redisService.get(
+        lecturerVerificationCacheKey(sessionId),
+      );
+      if (cached !== null) {
+        return this.parseLecturerVerification(cached);
+      }
+    }
+
+    const verification = await this.prisma.lecturerLocationVerification.findFirst({
+      where: { sessionId, status: 'PASS' },
+      orderBy: { createdAt: 'desc' },
+    });
+    const result = verification
+      ? {
+          latitude: Number(verification.latitude),
+          longitude: Number(verification.longitude),
+          accuracy: Number(verification.accuracy),
+          verifiedAt: verification.createdAt,
+        }
+      : null;
+    if (this.redisService) {
+      await this.redisService.set(
+        lecturerVerificationCacheKey(sessionId),
+        JSON.stringify(result ?? { verifiedAt: null }),
+        { ttlSec: LECTURER_VERIFICATION_CACHE_TTL_SECONDS, ifNotExists: true },
+      );
+    }
+    return result;
+  }
+
+  async cacheLecturerLocationVerification(
+    sessionId: number,
+    verification: {
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+      verifiedAt: Date;
+    },
+  ): Promise<void> {
+    if (!this.redisService) return;
+    await this.redisService.eval(
+      UPDATE_LATEST_LECTURER_VERIFICATION_SCRIPT,
+      [lecturerVerificationCacheKey(sessionId)],
+      [
+        JSON.stringify({
+          ...verification,
+          verifiedAt: verification.verifiedAt.toISOString(),
+        }),
+        String(LECTURER_VERIFICATION_CACHE_TTL_SECONDS),
+      ],
+    );
   }
 
   async findByIdForUser(
@@ -292,6 +393,10 @@ export class AttendanceSessionsService {
 
     await this.jobScheduler.cancel(sessionFlushJobId(id));
     await this.attendanceSessionRepository.delete(id);
+    if (this.redisService) {
+      await this.redisService.del(attendanceSessionCacheKey(id));
+      await this.redisService.del(lecturerVerificationCacheKey(id));
+    }
   }
 
   async findByIds(ids: number[]): Promise<AttendanceSession[]> {
@@ -319,11 +424,15 @@ export class AttendanceSessionsService {
     const updated = await this.attendanceSessionRepository.close(id);
     await this.jobScheduler.schedule(
       SESSION_FLUSH_JOB,
-      new Date(),
+      new Date(
+        updated.closeAt.getTime() + REVIEW_RESOLUTION_WINDOW_MS,
+      ),
       { sessionId: id },
       sessionFlushJobId(id),
     );
-    return this.withComputedStatus(updated);
+    const result = this.withComputedStatus(updated);
+    await this.cacheSession(result);
+    return result;
   }
 
   async cancel(
@@ -361,7 +470,88 @@ export class AttendanceSessionsService {
       { sessionId: id },
       sessionFlushJobId(id),
     );
-    return this.withComputedStatus(updated);
+    const result = this.withComputedStatus(updated);
+    await this.cacheSession(result);
+    return result;
+  }
+
+  private async cacheSession(session: AttendanceSession): Promise<void> {
+    if (!this.redisService) return;
+    await this.redisService.set(
+      attendanceSessionCacheKey(session.id),
+      JSON.stringify(session),
+      { ttlSec: SESSION_CACHE_TTL_SECONDS },
+    );
+    await this.redisService.set(
+      lecturerVerificationCacheKey(session.id),
+      JSON.stringify({ verifiedAt: null }),
+      { ttlSec: LECTURER_VERIFICATION_CACHE_TTL_SECONDS, ifNotExists: true },
+    );
+  }
+
+  private async getCachedSession(
+    id: number,
+  ): Promise<AttendanceSession | null> {
+    if (!this.redisService) return null;
+    const key = attendanceSessionCacheKey(id);
+    const raw = await this.redisService.get(key);
+    if (raw === null) return null;
+    try {
+      const parsed = JSON.parse(raw) as AttendanceSession;
+      const session = {
+        ...parsed,
+        openAt: new Date(parsed.openAt),
+        closeAt: new Date(parsed.closeAt),
+        createdAt: new Date(parsed.createdAt),
+        updatedAt: new Date(parsed.updatedAt),
+      };
+      if (
+        session.id !== id ||
+        !Number.isFinite(session.openAt.getTime()) ||
+        !Number.isFinite(session.closeAt.getTime()) ||
+        !Number.isFinite(session.createdAt.getTime()) ||
+        !Number.isFinite(session.updatedAt.getTime())
+      ) {
+        throw new Error('Invalid cached session data');
+      }
+      return session;
+    } catch (error) {
+      this.logger.warn(
+        `Invalid cached attendance session ${id}; loading from PostgreSQL: ${(error as Error).message}`,
+      );
+      await this.redisService.del(key);
+      return null;
+    }
+  }
+
+  private parseLecturerVerification(raw: string): {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    verifiedAt: Date;
+  } | null {
+    const parsed = JSON.parse(raw) as {
+      latitude?: unknown;
+      longitude?: unknown;
+      accuracy?: unknown;
+      verifiedAt?: unknown;
+    };
+    if (parsed.verifiedAt === null) return null;
+    const verifiedAt = new Date(String(parsed.verifiedAt));
+    if (
+      typeof parsed.latitude !== 'number' ||
+      typeof parsed.longitude !== 'number' ||
+      typeof parsed.accuracy !== 'number' ||
+      !Number.isFinite(verifiedAt.getTime())
+    ) {
+      throw new Error('Cached lecturer verification is invalid');
+    }
+    return {
+      latitude: parsed.latitude,
+      longitude: parsed.longitude,
+      accuracy: parsed.accuracy,
+      verifiedAt,
+    };
   }
 
   private withComputedStatus(session: AttendanceSession): AttendanceSession {

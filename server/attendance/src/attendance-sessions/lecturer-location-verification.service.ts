@@ -75,6 +75,17 @@ export class LecturerLocationVerificationService {
         reasons,
       },
     });
+    if (status === 'PASS') {
+      await this.attendanceSessionsService.cacheLecturerLocationVerification(
+        sessionId,
+        {
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          accuracy: dto.accuracy,
+          verifiedAt: verification.createdAt,
+        },
+      );
+    }
 
     return {
       id: verification.id,

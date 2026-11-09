@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 
 import { PrismaService } from '../../../common/database/prisma.service';
 import type { AttendanceAttemptResult } from '@prisma/client';
@@ -16,9 +17,11 @@ export class PrismaAttendanceCheckInStore
 
   async createAttempt(
     input: AttendanceAttemptInput,
-  ): Promise<{ id: number; count: number }> {
+  ): Promise<{ id: string; count: number }> {
+    const queueId = randomUUID();
     const attempt = await this.prisma.attendanceAttempt.create({
       data: {
+        queueId,
         sessionId: input.sessionId,
         userId: input.userId,
         latitude: input.latitude,
@@ -31,19 +34,19 @@ export class PrismaAttendanceCheckInStore
     });
 
     return {
-      id: attempt.id,
+      id: attempt.queueId!,
       count: await this.getAttemptCount(input.sessionId, input.userId),
     };
   }
 
   async completeAttempt(
-    id: number,
+    id: string,
     result: AttendanceAttemptResult,
     reasons: string[],
   ): Promise<void> {
     await this.prisma.$transaction(async (transaction) => {
       const attempt = await transaction.attendanceAttempt.update({
-        where: { id },
+        where: { queueId: id },
         data: { result, reasons },
         select: { id: true, sessionId: true, userId: true },
       });
@@ -90,6 +93,43 @@ export class PrismaAttendanceCheckInStore
     return this.prisma.attendanceAttempt.count({
       where: { sessionId, userId },
     });
+  }
+
+  async setAttestationResult(
+    id: string,
+    input: {
+      provider: 'PLAY_INTEGRITY' | 'APP_ATTEST';
+      verdict: string;
+      reasons: string[];
+    },
+  ): Promise<void> {
+    const attempt = await this.prisma.attendanceAttempt.findUnique({
+      where: { queueId: id },
+      select: { sessionId: true, userId: true },
+    });
+    if (!attempt) {
+      throw new Error(`Attendance attempt ${id} was not found`);
+    }
+
+    await this.prisma.deviceIntegrityCheck.createMany({
+      data: [{
+        sourceKey: `${id}:integrity`,
+        userId: attempt.userId,
+        sessionId: attempt.sessionId,
+        provider: input.provider,
+        verdict: input.verdict,
+        reasons: input.reasons.length ? input.reasons : ['ATTESTATION_OK'],
+      }],
+      skipDuplicates: true,
+    });
+  }
+
+  async getDeviceTrustStatus(
+    _userId: number,
+    _deviceId: string,
+    loadFromDatabase: () => Promise<string>,
+  ): Promise<string> {
+    return loadFromDatabase();
   }
 
   async isUsed(sessionId: number, deviceId: string, userId?: number): Promise<boolean> {

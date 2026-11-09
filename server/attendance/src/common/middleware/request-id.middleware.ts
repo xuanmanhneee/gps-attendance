@@ -6,11 +6,13 @@ export const REQUEST_ID_HEADER = 'x-request-id';
 
 export interface RequestWithId extends Request {
   requestId?: string;
+  requestStartedAtNs?: bigint;
 }
 
 @Injectable()
 export class RequestIdMiddleware implements NestMiddleware {
   use(req: RequestWithId, res: Response, next: NextFunction) {
+    req.requestStartedAtNs = process.hrtime.bigint();
     const existingId = req.headers[REQUEST_ID_HEADER];
     const requestId =
       typeof existingId === 'string' && existingId.trim().length > 0

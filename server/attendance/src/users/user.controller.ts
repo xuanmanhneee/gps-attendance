@@ -7,7 +7,6 @@ import {
   NotFoundException,
   Param,
   ParseIntPipe,
-  Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -17,14 +16,11 @@ import {
   ApiResponse,
   UserErrorCode,
   UserProfileDto,
-  UserFilterCriteria,
 } from '@gps-attendance/shared';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { User } from './user.model';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserFilterService } from './user-filter.service';
-import { UserFilterDto } from './dto/user-filter.dto';
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 
 @ApiTags('users')
@@ -33,7 +29,6 @@ import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 export class UserController {
   constructor(
     private readonly usersService: UsersService,
-    private readonly userFilterService: UserFilterService,
   ) {}
 
   @ApiOperation({ summary: 'Lấy thông tin profile người dùng hiện tại' })
@@ -117,10 +112,5 @@ export class UserController {
       success: true,
       data: user,
     };
-  }
-
-  @Post('test-filter')
-  async testFilter(@Body() criteria: UserFilterDto) {
-    return this.userFilterService.resolveUserIds(criteria as UserFilterCriteria);
   }
 }

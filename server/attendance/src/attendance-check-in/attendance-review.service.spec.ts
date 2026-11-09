@@ -1,65 +1,74 @@
-import { AttendanceCheckInService } from './attendance-check-in.service';
+import { AttendanceSessionQueryService } from '../attendance-sessions/attendance-session-query.service';
 
-describe('AttendanceCheckInService review resolution audit', () => {
-  it('giữ quyết định thành công khi ghi audit lỗi và log đủ entry', async () => {
-    const logger = {
-      log: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-      verbose: jest.fn(),
+describe('AttendanceSessionQueryService review resolution', () => {
+  it('records an approved review and its attendance history atomically', async () => {
+    const attempt = {
+      id: 12,
+      sessionId: 3,
+      userId: 7,
+      result: 'REVIEW',
+      serverTimestamp: new Date('2026-01-01T10:00:00.000Z'),
+      deviceId: 'device-7',
+      latitude: 10,
+      longitude: 106,
+      accuracy: 5,
+      distanceToCenter: 2,
+      reasons: ['DEVICE_ATTESTATION_FAILED'],
     };
-    const audit = { record: jest.fn().mockRejectedValue(new Error('db down')) };
-    const now = Date.now();
-    const service = new AttendanceCheckInService(
-      {
-        findById: jest.fn().mockResolvedValue({
-          id: 1,
-          createdBy: 99,
-          status: 'open',
-          openAt: new Date(now - 60_000),
-          closeAt: new Date(now + 60_000),
-        }),
-      } as never,
-      {} as never,
-      {
-        resolveReview: jest.fn().mockResolvedValue({
-          status: 'resolved',
-          previousStatus: 'absent',
-          record: {
-            sessionId: 1,
-            userId: 2,
-            status: 'present',
-            updateBy: 99,
-            reasons: ['LOW_CONFIDENCE_SCORE'],
-            note: 'Em có mặt',
-          },
-        }),
-      } as never,
+    const tx = {
+      attendanceAttempt: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      attendanceRecord: { upsert: jest.fn().mockResolvedValue({}) },
+      attendanceHistoryEvent: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const prisma = {
+      attendanceAttempt: { findFirst: jest.fn().mockResolvedValue(attempt) },
+      $transaction: jest.fn(async (callback: (transaction: typeof tx) => unknown) =>
+        callback(tx),
+      ),
+    };
+    const sessions = {
+      findByIdForUser: jest.fn().mockResolvedValue({ id: 3 }),
+    };
+    const service = new AttendanceSessionQueryService(
+      sessions as never,
       {} as never,
       {} as never,
-      {} as never,
-      audit as never,
-      { create: () => logger } as never,
+      prisma as never,
     );
 
     await expect(
-      service.resolveReview(1, 2, 'approve', 99, 'Đã xác nhận'),
+      service.reviewAttempt(3, 12, 99, 'organizer', 'APPROVED', 'Đã xác nhận'),
     ).resolves.toBeUndefined();
-    expect(audit.record).toHaveBeenCalledWith(
+
+    expect(sessions.findByIdForUser).toHaveBeenCalledWith(3, {
+      userId: 99,
+      role: 'organizer',
+    });
+    expect(tx.attendanceAttempt.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        entityId: '1:2',
-        oldValue: { status: 'absent' },
-        newValue: { status: 'present' },
-        metadata: {
-          reasons: ['LOW_CONFIDENCE_SCORE'],
-          studentNote: 'Em có mặt',
-        },
+        where: { id: 12, sessionId: 3, result: 'REVIEW' },
+        data: expect.objectContaining({
+          result: 'APPROVED',
+          reviewedBy: 99,
+          reviewNote: 'Đã xác nhận',
+        }),
       }),
     );
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('"entityId":"1:2"'),
-      expect.any(String),
+    expect(tx.attendanceRecord.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { sessionId_userId: { sessionId: 3, userId: 7 } },
+        create: expect.objectContaining({ status: 'present', updatedBy: 99 }),
+      }),
+    );
+    expect(tx.attendanceHistoryEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventType: 'REVIEW_DECISION',
+          status: 'present',
+          attemptResult: 'APPROVED',
+          reasons: ['DEVICE_ATTESTATION_FAILED'],
+        }),
+      }),
     );
   });
 });

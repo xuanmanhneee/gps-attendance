@@ -5,6 +5,7 @@ import { PrismaService } from '../common/database/prisma.service';
 describe('HealthService', () => {
   let service: HealthService;
   let prisma: { $queryRawUnsafe: jest.Mock };
+  let memoryUsage: jest.SpyInstance;
 
   beforeEach(async () => {
     prisma = {
@@ -19,6 +20,17 @@ describe('HealthService', () => {
     }).compile();
 
     service = module.get<HealthService>(HealthService);
+    memoryUsage = jest.spyOn(process, 'memoryUsage').mockReturnValue({
+      rss: 1024 * 1024,
+      heapTotal: 1024 * 1024,
+      heapUsed: 512 * 1024,
+      external: 0,
+      arrayBuffers: 0,
+    });
+  });
+
+  afterEach(() => {
+    memoryUsage.mockRestore();
   });
 
   it('should be defined', () => {

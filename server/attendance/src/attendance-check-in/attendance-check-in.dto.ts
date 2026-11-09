@@ -49,7 +49,7 @@ export class LocationDto implements Location {
   })
   @IsNumber()
   @Min(0)
-  @Max(1000)
+  @Max(100)
   accuracy!: number;
 
   @ApiProperty({
@@ -57,6 +57,7 @@ export class LocationDto implements Location {
     example: 1755345600000,
   })
   @IsInt()
+  @Min(0)
   timestamp!: number;
 
   @ApiProperty({

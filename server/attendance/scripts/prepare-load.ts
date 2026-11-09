@@ -8,6 +8,11 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { PrismaClient, Role } from '@prisma/client';
+import { deviceTrustCacheKey } from '../src/device-trust/device-trust-cache';
+import {
+  attendanceSessionCacheKey,
+  lecturerVerificationCacheKey,
+} from '../src/attendance-sessions/attendance-session-cache';
 
 const parsePositiveInt = (name: string, fallback: number): number => {
   const value = Number(process.env[name] ?? fallback);
@@ -17,7 +22,7 @@ const parsePositiveInt = (name: string, fallback: number): number => {
   return value;
 };
 
-const count = parsePositiveInt('LOAD_USERS', 1000);
+const count = parsePositiveInt('LOAD_USERS', 1200);
 const sessionMinutes = parsePositiveInt('LOAD_SESSION_MINUTES', 10);
 const dataPath = process.env.LOAD_DATA_PATH ?? '/perf-data/load-data.json';
 const secret = process.env.JWT_SECRET;
@@ -84,6 +89,21 @@ async function main(): Promise<void> {
     throw new Error(`Expected ${count} students, found ${students.length}`);
   }
 
+  const trustPipeline = redis.pipeline();
+  for (const [index, student] of students.entries()) {
+    trustPipeline.set(
+      deviceTrustCacheKey(
+        student.id,
+        `load-device-${String(index + 1).padStart(6, '0')}`,
+      ),
+      'TRUSTED',
+    );
+  }
+  const trustResults = await trustPipeline.exec();
+  if (!trustResults || trustResults.some(([error]) => error)) {
+    throw new Error('Failed to populate Redis device trust cache');
+  }
+
   await prisma.registeredDevice.createMany({
     data: students.map((student, index) => ({
       userId: student.id,
@@ -132,6 +152,31 @@ async function main(): Promise<void> {
       createdBy: lecturer.id,
     },
   });
+  await redis.set(
+    attendanceSessionCacheKey(session.id),
+    JSON.stringify({
+      ...session,
+      latitude: Number(session.latitude),
+      longitude: Number(session.longitude),
+      radius: Number(session.radius),
+      gpsAccuracyThreshold:
+        session.gpsAccuracyThreshold === null
+          ? null
+          : Number(session.gpsAccuracyThreshold),
+      lecturerValidationRadius:
+        session.lecturerValidationRadius === null
+          ? null
+          : Number(session.lecturerValidationRadius),
+    }),
+    'EX',
+    86_400,
+  );
+  await redis.set(
+    lecturerVerificationCacheKey(session.id),
+    JSON.stringify({ verifiedAt: null }),
+    'EX',
+    300,
+  );
 
   const bufferKey = `attendance:buffer:${session.id}`;
   const pipeline = redis.pipeline();

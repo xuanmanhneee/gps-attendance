@@ -24,7 +24,7 @@ describe('CreateAccountWithUserDto.role', () => {
     expect(validateRole('admin')?.constraints?.isIn).toBeDefined();
   });
 
-  it.each(['organizer', 'participant'])('rejects legacy role %s', (role) => {
+  it.each(['lecturer', 'student'])('rejects legacy role %s', (role) => {
     expect(validateRole(role)?.constraints?.isIn).toBeDefined();
   });
 });

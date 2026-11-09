@@ -30,11 +30,11 @@ function toSafeAccount(account: Account): SafeAccount {
 }
 
 @Controller('v0/accounts')
+@ApiBearerAuth()
 export class AccountController {
   constructor(private readonly accountService: AccountService) {}
 
   @Post()
-  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @HttpCode(HttpStatus.CREATED)
@@ -54,6 +54,8 @@ export class AccountController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async findById(@Param('id', ParseIntPipe) id: number) {
     const account = await this.accountService.findById(id);
     if (!account) {

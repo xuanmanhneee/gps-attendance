@@ -62,10 +62,14 @@ describe('PrismaAttendanceCheckInStore.completeAttempt audit trail', () => {
     };
     const store = new PrismaAttendanceCheckInStore(prisma as never);
 
-    await store.completeAttempt(5, 'REVIEW', ['LOW_LOCATION_ACCURACY']);
+    await store.completeAttempt(
+      'b9dbe035-64d1-4ad0-89e9-ef4178be2afe',
+      'REVIEW',
+      ['LOW_LOCATION_ACCURACY'],
+    );
 
     expect(transaction.attendanceAttempt.update).toHaveBeenCalledWith({
-      where: { id: 5 },
+      where: { queueId: 'b9dbe035-64d1-4ad0-89e9-ef4178be2afe' },
       data: { result: 'REVIEW', reasons: ['LOW_LOCATION_ACCURACY'] },
       select: { id: true, sessionId: true, userId: true },
     });

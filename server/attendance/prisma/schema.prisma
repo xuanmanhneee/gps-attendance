@@ -325,6 +325,7 @@ model AttendanceRecord {
 
 model AttendanceAttempt {
   id               Int                      @id @default(autoincrement())
+  queueId          String?                  @unique @map("queue_id") @db.Uuid
   sessionId        Int                      @map("session_id")
   userId           Int                      @map("user_id")
   latitude         Decimal                  @db.Decimal(10, 7)
@@ -356,6 +357,7 @@ model AttendanceAttempt {
 
 model AttendanceHistoryEvent {
   id            Int                        @id @default(autoincrement())
+  sourceKey     String?                    @unique @map("source_key") @db.VarChar(100)
   sessionId     Int                        @map("session_id")
   userId        Int                        @map("user_id")
   actorId       Int?                       @map("actor_id")
@@ -589,6 +591,7 @@ model RegisteredDevice {
 
 model DeviceIntegrityCheck {
   id                 Int               @id @default(autoincrement())
+  sourceKey          String?           @unique @map("source_key") @db.VarChar(100)
   userId             Int               @map("user_id")
   registeredDeviceId Int?              @map("registered_device_id")
   sessionId          Int?              @map("session_id")
@@ -609,6 +612,7 @@ model DeviceIntegrityCheck {
 
 model AuditLog {
   id          Int       @id @default(autoincrement())
+  sourceKey   String?   @unique @map("source_key") @db.VarChar(100)
   actorUserId Int?      @map("actor_user_id")
   action      String    @db.VarChar(100)
   entityType  String    @map("entity_type") @db.VarChar(100)

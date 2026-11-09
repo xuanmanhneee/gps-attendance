@@ -31,6 +31,10 @@ import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../context/auth-context';
 import { getStableDeviceId } from '../../services/device-id';
 import { checkDeviceSecurity, getIntegrity } from '../../services/integrity';
+import {
+  LocationAccuracyError,
+  sanitizeLocationAccuracy,
+} from '../../services/location';
 import { appAlert } from '../../utils/app-alert';
 
 type Session = MyAttendanceSessionResponse;
@@ -365,8 +369,8 @@ export default function AttendanceSessionDetailScreen() {
     }
 
     appAlert(
-      'Thiết bị an toàn',
-      'Đã xác thực tính toàn vẹn: Thiết bị phần cứng thật, nguyên bản (chưa Root/Jailbreak), định vị GPS chuẩn xác.',
+      'Kiểm tra thiết bị hoàn tất',
+      'Thiết bị vượt qua các kiểm tra cục bộ. Xác minh chứng thực từ nhà cung cấp chưa được cấu hình.',
     );
   };
 
@@ -396,11 +400,14 @@ export default function AttendanceSessionDetailScreen() {
       appAlert('Lỗi tọa độ', 'Tọa độ GPS không hợp lệ. Vui lòng kiểm tra lại thiết bị.');
       return;
     }
-    const currentAccuracy = accuracy ?? 0;
-    if (currentAccuracy > 1000) {
+    let currentAccuracy: number;
+    try {
+      currentAccuracy = sanitizeLocationAccuracy(accuracy);
+    } catch (error) {
+      if (!(error instanceof LocationAccuracyError)) throw error;
       appAlert(
         'Sai số GPS không hợp lệ',
-        `Thiết bị báo sai số ${Math.round(currentAccuracy)}m. Hãy ra chỗ thoáng rồi thử lại.`,
+        'Không xác định được sai số GPS hoặc sai số vượt quá 100 m. Hãy ra chỗ thoáng rồi thử lại.',
       );
       return;
     }
@@ -415,7 +422,7 @@ export default function AttendanceSessionDetailScreen() {
           location: {
             latitude,
             longitude,
-            accuracy: Math.max(0, currentAccuracy),
+            accuracy: currentAccuracy,
             timestamp: currentLocation.timestamp,
             isMockLocation: currentLocation.mocked ?? false,
           },
@@ -646,7 +653,11 @@ export default function AttendanceSessionDetailScreen() {
           <InfoRow
             icon="target"
             label="GPS Accuracy thiết bị"
-            value={location ? `±${Math.round(location.coords.accuracy ?? 0)} m` : 'Chưa xác định'}
+            value={
+              location?.coords.accuracy == null
+                ? 'Chưa xác định'
+                : `±${Math.round(location.coords.accuracy)} m`
+            }
           />
           <Pressable accessibilityRole="button" onPress={() => void handleGpsPress()} style={styles.infoRow}>
             <View style={styles.infoLabelGroup}>

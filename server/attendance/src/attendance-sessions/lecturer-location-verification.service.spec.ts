@@ -17,17 +17,25 @@ describe('LecturerLocationVerificationService', () => {
   };
   const prisma = {
     lecturerLocationVerification: {
-      create: jest.fn().mockResolvedValue({ id: 44, serverTimestamp: new Date() }),
+      create: jest.fn().mockResolvedValue({
+        id: 44,
+        createdAt: new Date(),
+        serverTimestamp: new Date(),
+      }),
     },
   };
   const attendanceSessionsService = {
     findByIdForUser: jest.fn().mockResolvedValue(session),
+    cacheLecturerLocationVerification: jest.fn().mockResolvedValue(undefined),
   };
   let service: LecturerLocationVerificationService;
 
   beforeEach(() => {
     jest.clearAllMocks();
     attendanceSessionsService.findByIdForUser.mockResolvedValue(session);
+    attendanceSessionsService.cacheLecturerLocationVerification.mockResolvedValue(
+      undefined,
+    );
     service = new LecturerLocationVerificationService(
       prisma as unknown as PrismaService,
       new GeoService(),
@@ -44,6 +52,16 @@ describe('LecturerLocationVerificationService', () => {
 
     expect(result.status).toBe('PASS');
     expect(result.sessionCenterChanged).toBe(false);
+    expect(
+      attendanceSessionsService.cacheLecturerLocationVerification,
+    ).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        latitude: center.latitude,
+        longitude: center.longitude,
+        accuracy: 5,
+      }),
+    );
     expect(prisma.lecturerLocationVerification.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         sessionId: 9,
@@ -64,6 +82,9 @@ describe('LecturerLocationVerificationService', () => {
     expect(result.status).toBe('WARNING');
     expect(result.reasons).toContain('LECTURER_OUTSIDE_EXPECTED_LOCATION');
     expect(result.sessionCenterChanged).toBe(false);
+    expect(
+      attendanceSessionsService.cacheLecturerLocationVerification,
+    ).not.toHaveBeenCalled();
   });
 
   it('rejects stale lecturer GPS evidence', async () => {

@@ -8,6 +8,7 @@ import { PrismaClient } from '@prisma/client';
 
 const dataPath = process.env.LOAD_DATA_PATH ?? '/perf-data/load-data.json';
 const phase = process.env.VERIFY_PHASE ?? 'before-flush';
+const ATTEMPT_QUEUE_TIMEOUT_MS = 60_000;
 if (phase !== 'before-flush' && phase !== 'after-flush') {
   throw new Error('VERIFY_PHASE must be before-flush or after-flush');
 }
@@ -26,6 +27,42 @@ const redis = new Redis({
 });
 
 async function main(): Promise<void> {
+  const deadline = Date.now() + ATTEMPT_QUEUE_TIMEOUT_MS;
+  let pendingAttempts = -1;
+  let queuedAttempts = -1;
+  let persistedAttempts = 0;
+  while (Date.now() < deadline) {
+    [pendingAttempts, queuedAttempts, persistedAttempts] = await Promise.all([
+      redis.zcard('attendance:attempts:pending-index'),
+      redis.zcard('attendance:attempts:queue'),
+      prisma.attendanceAttempt.count({
+        where: { sessionId: fixture.sessionId },
+      }),
+    ]);
+    if (
+      pendingAttempts === 0 &&
+      queuedAttempts === 0 &&
+      persistedAttempts === fixture.users.length
+    ) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  const [historyEvents, auditLogs, integrityChecks] = await Promise.all([
+    prisma.attendanceHistoryEvent.count({
+      where: { sessionId: fixture.sessionId },
+    }),
+    prisma.auditLog.count({
+      where: {
+        entityType: 'attendance_check_in',
+        entityId: String(fixture.sessionId),
+      },
+    }),
+    prisma.deviceIntegrityCheck.count({
+      where: { sessionId: fixture.sessionId },
+    }),
+  ]);
   const buffered = await redis.hgetall(`attendance:buffer:${fixture.sessionId}`);
   const bufferRecords = Object.values(buffered).map(
     (raw) => JSON.parse(raw) as { status: string },
@@ -45,8 +82,25 @@ async function main(): Promise<void> {
     postgres: persisted.length,
     postgresPresent: persisted.filter((record) => record.status === 'present')
       .length,
+    pendingAttempts,
+    queuedAttempts,
+    persistedAttempts,
+    historyEvents,
+    auditLogs,
+    integrityChecks,
   };
   console.log(JSON.stringify(counts));
+
+  if (
+    pendingAttempts !== 0 ||
+    queuedAttempts !== 0 ||
+    persistedAttempts !== expected ||
+    historyEvents !== expected * 2 ||
+    auditLogs !== expected * 2 ||
+    integrityChecks !== expected
+  ) {
+    throw new Error('Asynchronous check-in evidence did not persist completely');
+  }
 
   if (phase === 'before-flush') {
     if (

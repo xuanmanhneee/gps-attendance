@@ -1,10 +1,8 @@
-# Local performance stack
+# Cụm kiểm thử hiệu năng cục bộ (Local Performance Stack)
 
-This stack is isolated from `docker-compose.yml`: it has its own Compose
-project, PostgreSQL/Redis volumes, and API image. PostgreSQL and Redis do not
-publish host ports; an Nginx load balancer is bound to `127.0.0.1:3100`.
+Stack này được cô lập hoàn toàn với `docker-compose.yml`: nó có dự án Compose riêng, các volume PostgreSQL/Redis riêng và image API riêng. PostgreSQL và Redis không mở cổng ra máy host; bộ cân bằng tải Nginx được gắn vào `127.0.0.1:3100`.
 
-Run from the repository root:
+Chạy từ thư mục gốc của kho lưu trữ:
 
 ```powershell
 docker compose -f docker-compose.perf.yml up --build -d --scale backend=3 load-balancer
@@ -14,20 +12,17 @@ docker compose -f docker-compose.perf.yml run --rm verify
 docker compose -f docker-compose.perf.yml stats
 ```
 
-`prepare` reuses the prefixed `LOAD` users/accounts, creates a new open
-session, writes its 1,000 absent records to Redis, schedules the normal flush
-job, and saves test tokens in a private Docker volume. It bypasses session
-creation and roster initialization so the k6 result measures the check-in hot
-path. Run separate functional tests for those two setup steps.
+Lệnh `prepare` tái sử dụng các tài khoản/người dùng có tiền tố `LOAD`, tạo một phiên học mở mới, ghi sẵn 1.200 bản ghi `absent` vào Redis, lên lịch cho công việc flush định kỳ và lưu các token kiểm thử vào một Docker volume riêng. Lệnh này bỏ qua bước tạo phiên và khởi tạo roster qua API thông thường để kết quả k6 đo lường chính xác đường dẫn check-in (hot path). Hãy chạy các bài kiểm thử chức năng riêng biệt cho hai bước chuẩn bị đó.
 
-The default test starts one check-in per user over one minute. For a burst
-of 1,000 check-ins over ten seconds, set `LOAD_TIME_UNIT=10s` and
-`LOAD_VUS=1000` before running `load`. The default p95 acceptance threshold is
-50 ms (`PERF_P95_MS` can be set for a different agreed target). A failed
-`dropped_iterations` threshold means k6 did not send the intended load.
+Các lượt thử điểm danh (attempt), kết quả xác thực integrity, sự kiện lịch sử (history) và nhật ký kiểm toán (audit) được lưu trữ bất đồng bộ bởi worker hỗ trợ Redis của từng API theo các lô có tính lũy thừa (idempotent batches). Lệnh `verify` đợi tối đa 60 giây để các hàng đợi này được xả hết và kiểm tra số lượng hàng trong PostgreSQL trước khi xác thực bộ đệm bản ghi điểm danh (attendance record buffer).
 
-The default session closes ten minutes after `prepare`. Once it closes and
-the scheduler has run (it polls every ten seconds), verify PostgreSQL:
+Dữ liệu phiên và mốc định vị GPS mới nhất của giảng viên được đọc từ Redis trên hot path; bước tạo phiên sẽ nạp trước dữ liệu vào bộ nhớ đệm (cache), việc đóng hoặc hủy phiên sẽ làm mới cache, và mỗi lần giảng viên xác thực vị trí thành công mới sẽ cập nhật bản ghi cache tương ứng.
+
+Bài kiểm thử mặc định khởi tạo chính xác 1.200 VUs, giữ mỗi VU ở rào chắn bắt đầu 2 giây, sau đó gửi một yêu cầu check-in cho mỗi VU để tạo ra một đợt tải đột biến đồng thời (burst spike). Số lượng fixture và `LOAD_VUS` phải khớp nhau; đối với bài kiểm tra chẩn đoán nhỏ hơn, hãy đặt cả `LOAD_USERS` và `LOAD_VUS` cùng một giá trị. Các ngưỡng nghiệm thu là: 0 yêu cầu HTTP thất bại, 100% kiểm tra thành công, và p95 dưới 50 ms (`PERF_P95_MS` có thể được cấu hình cho một mục tiêu đã thỏa thuận khác).
+
+Bảng tóm tắt của k6 cũng báo cáo các xu hướng thời gian phía API gồm `server_pre_handler_ms`, `server_handler_ms` và `server_request_ms`, cùng các xu hướng phía client gồm `client_blocked_ms`, `client_connecting_ms`, `client_sending_ms`, `client_waiting_ms` và `client_receiving_ms`, cũng như phía Nginx gồm `proxy_first_byte_ms`, `upstream_connect_ms` và `upstream_header_ms`. Các chỉ số này tách biệt thời gian trong guards/framework, thời gian thực thi handler, mạng client, chuyển tiếp proxy và thời gian chờ API. Các header đo thời gian của API chỉ được phát ra khi cả `NODE_ENV=test` và `LOAD_TEST_MODE=true`.
+
+Phiên học mặc định sẽ đóng sau 10 phút kể từ lệnh `prepare`. Khi phiên đóng và bộ lập lịch đã chạy (quét mỗi 10 giây), hãy xác minh PostgreSQL:
 
 ```powershell
 $env:VERIFY_PHASE = 'after-flush'
@@ -35,34 +30,25 @@ docker compose -f docker-compose.perf.yml run --rm verify
 Remove-Item Env:VERIFY_PHASE
 ```
 
-`before-flush` verification expects all students present in Redis and no
-PostgreSQL records. `after-flush` expects all students present in PostgreSQL
-and an empty Redis buffer. Each run needs a fresh `prepare` invocation.
+Bước xác minh `before-flush` yêu cầu tất cả sinh viên phải có bản ghi `present` trong Redis và chưa có bản ghi nào trong PostgreSQL. Bước `after-flush` yêu cầu tất cả sinh viên phải có bản ghi `present` trong PostgreSQL và bộ đệm Redis phải rỗng. Mỗi lần chạy kiểm thử cần một lần gọi `prepare` mới.
 
-To check two concurrent users sharing a device and two concurrent requests
-from one user, prepare a separate fixture with at least three users, then run:
+Để kiểm tra trường hợp hai người dùng đồng thời dùng chung một thiết bị và hai yêu cầu đồng thời từ một người dùng, hãy chuẩn bị một fixture riêng với ít nhất ba người dùng, sau đó chạy:
 
 ```powershell
 docker compose -f docker-compose.perf.yml run --rm -e LOAD_USERS=3 prepare
 docker compose -f docker-compose.perf.yml run --rm --entrypoint k6 load run /scripts/check-in-race.js
 ```
 
-Resource defaults are 2 CPU/2 GB per API instance, 2 CPU/2 GB for PostgreSQL, and
-1 CPU/512 MB for Redis. Override with `PERF_API_CPUS`, `PERF_API_MEMORY`,
-`PERF_DB_CPUS`, `PERF_DB_MEMORY`, `PERF_REDIS_CPUS`, and `PERF_REDIS_MEMORY`.
-Each API instance defaults to a 15-connection PostgreSQL pool; override with
-`PERF_DB_POOL_MAX` while keeping the sum across API replicas and other clients
-below PostgreSQL's configured connection limit.
-Keep enough host capacity for k6 and Docker Desktop. The test fixture count
-can be changed with `LOAD_USERS`; session length with `LOAD_SESSION_MINUTES`.
-The isolated performance API enables the test-only rate-limit bypass and
-supplies mock integrity evidence; never enable these settings in production.
+Tài nguyên mặc định là 2 CPU / 2 GB cho mỗi container API, 2 CPU / 2 GB cho PostgreSQL, và 1 CPU / 512 MB cho Redis. Có thể ghi đè bằng các biến môi trường: `PERF_API_CPUS`, `PERF_API_MEMORY`, `PERF_DB_CPUS`, `PERF_DB_MEMORY`, `PERF_REDIS_CPUS` và `PERF_REDIS_MEMORY`. Mỗi instance API mặc định có một pool kết nối PostgreSQL tối đa 15 kết nối; có thể ghi đè bằng `PERF_DB_POOL_MAX` nhưng cần đảm bảo tổng số kết nối trên tất cả replica API và các client khác không vượt quá giới hạn kết nối cấu hình của PostgreSQL.
 
-Stop the stack without deleting its test data:
+API kiểm thử hiệu năng sử dụng `LOG_LEVEL=error` để các log info theo từng request không gây nghẽn I/O console trên hot path được đo lường; các lỗi vẫn được ghi nhận đầy đủ. Cần duy trì đủ dung lượng máy host cho k6 và Docker Desktop. Số lượng fixture kiểm thử có thể thay đổi bằng `LOAD_USERS`; thời lượng phiên học thay đổi bằng `LOAD_SESSION_MINUTES`.
+
+API hiệu năng cô lập này kích hoạt tính năng bỏ qua giới hạn tần suất (rate-limit bypass) chỉ dành cho kiểm thử và sử dụng một token attestation kiểm thử cố định. API chỉ chấp nhận token đó khi `NODE_ENV=test`, `LOAD_TEST_MODE=true` và tên cơ sở dữ liệu chính xác là `gps_attendance_loadtest`; tuyệt đối không bật các cài đặt này trên môi trường sản xuất (production).
+
+Dừng stack mà không xóa dữ liệu kiểm thử:
 
 ```powershell
 docker compose -f docker-compose.perf.yml down
 ```
 
-The generated tokens live only in the `perf_data` Docker volume. Treat that
-volume as test credentials and never use this stack against a public API.
+Các token được tạo chỉ tồn tại trong Docker volume `perf_data`. Hãy xem volume đó như các thông tin xác thực kiểm thử và không bao giờ sử dụng stack này chống lại một API công khai.

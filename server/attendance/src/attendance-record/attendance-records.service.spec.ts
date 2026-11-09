@@ -78,6 +78,7 @@ describe('AttendanceRecordsService.getMySummary', () => {
           distanceMeters: null,
         },
       ] as StudentAttendanceHistoryItemDto[]),
+      findByUser: jest.fn().mockResolvedValue([]),
     };
 
     const loggerFactory = {
@@ -136,6 +137,7 @@ describe('AttendanceRecordsService.getMySummary', () => {
         makeRecord(2, 'pending'),
         makeRecord(3, 'cancelled'),
       ]),
+      findByUser: jest.fn().mockResolvedValue([]),
     };
     const loggerFactory = {
       create: jest.fn(() => ({
@@ -159,5 +161,57 @@ describe('AttendanceRecordsService.getMySummary', () => {
       absentCount: 1,
       attendanceRate: 0,
     });
+  });
+
+  it('preserves a newer persisted review decision when flushing an older buffer snapshot', async () => {
+    const buffered = {
+      sessionId: 7,
+      userId: 42,
+      status: 'absent',
+      deviceId: 'device-1',
+      checkedInAt: null,
+      latitude: 10,
+      longitude: 106,
+      accuracy: 10,
+      distanceMeters: 12,
+      updatedAt: new Date('2026-11-08T10:00:00.000Z'),
+      updateBy: null,
+    };
+    const persisted = {
+      ...buffered,
+      status: 'present',
+      checkedInAt: new Date('2026-11-08T10:01:00.000Z'),
+      updateBy: 99,
+      updatedAt: new Date('2026-11-08T10:01:00.000Z'),
+    };
+    const repository = {
+      findBySession: jest.fn().mockResolvedValue([persisted]),
+      upsertRecords: jest.fn().mockResolvedValue(undefined),
+    };
+    const buffer = {
+      beginSessionFlush: jest.fn().mockResolvedValue([buffered]),
+      completeSessionFlush: jest.fn().mockResolvedValue(undefined),
+    };
+    const loggerFactory = {
+      create: jest.fn(() => ({
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        debug: jest.fn(),
+      })),
+    };
+    const service = new AttendanceRecordsService(
+      repository as any,
+      loggerFactory as any,
+      buffer as any,
+      { onJob: jest.fn() } as any,
+    );
+
+    await service.flushSession(7);
+
+    expect(repository.upsertRecords).toHaveBeenCalledWith([
+      expect.objectContaining({ status: 'present', updateBy: 99 }),
+    ]);
+    expect(buffer.completeSessionFlush).toHaveBeenCalledWith(7);
   });
 });

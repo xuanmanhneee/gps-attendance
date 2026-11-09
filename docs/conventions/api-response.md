@@ -1,9 +1,8 @@
-# API Response & Error Code
+# Quy ước Phản hồi API & Mã Lỗi (API Response & Error Codes)
 
-## 1. ApiResponse<T>
+## 1. Chuẩn phản hồi `ApiResponse<T>`
 
-Mọi response từ server luôn theo discriminated union, định nghĩa tại
-`packages/shared/src/api/response`:
+Mọi phản hồi (response) từ server luôn tuân thủ cấu trúc Discriminated Union chặt chẽ, được định nghĩa tại `packages/shared/src/api/response`:
 
 ```typescript
 export interface ApiSuccessResponse<T> {
@@ -20,18 +19,14 @@ export interface ApiErrorResponse {
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 ```
 
-**Quy tắc:**
-- Không dùng field optional kiểu `data?: T; error?: string` — luôn dùng
-  discriminated union để TypeScript tự narrow type theo `success`.
-- Controller trả về đúng shape `{ success: true, data }` — không trả raw
-  object hay array trực tiếp.
-- Khi throw lỗi nghiệp vụ, dùng `code` theo convention ở mục 2, không tự
-  chế message tự do làm code.
+**Các quy tắc bắt buộc:**
+- **Không dùng trường tùy chọn (optional field)** kiểu `{ data?: T; error?: string }` — luôn luôn sử dụng discriminated union để trình biên dịch TypeScript tự động thu hẹp kiểu (narrow type) an toàn dựa trên thuộc tính `success`.
+- **Controller luôn trả về đúng cấu trúc chuẩn** `{ success: true, data }` — tuyệt đối không trả về đối tượng thô (raw object) hoặc mảng trực tiếp ra ngoài HTTP response.
+- **Khi ném ngoại lệ nghiệp vụ (business exception)**, bắt buộc dùng `code` theo đúng quy ước mã lỗi ở Mục 2 dưới đây, không tự ý sáng tác chuỗi thông báo tự do thay cho mã lỗi.
 
-## 2. Error code
+## 2. Quy ước Mã Lỗi (Error Codes)
 
-Mỗi domain định nghĩa 1 const object namespaced theo domain, đặt trong
-`packages/shared/src/api/response/error_codes/`:
+Mỗi domain nghiệp vụ định nghĩa một hằng đối tượng (const object) có tiền tố phân vùng (namespaced) theo domain tương ứng, đặt tại thư mục `packages/shared/src/api/response/error_codes/`:
 
 ```typescript
 export const AttendanceSessionErrorCode = {
@@ -42,12 +37,9 @@ export const AttendanceSessionErrorCode = {
 } as const;
 ```
 
-**Quy tắc:**
-- Tên file: `<domain>-error.codes.ts`.
-- Tên const: `<Domain>ErrorCode` (PascalCase).
-- Giá trị string: `<DOMAIN>_<REASON>` (SCREAMING_SNAKE_CASE), luôn prefix
-  bằng tên domain để tránh đụng code giữa các domain khác nhau.
-- Luôn thêm `as const` để TypeScript suy ra union literal type, phục vụ
-  switch-case exhaustive check ở phía client.
-- Export từ `packages/shared/src/api/<domain>/index.ts` để client import
-  gọn qua 1 path.
+**Các quy tắc bắt buộc:**
+- **Quy tắc đặt tên file:** `<domain>-error.codes.ts` (ví dụ: `attendance-check-in-error.codes.ts`, `attendance-session-error.codes.ts`).
+- **Quy tắc đặt tên hằng:** `<Domain>ErrorCode` (viết theo định dạng PascalCase).
+- **Quy tắc giá trị chuỗi (string value):** `<DOMAIN>_<REASON>` (viết hoa dạng SCREAMING_SNAKE_CASE), luôn bắt đầu bằng tên domain làm tiền tố để tránh xung đột mã lỗi giữa các phân hệ nghiệp vụ khác nhau.
+- **Bắt buộc gắn `as const`:** Giúp TypeScript tự động suy diễn kiểu union literal, phục vụ kiểm tra toàn diện không sót trường hợp (exhaustive switch-case check) ở phía client.
+- **Xuất khẩu tập trung (Export):** Luôn xuất khẩu từ `packages/shared/src/api/<domain>/index.ts` để phía ứng dụng client có thể import gọn gàng qua một đường dẫn duy nhất.

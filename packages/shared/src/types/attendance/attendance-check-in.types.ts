@@ -57,7 +57,8 @@ export type AttendanceValidationReason =
   | 'UNCERTAIN_BOUNDARY'
   | 'NEAR_LECTURER'
   | 'FAR_FROM_LECTURER'
-  | 'NO_LECTURER_LOCATION';
+  | 'NO_LECTURER_LOCATION'
+  | 'INVALID_LOCATION_TIMESTAMP';
 
 // -----------------------------------------------------------------------------
 // Attendance Check-in
@@ -68,7 +69,8 @@ export type AttendanceCheckInReason =
   | 'TOO_MANY_ATTEMPTS'
   | 'DUPLICATE_DEVICE'
   | 'DEVICE_UNVERIFIED'
-  | 'DEVICE_BLOCKED';
+  | 'DEVICE_BLOCKED'
+  | 'DEVICE_ATTESTATION_FAILED';
 
 export interface CheckInRequest {
   /** Phiên điểm danh */

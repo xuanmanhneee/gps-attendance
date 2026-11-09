@@ -69,6 +69,7 @@ describe('AuthService', () => {
         userId: 1,
         username: 'testuser',
         passwordHash: hashedPassword,
+        status: 'active',
       });
 
       usersService.findById = jest.fn().mockResolvedValue({
@@ -100,6 +101,7 @@ describe('AuthService', () => {
         id: 10,
         username: 'testuser',
         passwordHash: hashedPassword,
+        status: 'active',
       });
 
       await expect(

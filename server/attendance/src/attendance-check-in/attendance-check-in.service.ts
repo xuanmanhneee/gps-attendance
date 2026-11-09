@@ -23,9 +23,9 @@ import { ATTENDANCE_CHECK_IN_DEVICE_USAGE_REPOSITORY } from './attendance-check-
 import { IAttendanceCheckInDeviceUsageRepository } from './repositories/attendance-check-in-device-usage.repository';
 import { ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY } from './attendance-check-in.token';
 import type { IAttendanceCheckInAttemptRepository } from './repositories/attendance-check-in-attempt.repository';
-import { AuditLogService } from '../common/audit/audit-log.service';
 import { DeviceAttestationService } from '../common/device-attestation/device-attestation.service';
 import { MonitoringService } from '../health/monitoring.service';
+import { LocationTimestampCheck } from '../attendance-validation/checks/location-timestamp.check';
 
 @Injectable()
 export class AttendanceCheckInService {
@@ -40,16 +40,16 @@ export class AttendanceCheckInService {
     @Inject(ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY)
     private readonly attemptRepository: IAttendanceCheckInAttemptRepository,
     private readonly prisma: PrismaService,
-    private readonly auditLogService?: AuditLogService,
     private readonly deviceAttestationService?: DeviceAttestationService,
     private readonly monitoringService?: MonitoringService,
+    private readonly locationTimestampCheck: LocationTimestampCheck =
+      new LocationTimestampCheck(),
   ) {}
 
   async checkIn(
     dto: CheckInRequestDto,
     userId: number,
   ): Promise<AttendanceCheckInResult> {
-    const audit = this.auditLogService ?? { record: async () => {} };
     const attestationService = this.deviceAttestationService ?? new DeviceAttestationService();
     const monitoring = this.monitoringService ?? { recordCheckInOutcome: () => {} };
 
@@ -57,21 +57,7 @@ export class AttendanceCheckInService {
     // 1. Guard layer: kiểm tra phiên điểm danh
     // -------------------------------------------------------------------------
 
-    const [session] = await Promise.all([
-      this.attendanceSessionsService.findById(dto.sessionId),
-      audit.record({
-        actorUserId: userId,
-        action: 'CHECK_IN_REQUESTED',
-        entityType: 'attendance_session',
-        entityId: String(dto.sessionId),
-        metadata: {
-          latitude: dto.location.latitude,
-          longitude: dto.location.longitude,
-          accuracy: dto.location.accuracy,
-          deviceId: dto.device.deviceId,
-        },
-      }),
-    ]);
+    const session = await this.attendanceSessionsService.findById(dto.sessionId);
 
     if (!session) {
       throw new NotFoundException({
@@ -85,6 +71,13 @@ export class AttendanceCheckInService {
       throw new BadRequestException({
         code: AttendanceSessionErrorCode.SESSION_NOT_OPEN,
         message: 'Phiên điểm danh hiện không mở hoặc đã hết thời gian điểm danh',
+      });
+    }
+
+    if (!this.locationTimestampCheck.evaluate(dto.location, now).isValid) {
+      throw new BadRequestException({
+        code: AttendanceCheckInErrorCode.INVALID_LOCATION_TIMESTAMP,
+        message: 'Vị trí GPS đã quá cũ hoặc thời gian thiết bị không hợp lệ',
       });
     }
 
@@ -102,6 +95,8 @@ export class AttendanceCheckInService {
         distanceToCenter,
         deviceId: dto.device.deviceId,
         isMockLocation: dto.location.isMockLocation,
+        platform: dto.device.platform,
+        model: dto.device.model,
       }),
       this.attendanceRecordsService.getBySessionAndUser(dto.sessionId, userId),
     ]);
@@ -145,25 +140,21 @@ export class AttendanceCheckInService {
       };
     }
 
-    const [registeredDevice, device] = await Promise.all([
-      this.prisma.registeredDevice.upsert({
-        where: {
-          userId_deviceId: { userId, deviceId: dto.device.deviceId },
+    const [deviceTrustStatus, device] = await Promise.all([
+      this.attemptRepository.getDeviceTrustStatus(
+        userId,
+        dto.device.deviceId,
+        async () => {
+          const registeredDevice =
+            await this.prisma.registeredDevice.findUnique({
+              where: {
+                userId_deviceId: { userId, deviceId: dto.device.deviceId },
+              },
+              select: { trustStatus: true },
+            });
+          return registeredDevice?.trustStatus ?? 'UNVERIFIED';
         },
-        create: {
-          userId,
-          deviceId: dto.device.deviceId,
-          platform: dto.device.platform,
-          model: dto.device.model,
-          trustStatus: 'UNVERIFIED',
-        },
-        update: {
-          platform: dto.device.platform,
-          model: dto.device.model,
-          lastSeenAt: new Date(),
-        },
-        select: { id: true, trustStatus: true },
-      }),
+      ),
       this.deviceCheck.evaluate({
         sessionId: dto.sessionId,
         deviceId: dto.device.deviceId,
@@ -171,43 +162,22 @@ export class AttendanceCheckInService {
       }),
     ]);
 
-    const attestation = attestationService.verify(
+    const attestation = await attestationService.verify(
       dto.device.platform,
       dto.integrity?.integrityToken,
     );
+    await this.attemptRepository.setAttestationResult(attempt.attemptId, {
+      provider: dto.device.platform === 'ios' ? 'APP_ATTEST' : 'PLAY_INTEGRITY',
+      verdict: attestation.verdict,
+      reasons: attestation.reasons,
+    });
 
-    const [latestLecturerVerification] = await Promise.all([
-      this.prisma.lecturerLocationVerification?.findFirst?.({
-        where: {
-          sessionId: dto.sessionId,
-          status: 'PASS',
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.deviceIntegrityCheck.create({
-        data: {
-          userId,
-          registeredDeviceId: registeredDevice.id,
-          sessionId: dto.sessionId,
-          provider: dto.device.platform === 'ios' ? 'APP_ATTEST' : 'PLAY_INTEGRITY',
-          verdict: attestation.verdict,
-          reasons: attestation.reasons.length > 0 ? attestation.reasons : ['ATTESTATION_OK'],
-        },
-      }),
-    ]);
+    const latestLecturerVerification =
+      await this.attendanceSessionsService.findLatestLecturerVerification(
+        dto.sessionId,
+      );
 
     if (!attestation.isValid) {
-      await audit.record({
-        actorUserId: userId,
-        action: 'CHECK_IN_REVIEWED',
-        entityType: 'attendance_check_in',
-        entityId: String(dto.sessionId),
-        metadata: {
-          reason: 'DEVICE_ATTESTATION_FAILED',
-          details: attestation.reasons,
-        },
-      });
-
       if (attestation.verdict === 'DEVICE_ROOTED' || attestation.verdict === 'EMULATOR_DETECTED') {
         await this.attemptRepository.completeAttempt(
           attempt.attemptId,
@@ -218,7 +188,7 @@ export class AttendanceCheckInService {
       }
     }
 
-    if (registeredDevice.trustStatus === 'BLOCKED') {
+    if (deviceTrustStatus === 'BLOCKED') {
       await this.attemptRepository.completeAttempt(
         attempt.attemptId,
         'REJECTED',
@@ -242,7 +212,7 @@ export class AttendanceCheckInService {
     // -------------------------------------------------------------------------
     // 3. Validation layer: kiểm tra định vị & chấm điểm tin cậy
     // -------------------------------------------------------------------------
-    const checkedInAt = new Date();
+    const checkedInAt = now;
     const existingRecordCount = 0;
 
     // Truy vấn mốc vị trí xác thực gần nhất của giảng viên trong session (nếu có)
@@ -251,7 +221,7 @@ export class AttendanceCheckInService {
           latitude: Number(latestLecturerVerification.latitude),
           longitude: Number(latestLecturerVerification.longitude),
           accuracy: Number(latestLecturerVerification.accuracy),
-          verifiedAt: latestLecturerVerification.createdAt,
+          verifiedAt: latestLecturerVerification.verifiedAt,
         }
       : null;
 
@@ -269,10 +239,14 @@ export class AttendanceCheckInService {
     const reasons: AttendanceCheckInReason[] = [...validation.reasons];
     const finalStatus: 'VALID' | 'REVIEW' =
       validation.status === 'VALID' &&
-      registeredDevice.trustStatus !== 'UNVERIFIED'
+      attestation.isValid &&
+      deviceTrustStatus !== 'UNVERIFIED'
         ? 'VALID'
         : 'REVIEW';
-    if (registeredDevice.trustStatus === 'UNVERIFIED') {
+    if (!attestation.isValid) {
+      reasons.push('DEVICE_ATTESTATION_FAILED');
+    }
+    if (deviceTrustStatus === 'UNVERIFIED') {
       reasons.push('DEVICE_UNVERIFIED');
     }
 
@@ -284,19 +258,6 @@ export class AttendanceCheckInService {
           'REJECTED',
           reasons,
         ),
-        audit.record({
-          actorUserId: userId,
-          action: 'CHECK_IN_REJECTED',
-          entityType: 'attendance_check_in',
-          entityId: String(dto.sessionId),
-          metadata: {
-            status: 'REJECTED',
-            reasons,
-            distanceMeters: validation.distance,
-            distanceToLecturer: validation.distanceToLecturer,
-            lecturerProximityVerdict: validation.lecturerProximityVerdict,
-          },
-        }),
       ]);
       return {
         status: 'REJECTED',
@@ -337,19 +298,6 @@ export class AttendanceCheckInService {
         finalStatus === 'VALID' ? 'APPROVED' : 'REVIEW',
         reasons,
       ),
-      audit.record({
-        actorUserId: userId,
-        action: 'CHECK_IN_RESULT',
-        entityType: 'attendance_check_in',
-        entityId: String(dto.sessionId),
-        metadata: {
-          status: finalStatus,
-          reasons,
-          distanceMeters: validation.distance,
-          distanceToLecturer: validation.distanceToLecturer,
-          lecturerProximityVerdict: validation.lecturerProximityVerdict,
-        },
-      }),
     ]);
 
     if (finalStatus === 'VALID') {

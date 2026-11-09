@@ -4,18 +4,19 @@ import { AttendanceValidationModule } from '../attendance-validation/attendance-
 import { AttendanceCheckInController } from './attendance-check-in.controller';
 import { AttendanceCheckInService } from './attendance-check-in.service';
 import { AttendanceRecordModule } from '../attendance-record/attendance-record.module';
-import { PrismaAttendanceCheckInStore } from './infra/prisma/prisma-attendance-check-in.store';
+import { RedisAttendanceCheckInStore } from './infra/redis/redis-attendance-check-in.store';
 import {
   ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY,
   ATTENDANCE_CHECK_IN_DEVICE_USAGE_REPOSITORY,
 } from './attendance-check-in.token';
 import { AttemptCheck } from './checks/attempt.check';
 import { DeviceCheck } from './checks/device.check';
-import { AuditLogService } from '../common/audit/audit-log.service';
 import { DeviceAttestationService } from '../common/device-attestation/device-attestation.service';
 import { DeviceRateLimitGuard } from '../common/guards/device-rate-limit.guard';
 import { RateLimitService } from '../common/rate-limit/rate-limit.service';
 import { HealthModule } from '../health/health.module';
+import { LocationTimestampCheck } from '../attendance-validation/checks/location-timestamp.check';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
   imports: [
@@ -23,22 +24,23 @@ import { HealthModule } from '../health/health.module';
     AttendanceValidationModule,
     AttendanceRecordModule,
     HealthModule,
+    RedisModule,
   ],
   controllers: [AttendanceCheckInController],
   providers: [
     AttendanceCheckInService,
-    PrismaAttendanceCheckInStore,
+    RedisAttendanceCheckInStore,
     {
       provide: ATTENDANCE_CHECK_IN_ATTEMPT_REPOSITORY,
-      useExisting: PrismaAttendanceCheckInStore,
+      useExisting: RedisAttendanceCheckInStore,
     },
     {
       provide: ATTENDANCE_CHECK_IN_DEVICE_USAGE_REPOSITORY,
-      useExisting: PrismaAttendanceCheckInStore,
+      useExisting: RedisAttendanceCheckInStore,
     },
     AttemptCheck,
     DeviceCheck,
-    AuditLogService,
+    LocationTimestampCheck,
     DeviceAttestationService,
     DeviceRateLimitGuard,
     RateLimitService,

@@ -1,18 +1,18 @@
-# Load Tests
+# Kiểm thử tải k6 (Load Tests)
 
-These k6 scenarios measure API behavior on an explicitly selected local or staging environment. Do not run write scenarios against production.
+Các kịch bản k6 này đo lường hành vi của API trên môi trường cục bộ (local) hoặc môi trường staging được chỉ định rõ ràng. Không chạy các kịch bản ghi dữ liệu (write scenarios) vào môi trường sản xuất (production).
 
-## Prerequisites
+## Điều kiện tiên quyết
 
-- Install k6 and start the API against a disposable or staging database.
-- Use valid access tokens for the selected role.
-- Keep the API, database, Redis, and load generator close to the intended deployment topology.
+- Cài đặt k6 và khởi động API kết nối với một cơ sở dữ liệu dùng một lần (disposable) hoặc database staging.
+- Sử dụng access token hợp lệ cho role được chọn.
+- Duy trì API, cơ sở dữ liệu, Redis và bộ tạo tải (load generator) gần với cấu trúc liên kết triển khai dự kiến.
 
-## Read-only API ramp test
+## Kịch bản kiểm thử tải tăng dần cho API chỉ đọc (Read-only API ramp test)
 
-The scenario ramps to `MAX_VUS` virtual users and repeatedly calls a role-specific mix of endpoints. `TOKEN` is required. `ROLE` accepts `participant`, `organizer`, or `admin`; `SESSION_ID` adds the session detail endpoint to staff traffic.
+Kịch bản này tăng dần số lượng người dùng ảo lên `MAX_VUS` và gọi liên tục một tập hợp các endpoint đặc thù theo từng role. Biến `TOKEN` là bắt buộc. `ROLE` chấp nhận các giá trị: `participant`, `organizer` hoặc `admin`; `SESSION_ID` bổ sung endpoint chi tiết phiên vào lưu lượng của nhân sự quản lý.
 
-PowerShell example:
+Ví dụ lệnh PowerShell:
 
 ```powershell
 $env:BASE_URL = 'http://localhost:3000'
@@ -24,13 +24,13 @@ $env:ERROR_RATE = '0.01'
 k6 run tests/load/read-api.js
 ```
 
-Optional settings: `PAUSE_SECONDS` (default `0.5`), `P95_MS` (default `1000`), and `ERROR_RATE` (default `0.01`). Run separate tests for student and staff roles so the result identifies which API mix is under load.
+Cấu hình tùy chọn: `PAUSE_SECONDS` (mặc định `0.5`), `P95_MS` (mặc định `1000`), và `ERROR_RATE` (mặc định `0.01`). Hãy chạy các bài kiểm tra riêng biệt cho role sinh viên và role giảng viên/quản trị viên để kết quả xác định rõ tập API nào đang chịu tải.
 
-## Check-in ramp and spike test
+## Kịch bản kiểm thử tăng tải và tải đột biến điểm danh (Check-in ramp and spike test)
 
-`checkin-burst.js` ramps from `RAMP_VUS` to `MAX_VUS`, holds the spike, then cools down. Each VU sends exactly one check-in; later iterations sleep without sending more requests. Supply at least `MAX_VUS` fixtures through `CHECKIN_FIXTURES`. Every fixture needs a unique student token and device ID, plus a numeric session ID assigned to that student. The target session must be open and disposable. The runner refreshes each location timestamp at send time.
+`checkin-burst.js` tăng dần từ `RAMP_VUS` lên `MAX_VUS`, duy trì mức tải đột biến (spike), sau đó hạ nhiệt (cool down). Mỗi VU chỉ gửi chính xác một yêu cầu check-in; các vòng lặp sau đó sẽ ở trạng thái nghỉ mà không gửi thêm request. Cần cung cấp ít nhất `MAX_VUS` bộ dữ liệu mẫu (fixtures) qua biến `CHECKIN_FIXTURES`. Mỗi fixture cần một token sinh viên và device ID duy nhất, kèm theo ID phiên học dạng số được phân công cho sinh viên đó. Phiên mục tiêu phải đang mở và là phiên dùng một lần. Trình chạy kiểm thử sẽ làm mới timestamp tọa độ tại thời điểm gửi.
 
-Fixture shape:
+Định dạng fixture:
 
 ```json
 [
@@ -56,7 +56,7 @@ Fixture shape:
 ]
 ```
 
-PowerShell example for a 50-user ramp/spike:
+Ví dụ lệnh PowerShell cho bài kiểm thử 50 người dùng tăng tải / đột biến:
 
 ```powershell
 $env:BASE_URL = 'http://localhost:3000'
@@ -70,14 +70,14 @@ $env:COOLDOWN_DURATION = '10s'
 k6 run tests/load/checkin-burst.js --summary-export=result-spike-50vu.json
 ```
 
-Optional thresholds: `P95_MS` (default `1000`) and `TECHNICAL_ERROR_RATE` (default `0.01`). The script reports `checkin_rate_limited`, `checkin_business_rejected`, `checkin_accepted`, and a technical error rate separately. k6's built-in `http_req_failed` includes HTTP 4xx such as 429, so do not interpret it as infrastructure-only errors.
+Các ngưỡng cấu hình tùy chọn: `P95_MS` (mặc định `1000`) và `TECHNICAL_ERROR_RATE` (mặc định `0.01`). Kịch bản báo cáo riêng biệt các chỉ số: `checkin_rate_limited`, `checkin_business_rejected`, `checkin_accepted` và tỷ lệ lỗi kỹ thuật. Chỉ số `http_req_failed` tích hợp sẵn của k6 bao gồm cả các mã HTTP 4xx như 429, do đó không nên hiểu nhầm nó chỉ là lỗi hạ tầng.
 
-Keep real tokens and local fixture files out of version control. Do not delete attendance rows or attempts to reset tests. The schema stores records, attempts, audit logs, and review evidence; use a disposable test database and create a fresh test session for each run.
+Không đưa các token thật và file fixture cục bộ vào hệ thống quản lý phiên bản (Git). Không xóa các hàng attendance hoặc attempt để reset bài kiểm thử. Schema lưu trữ các bản ghi, lượt thử, nhật ký audit và chứng cứ review; hãy sử dụng một cơ sở dữ liệu kiểm thử dùng một lần và tạo một phiên kiểm thử mới cho mỗi lượt chạy.
 
-`checkin-fixtures.example.json` is a placeholder-only template, not a runnable credential. Fixture paths passed to k6 are relative to the script directory. To check k6 module loading without sending requests, run `k6 inspect -e CHECKIN_FIXTURES=checkin-fixtures.example.json -e MAX_VUS=1 tests/load/checkin-burst.js`.
+`checkin-fixtures.example.json` chỉ là file mẫu khung, không phải thông tin xác thực có thể chạy trực tiếp. Đường dẫn fixture truyền vào k6 được tính tương đối theo thư mục của script. Để kiểm tra việc nạp module của k6 mà không gửi request, hãy chạy lệnh: `k6 inspect -e CHECKIN_FIXTURES=checkin-fixtures.example.json -e MAX_VUS=1 tests/load/checkin-burst.js`.
 
-The endpoint currently has a 3-request/60-second throttler; the additional device guard allows 60 requests/IP/minute and 30 requests/device/minute. VUs from one load generator share an IP bucket, so a 50-VU test from one machine will primarily measure rate limiting. To measure backend capacity, run only against isolated staging with an explicitly configured test policy or a legitimate distributed load-generator setup. Do not spoof forwarding headers or disable production limits.
+Endpoint check-in hiện tại có bộ giới hạn tần suất 3 request / 60 giây; guard thiết bị bổ sung cho phép 60 request / IP / phút và 30 request / device / phút. Các VU từ một máy phát tải chia sẻ cùng một IP bucket, do đó bài kiểm tra 50 VU từ một máy sẽ chủ yếu đo lường cơ chế giới hạn tần suất. Để đo lường công suất thực của backend, chỉ chạy trên môi trường staging cô lập với chính sách kiểm thử được cấu hình rõ ràng hoặc hệ thống máy phát tải phân tán hợp lệ. Không giả mạo forwarding header hoặc tắt các giới hạn bảo vệ trên production.
 
-## Interpreting results
+## Diễn giải kết quả đo lường
 
-Record VUs, request rate, p95/p99 latency, failed checks, HTTP 429 responses, API CPU/memory, database CPU/connections, and Redis health. Increase `MAX_VUS` in controlled steps and stop when the agreed latency/error objectives fail or infrastructure reaches its safe operating limit. The configured thresholds are starter targets, not measured capacity claims.
+Ghi nhận số lượng VUs, tốc độ request (throughput), độ trễ p95/p99, các kiểm tra thất bại, phản hồi HTTP 429, CPU/bộ nhớ của API, CPU/kết nối của database, và tình trạng sức khỏe của Redis. Hãy tăng dần `MAX_VUS` theo các bước có kiểm soát và dừng lại khi các mục tiêu độ trễ/lỗi đã thỏa thuận bị vi phạm hoặc hạ tầng chạm ngưỡng giới hạn an toàn. Các ngưỡng cấu hình ban đầu là mục tiêu định hướng, không phải tuyên bố công suất đã được đo lường chính thức.

@@ -1,1 +1,1 @@
-export const REVIEW_RESOLUTION_WINDOW_MS = 10 * 60 * 1000;
+export const REVIEW_RESOLUTION_WINDOW_MS = 24 * 60 * 60 * 1000;

@@ -24,8 +24,8 @@ describe('LocationDto coordinates', () => {
   });
 
   it('rejects latitude outside [-90, 90]', () => {
-    expect(findError('latitude', -90.001)?.constraints?.min).toBeDefined();
-    expect(findError('latitude', 90.001)?.constraints?.max).toBeDefined();
+    expect(findError('latitude', -90.001)?.constraints?.isLatitude).toBeDefined();
+    expect(findError('latitude', 90.001)?.constraints?.isLatitude).toBeDefined();
   });
 
   it.each([-180, 180])('accepts longitude boundary %s', (longitude) => {
@@ -33,8 +33,8 @@ describe('LocationDto coordinates', () => {
   });
 
   it('rejects longitude outside [-180, 180]', () => {
-    expect(findError('longitude', -180.001)?.constraints?.min).toBeDefined();
-    expect(findError('longitude', 180.001)?.constraints?.max).toBeDefined();
+    expect(findError('longitude', -180.001)?.constraints?.isLongitude).toBeDefined();
+    expect(findError('longitude', 180.001)?.constraints?.isLongitude).toBeDefined();
   });
 });
 
@@ -46,6 +46,11 @@ describe('LocationDto metadata', () => {
 
   it('rejects negative accuracy', () => {
     expect(findError('accuracy', -0.001)?.constraints?.min).toBeDefined();
+  });
+
+  it('accepts accuracy up to 100 meters and rejects lower-quality readings', () => {
+    expect(findError('accuracy', 100)).toBeUndefined();
+    expect(findError('accuracy', 100.001)?.constraints?.max).toBeDefined();
   });
 
   it('rejects negative timestamp', () => {

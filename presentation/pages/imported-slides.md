@@ -1,13 +1,13 @@
-# Imported Slides
+# Slide Nhập Ngoài (Imported Slides)
 
-You can split your slides.md into multiple files and organize them as you want using the `src` attribute.
+Bạn có thể chia nhỏ file `slides.md` thành nhiều file và sắp xếp theo ý muốn bằng cách sử dụng thuộc tính `src`.
 
 #### `slides.md`
 
 ```markdown
-# Page 1
+# Trang 1
 
-Page 2 from main entry.
+Trang 2 từ file chính.
 
 ---
 
@@ -19,9 +19,9 @@ Page 2 from main entry.
 #### `subpage.md`
 
 ```markdown
-# Page 2
+# Trang 2
 
-Page 2 from another file.
+Trang 2 từ file khác.
 ```
 
-[Learn more](https://sli.dev/guide/syntax.html#importing-slides)
+[Tìm hiểu thêm](https://sli.dev/guide/syntax.html#importing-slides)

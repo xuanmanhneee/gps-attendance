@@ -28,7 +28,10 @@ const request = {
 };
 
 describe('AttendanceCheckInService device trust', () => {
-  const sessions = { findById: jest.fn().mockResolvedValue(openSession) };
+  const sessions = {
+    findById: jest.fn().mockResolvedValue(openSession),
+    findLatestLecturerVerification: jest.fn().mockResolvedValue(null),
+  };
   const validation = {
     distanceToCenter: jest.fn().mockReturnValue(0),
     validate: jest.fn().mockReturnValue({ status: 'VALID', reasons: [], distance: 0 }),
@@ -37,13 +40,28 @@ describe('AttendanceCheckInService device trust', () => {
     getBySessionAndUser: jest.fn().mockResolvedValue({ status: 'absent' }),
     markPresent: jest.fn().mockResolvedValue(undefined),
   };
-  const attemptCheck = { evaluate: jest.fn().mockResolvedValue({ attemptId: 10, isTooMany: false }) };
+  const attemptCheck = {
+    evaluate: jest.fn().mockResolvedValue({
+      attemptId: 'attempt-10',
+      isTooMany: false,
+    }),
+  };
   const deviceCheck = { evaluate: jest.fn().mockResolvedValue({ isDuplicate: false }) };
   const deviceUsage = { markUsed: jest.fn().mockResolvedValue(undefined) };
-  const attemptRepository = { completeAttempt: jest.fn().mockResolvedValue(undefined) };
+  const attemptRepository = {
+    completeAttempt: jest.fn().mockResolvedValue(undefined),
+    setAttestationResult: jest.fn().mockResolvedValue(undefined),
+    getDeviceTrustStatus: jest.fn().mockResolvedValue('UNVERIFIED'),
+  };
+  const attestation = {
+    verify: jest.fn().mockResolvedValue({
+      isValid: false,
+      verdict: 'TOKEN_MISSING',
+      reasons: ['TOKEN_MISSING'],
+    }),
+  };
   const prisma = {
-    registeredDevice: { upsert: jest.fn() },
-    deviceIntegrityCheck: { create: jest.fn().mockResolvedValue({}) },
+    registeredDevice: { findUnique: jest.fn() },
   };
 
   const makeService = () => new AttendanceCheckInService(
@@ -55,70 +73,107 @@ describe('AttendanceCheckInService device trust', () => {
     deviceUsage as never,
     attemptRepository as never,
     prisma as never,
+    attestation as never,
   );
 
   beforeEach(() => {
     jest.clearAllMocks();
     sessions.findById.mockResolvedValue(openSession);
+    sessions.findLatestLecturerVerification.mockResolvedValue(null);
     records.getBySessionAndUser.mockResolvedValue({ status: 'absent' });
-    attemptCheck.evaluate.mockResolvedValue({ attemptId: 10, isTooMany: false });
+    attemptCheck.evaluate.mockResolvedValue({
+      attemptId: 'attempt-10',
+      isTooMany: false,
+    });
     deviceCheck.evaluate.mockResolvedValue({ isDuplicate: false });
     validation.validate.mockReturnValue({ status: 'VALID', reasons: [], distance: 0 });
-    prisma.deviceIntegrityCheck.create.mockResolvedValue({});
+    attemptRepository.getDeviceTrustStatus.mockResolvedValue('UNVERIFIED');
+    attestation.verify.mockResolvedValue({
+      isValid: false,
+      verdict: 'TOKEN_MISSING',
+      reasons: ['TOKEN_MISSING'],
+    });
   });
 
-  it('requires review for an unverified device and records missing platform attestation honestly', async () => {
-    prisma.registeredDevice.upsert.mockResolvedValue({ id: 22, trustStatus: 'UNVERIFIED' });
-
+  it('queues platform attestation evidence for an unverified device', async () => {
     const result = await makeService().checkIn(request as never, 31);
 
-    expect(result).toEqual({ status: 'REVIEW', reasons: ['DEVICE_UNVERIFIED'] });
-    expect(prisma.deviceIntegrityCheck.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        registeredDeviceId: 22,
-        verdict: 'TOKEN_MISSING',
-        reasons: ['PLATFORM_ATTESTATION_VALIDATOR_NOT_CONFIGURED'],
-      }),
+    expect(result).toEqual({
+      status: 'REVIEW',
+      reasons: ['DEVICE_ATTESTATION_FAILED', 'DEVICE_UNVERIFIED'],
     });
+    expect(attemptRepository.setAttestationResult).toHaveBeenCalledWith(
+      'attempt-10',
+      {
+        provider: 'PLAY_INTEGRITY',
+        verdict: 'TOKEN_MISSING',
+        reasons: ['TOKEN_MISSING'],
+      },
+    );
     expect(attemptRepository.completeAttempt).toHaveBeenCalledWith(
-      10,
+      'attempt-10',
       'REVIEW',
-      ['DEVICE_UNVERIFIED'],
+      ['DEVICE_ATTESTATION_FAILED', 'DEVICE_UNVERIFIED'],
     );
     expect(records.markPresent).toHaveBeenCalledWith(
       expect.objectContaining({
         validationStatus: 'REVIEW',
-        reasons: ['DEVICE_UNVERIFIED'],
+        reasons: ['DEVICE_ATTESTATION_FAILED', 'DEVICE_UNVERIFIED'],
       }),
     );
   });
 
   it('rejects a device explicitly blocked by an administrator', async () => {
-    prisma.registeredDevice.upsert.mockResolvedValue({ id: 22, trustStatus: 'BLOCKED' });
+    attemptRepository.getDeviceTrustStatus.mockResolvedValue('BLOCKED');
 
     const result = await makeService().checkIn(request as never, 31);
 
     expect(result).toEqual({ status: 'REJECTED', reasons: ['DEVICE_BLOCKED'] });
     expect(validation.validate).not.toHaveBeenCalled();
     expect(attemptRepository.completeAttempt).toHaveBeenCalledWith(
-      10,
+      'attempt-10',
       'REJECTED',
       ['DEVICE_BLOCKED'],
     );
   });
 
-  it('allows a trusted device to follow the existing GPS validation outcome', async () => {
-    prisma.registeredDevice.upsert.mockResolvedValue({ id: 22, trustStatus: 'TRUSTED' });
+  it('does not let a trusted device bypass a failed attestation', async () => {
+    attemptRepository.getDeviceTrustStatus.mockResolvedValue('TRUSTED');
+
+    const result = await makeService().checkIn(request as never, 31);
+
+    expect(result).toEqual({
+      status: 'REVIEW',
+      reasons: ['DEVICE_ATTESTATION_FAILED'],
+    });
+    expect(attemptRepository.completeAttempt).toHaveBeenCalledWith(
+      'attempt-10',
+      'REVIEW',
+      ['DEVICE_ATTESTATION_FAILED'],
+    );
+    expect(records.markPresent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        validationStatus: 'REVIEW',
+        reasons: ['DEVICE_ATTESTATION_FAILED'],
+      }),
+    );
+  });
+
+  it('allows a trusted device when its attestation is verified', async () => {
+    attemptRepository.getDeviceTrustStatus.mockResolvedValue('TRUSTED');
+    attestation.verify.mockResolvedValue({
+      isValid: true,
+      verdict: 'PLAY_INTEGRITY_VERIFIED',
+      reasons: [],
+    });
 
     const result = await makeService().checkIn(request as never, 31);
 
     expect(result).toEqual({ status: 'VALID' });
-    expect(attemptRepository.completeAttempt).toHaveBeenCalledWith(10, 'APPROVED', []);
-    expect(records.markPresent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        validationStatus: 'VALID',
-        reasons: [],
-      }),
+    expect(attemptRepository.completeAttempt).toHaveBeenCalledWith(
+      'attempt-10',
+      'APPROVED',
+      [],
     );
   });
 });

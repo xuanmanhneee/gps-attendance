@@ -3,10 +3,15 @@ import { DeviceTrustStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../common/database/prisma.service';
 import { UpdateDeviceTrustDto } from './dto/update-device-trust.dto';
 import { ReplaceDeviceDto } from './dto/replace-device.dto';
+import { RedisService } from '../redis/redis.service';
+import { deviceTrustCacheKey } from './device-trust-cache';
 
 @Injectable()
 export class DeviceTrustService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+  ) {}
 
   async listDevices(options: {
     search?: string;
@@ -80,7 +85,7 @@ export class DeviceTrustService {
       throw new NotFoundException('Không tìm thấy thiết bị đã đăng ký');
     }
 
-    return this.prisma.$transaction(async (transaction) => {
+    const result = await this.prisma.$transaction(async (transaction) => {
       const updated = await transaction.registeredDevice.update({
         where: { id: deviceId },
         data: {
@@ -115,6 +120,11 @@ export class DeviceTrustService {
         blockedAt: updated.blockedAt?.toISOString() ?? null,
       };
     });
+    await this.redisService.set(
+      deviceTrustCacheKey(existing.userId, existing.deviceId),
+      result.trustStatus,
+    );
+    return result;
   }
 
   /**
@@ -131,7 +141,7 @@ export class DeviceTrustService {
 
     const newTrustStatus = dto.trustStatus ?? DeviceTrustStatus.TRUSTED;
 
-    return this.prisma.$transaction(async (transaction) => {
+    const result = await this.prisma.$transaction(async (transaction) => {
       // Nếu có truyền deviceId mới, kiểm tra xem đã bị trùng với deviceId khác của cùng user chưa
       if (dto.newDeviceId && dto.newDeviceId !== existing.deviceId) {
         const conflict = await transaction.registeredDevice.findUnique({
@@ -189,6 +199,18 @@ export class DeviceTrustService {
         blockedAt: updated.blockedAt?.toISOString() ?? null,
       };
     });
+    const newDeviceId = dto.newDeviceId?.trim() || existing.deviceId;
+    if (newDeviceId !== existing.deviceId) {
+      await this.redisService.set(
+        deviceTrustCacheKey(existing.userId, existing.deviceId),
+        DeviceTrustStatus.UNVERIFIED,
+      );
+    }
+    await this.redisService.set(
+      deviceTrustCacheKey(existing.userId, newDeviceId),
+      result.trustStatus,
+    );
+    return result;
   }
 
   /**
@@ -203,7 +225,7 @@ export class DeviceTrustService {
       throw new NotFoundException('Không tìm thấy thiết bị cần đặt lại');
     }
 
-    return this.prisma.$transaction(async (transaction) => {
+    const result = await this.prisma.$transaction(async (transaction) => {
       await transaction.registeredDevice.delete({
         where: { id: deviceId },
       });
@@ -230,5 +252,10 @@ export class DeviceTrustService {
         userFullname: existing.user.fullname,
       };
     });
+    await this.redisService.set(
+      deviceTrustCacheKey(existing.userId, existing.deviceId),
+      DeviceTrustStatus.UNVERIFIED,
+    );
+    return result;
   }
 }
