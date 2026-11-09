@@ -12,10 +12,9 @@ import { RedisAttendanceCheckInAttemptRepository } from '#attendance-check-in/in
 import { RedisAttendanceCheckInDeviceUsageRepository } from '#attendance-check-in/infra/redis/redis-attendance-checkin-device-usage.repository';
 import { RedisAttendanceRecordBuffer } from './infra/redis/redis-attendance-record-buffer';
 import { RedisModule } from '#redis/redis.module';
-import { JobSchedulerModule } from '#job-scheduler/job-scheduler.module';
 
 @Module({
-  imports: [RedisModule, JobSchedulerModule],
+  imports: [RedisModule],
 
   providers: [
     InMemoryAttendanceRecordStore,

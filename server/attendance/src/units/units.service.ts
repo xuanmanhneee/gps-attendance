@@ -27,6 +27,10 @@ export class UnitService {
     return this.unitRepository.findByIds(ids);
   }
 
+  findByExternalCode(code: string): Promise<Unit | null> {
+    return this.unitRepository.findByExternalCode(code);
+  }
+
   findAll(): Promise<Unit[]> {
     return this.unitRepository.findAll();
   }
@@ -56,6 +60,7 @@ export class UnitService {
     }
 
     return this.unitRepository.create({
+      externalCode: input.externalCode,
       name: input.name,
       parentId,
       level,
@@ -102,6 +107,9 @@ export class UnitService {
     }
 
     return this.unitRepository.update(id, {
+      ...(input.externalCode !== undefined && {
+        externalCode: input.externalCode,
+      }),
       ...(input.name !== undefined && { name: input.name }),
       ...(input.parentId !== undefined && { parentId: input.parentId }),
       level,

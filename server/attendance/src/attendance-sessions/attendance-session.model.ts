@@ -12,6 +12,7 @@ export interface AttendanceSession {
   createdBy: number; // user.id
   createdAt: Date;
   updatedAt: Date;
+  finalizedAt?: Date | null;
 }
 
 export interface CreateAttendanceSessionRecord {
@@ -22,7 +23,6 @@ export interface CreateAttendanceSessionRecord {
   openAt: Date;
   closeAt: Date;
   createdBy: number;
-
 }
 
 export type UpdateAttendanceSessionRecord = Partial<
@@ -35,5 +35,6 @@ export type UpdateAttendanceSessionRecord = Partial<
     | 'openAt'
     | 'closeAt'
     | 'status'
+    | 'finalizedAt'
   >
 >;

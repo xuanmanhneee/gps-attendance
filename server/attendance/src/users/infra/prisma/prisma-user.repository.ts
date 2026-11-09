@@ -32,6 +32,10 @@ export class PrismaUserRepository implements IUserRepository {
     });
   }
 
+  findByCodes(codes: string[], ctx?: ITransactionContext): Promise<User[]> {
+    return this.client(ctx).user.findMany({ where: { code: { in: codes } } });
+  }
+
   async findByCode(
     code: string,
     ctx?: ITransactionContext,
@@ -71,5 +75,13 @@ export class PrismaUserRepository implements IUserRepository {
 
   async create(data: CreateUserDto, ctx?: ITransactionContext): Promise<User> {
     return this.client(ctx).user.create({ data });
+  }
+
+  update(
+    id: number,
+    data: Partial<Pick<User, 'fullname' | 'role' | 'unitId'>>,
+    ctx?: ITransactionContext,
+  ): Promise<User> {
+    return this.client(ctx).user.update({ where: { id }, data });
   }
 }

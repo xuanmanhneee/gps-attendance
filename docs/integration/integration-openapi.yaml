@@ -1,220 +1,122 @@
 openapi: 3.1.0
 info:
-  title: GPS Attendance - Integration API
+  title: GPS Attendance Integration API
   version: 1.0.0
   description: |
-    Hợp đồng giữa hệ thống điểm danh và LMS.
-
-    **Phạm vi hiện tại**
-    - Một LMS kết nối với hệ thống điểm danh.
-    - `code` là mã người dùng duy nhất, ổn định và là khóa nối giữa hai hệ thống.
-    - LMS không gửi hoặc lưu ID tự tăng nội bộ của hệ thống điểm danh.
-    - LMS quản lý định danh người dùng trong chế độ tích hợp. API này không nhận
-      username, password và không tạo account nội bộ.
-    - Account nội bộ vẫn được dùng khi hệ thống điểm danh vận hành độc lập.
-
-    **Quy tắc làm việc**
-    - File này là nguồn sự thật của phần tích hợp.
-    - LMS không đọc database hoặc Redis của hệ thống điểm danh.
-    - LMS không được sửa code, cấu hình, database, Redis hoặc logic nghiệp vụ
-      của hệ thống điểm danh, kể cả để chạy tạm hay bổ sung field còn thiếu.
-    - Nếu hợp đồng thiếu endpoint, field hoặc hành vi, LMS gửi change request
-      cho phía hệ thống điểm danh; không tự sửa hệ thống điểm danh.
-    - Thêm field hoặc endpoint tương thích ngược có thể thực hiện trong `/v1`.
-      Thay đổi hoặc xóa hành vi đã công bố phải dùng phiên bản API mới.
-
-    **Bắt buộc dùng mock trước khi nối API thật**
-    - Phía LMS phải phát triển và kiểm thử luồng tích hợp bằng mock server sinh
-      trực tiếp từ file này trước khi kết nối hệ thống điểm danh thật.
-    - Chạy mock bằng lệnh:
-      `npx @stoplight/prism-cli mock integration-openapi.yaml`
-    - Chỉ chuyển sang API thật sau khi phía hệ thống điểm danh xác nhận endpoint
-      đã sẵn sàng và contract test đã đạt.
-    - LMS không được phụ thuộc vào field hoặc hành vi không có trong hợp đồng,
-      dù mock hoặc một môi trường thử nghiệm có vô tình trả thêm dữ liệu.
-
-    **Response**
-    - Thành công: `{ "success": true, "data": ... }`
-    - Lỗi: `{ "success": false, "code": "...", "message": "..." }`
-
-    **Dữ liệu tổ chức**
-    - Unit gồm trường (level 1), khoa (level 2) và lớp hành chính (level 3).
-    - Học phần và nhóm học phần chỉ được quản lý ở LMS.
-    - Khi tạo phiên, LMS gửi danh sách mã người dùng của buổi học.
-
-    **Kết quả bất đồng bộ**
-    - Danh sách người tham gia được chốt trước `openAt` theo chính sách hệ thống điểm danh.
-    - Kết quả chỉ chính thức khi `finalized = true`, sau khi hết cửa sổ review
-      và dữ liệu đã được lưu bền vững.
-    - Khi chốt, hệ thống điểm danh gửi webhook `session.finalized`.
-
-    **Giới hạn tốc độ**: 60 request/phút/API key. Request vượt giới hạn trả
-    429 và header `Retry-After`.
+    Hợp đồng REST giữa một GPS Attendance deployment và một hệ thống quản lý
+    đào tạo. LMS gửi mã người dùng; Attendance giữ và không công bố ID nội bộ.
 servers:
-  - url: http://127.0.0.1:4010/v1/integration
-    description: Mock server cục bộ do Prism tạo; LMS phải dùng trước khi nối API thật.
   - url: http://localhost:3000/v1/integration
-    description: API thật ở môi trường phát triển; chỉ dùng sau khi được xác nhận sẵn sàng.
 security:
   - ApiKeyAuth: []
-tags:
-  - name: Directory
-    description: Đồng bộ đơn vị và hồ sơ người dùng
-  - name: Sessions
-    description: Tạo phiên và lấy kết quả điểm danh
 paths:
   /units:
     put:
-      tags: [Directory]
-      summary: Đồng bộ cây đơn vị
-      description: |
-        Upsert theo `externalCode`. Có thể gửi con trước cha; hệ thống điểm danh
-        tự sắp xếp khi xử lý. Không xóa đơn vị vắng mặt trong request.
       operationId: syncUnits
+      summary: Upsert cây đơn vị
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              additionalProperties: false
               required: [units]
               properties:
                 units:
                   type: array
                   minItems: 1
                   maxItems: 2000
-                  items:
-                    $ref: '#/components/schemas/UnitInput'
+                  items: { $ref: '#/components/schemas/UnitInput' }
       responses:
-        '200':
-          description: Đồng bộ xong
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SyncResultEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
+        '200': { $ref: '#/components/responses/SyncResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /users:
     put:
-      tags: [Directory]
-      summary: Đồng bộ hồ sơ người dùng
-      description: |
-        Upsert theo `code`. API chỉ đồng bộ hồ sơ và không tạo account nội bộ.
-        Mỗi phần tử được xử lý độc lập; phần tử lỗi nằm trong `failed` và không
-        làm hỏng các phần tử hợp lệ khác.
       operationId: syncUsers
+      summary: Upsert hồ sơ người dùng, không tạo Account
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              additionalProperties: false
               required: [users]
               properties:
                 users:
                   type: array
                   minItems: 1
                   maxItems: 500
-                  items:
-                    $ref: '#/components/schemas/UserInput'
+                  items: { $ref: '#/components/schemas/UserInput' }
       responses:
-        '200':
-          description: Đồng bộ xong, có thể có phần tử thất bại
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SyncResultEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
+        '200': { $ref: '#/components/responses/SyncResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /accounts:
+    put:
+      operationId: syncAccounts
+      summary: Provision Account cho User đã đồng bộ
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [users]
+              properties:
+                users:
+                  type: array
+                  minItems: 1
+                  items: { $ref: '#/components/schemas/UserInput' }
+      responses:
+        '200': { $ref: '#/components/responses/SyncResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /courses:
+    put:
+      operationId: syncCourses
+      summary: Đồng bộ học phần thành Tag của organizer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [courses]
+              properties:
+                courses:
+                  type: array
+                  minItems: 1
+                  items: { $ref: '#/components/schemas/CourseInput' }
+      responses:
+        '200': { $ref: '#/components/responses/SyncResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /sessions:
     post:
-      tags: [Sessions]
-      summary: Tạo phiên điểm danh
-      description: |
-        Idempotent theo `externalId` trong phạm vi API client:
-        - Chưa có: tạo mới và trả 201.
-        - Đã có với cùng nội dung chuẩn hóa: trả 200 với phiên hiện có.
-        - Đã có với nội dung khác: trả 409 `INTEGRATION_EXTERNAL_ID_CONFLICT`.
-
-        Mọi mã trong `studentCodes` phải tồn tại và có role `participant`.
-        `lecturerCode` phải tồn tại và có role `organizer`. Nếu validation thất
-        bại thì không tạo phiên.
       operationId: createSession
+      summary: Tạo session idempotent theo externalId
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/CreateSessionRequest'
+            schema: { $ref: '#/components/schemas/CreateSessionInput' }
       responses:
-        '201':
-          description: Đã tạo
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SessionEnvelope'
-        '200':
-          description: Phiên đã tồn tại với cùng nội dung
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SessionEnvelope'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          description: externalId đã tồn tại với nội dung khác
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '422':
-          description: Mã người dùng hoặc giảng viên không hợp lệ
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error422'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
+        '200': { $ref: '#/components/responses/Session' }
+        '201': { $ref: '#/components/responses/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
   /sessions/{externalId}:
     get:
-      tags: [Sessions]
-      summary: Lấy trạng thái phiên
       operationId: getSession
+      summary: Đọc trạng thái session
       parameters:
         - $ref: '#/components/parameters/ExternalId'
       responses:
-        '200':
-          description: Thành công
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SessionEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
+        '200': { $ref: '#/components/responses/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/Error' }
   /sessions/{externalId}/records:
     get:
-      tags: [Sessions]
-      summary: Lấy kết quả điểm danh
-      description: |
-        Có thể gọi bất cứ lúc nào. Trước khi `finalized = true`, kết quả chỉ là
-        tạm thời và không được dùng làm số liệu chính thức.
       operationId: getSessionRecords
+      summary: Đọc kết quả điểm danh
       parameters:
         - $ref: '#/components/parameters/ExternalId'
       responses:
@@ -223,378 +125,183 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RecordsEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
+                type: object
+                required: [success, data]
+                properties:
+                  success: { type: boolean, const: true }
+                  data: { $ref: '#/components/schemas/Records' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/Error' }
   /sessions/{externalId}/cancel:
     post:
-      tags: [Sessions]
-      summary: Hủy phiên
-      description: |
-        Chỉ hủy được phiên `pending` hoặc `open`. Gọi lại với phiên đã hủy trả
-        200 và phiên hiện tại. Phiên đã đóng trả 409.
       operationId: cancelSession
+      summary: Hủy session
       parameters:
         - $ref: '#/components/parameters/ExternalId'
       responses:
-        '200':
-          description: Đã hủy hoặc đã hủy từ trước
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SessionEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Phiên đã đóng và không thể hủy
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-webhooks:
-  sessionFinalized:
-    post:
-      summary: Kết quả phiên đã được chốt
-      description: |
-        URL webhook được cấu hình khi cấp API key.
-
-        Header:
-        - `X-Event-Id`: UUID ổn định qua mọi lần retry của cùng một sự kiện.
-        - `X-Event-Type`: `session.finalized`.
-        - `X-Timestamp`: unix milliseconds của lần gửi hiện tại.
-        - `X-Signature`: `sha256=<hex>` với
-          `HMAC_SHA256(secret, X-Timestamp + "." + rawBody)`.
-
-        LMS trả 2xx để xác nhận. Timeout hoặc response không phải 2xx được thử
-        lại với backoff, tối đa 8 lần. LMS phải xử lý idempotent theo
-        `X-Event-Id`. Nếu webhook không tới, LMS vẫn lấy được kết quả qua API GET.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SessionFinalizedEvent'
-      responses:
-        '200':
-          description: LMS đã tiếp nhận
+        '200': { $ref: '#/components/responses/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
       in: header
       name: X-Api-Key
-      description: API key server-to-server, riêng cho từng hệ thống ngoài.
   parameters:
     ExternalId:
       name: externalId
       in: path
       required: true
-      schema:
-        type: string
-        minLength: 1
-        maxLength: 100
+      schema: { type: string, minLength: 1, maxLength: 100 }
   responses:
-    BadRequest:
-      description: Dữ liệu request không hợp lệ
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
     Unauthorized:
-      description: Thiếu hoặc sai API key
+      description: API key không hợp lệ
       content:
         application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    NotFound:
-      description: Không tìm thấy phiên trong phạm vi API client
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    TooManyRequests:
-      description: Vượt giới hạn tốc độ
-      headers:
-        Retry-After:
-          required: true
-          schema:
-            type: integer
-            minimum: 1
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-  schemas:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
     Error:
+      description: Request thất bại
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    SyncResult:
+      description: Kết quả đồng bộ
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [success, data]
+            properties:
+              success: { type: boolean, const: true }
+              data: { $ref: '#/components/schemas/SyncResult' }
+    Session:
+      description: Session
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [success, data]
+            properties:
+              success: { type: boolean, const: true }
+              data: { $ref: '#/components/schemas/Session' }
+  schemas:
+    ErrorEnvelope:
       type: object
       additionalProperties: false
       required: [success, code, message]
       properties:
-        success:
-          type: boolean
-          const: false
-        code:
-          type: string
-          minLength: 1
-          description: |
-            INTEGRATION_UNAUTHORIZED, INTEGRATION_RATE_LIMITED,
-            INTEGRATION_VALIDATION_FAILED, INTEGRATION_SESSION_NOT_FOUND,
-            INTEGRATION_EXTERNAL_ID_CONFLICT, INTEGRATION_UNKNOWN_CODES,
-            INTEGRATION_LECTURER_INVALID, INTEGRATION_SESSION_NOT_CANCELLABLE,
-            INTEGRATION_INVALID_TIME_RANGE.
-        message:
-          type: string
-          minLength: 1
-    Error422:
-      allOf:
-        - $ref: '#/components/schemas/Error'
-        - type: object
-          properties:
-            unknownCodes:
-              type: array
-              uniqueItems: true
-              items:
-                type: string
+        success: { type: boolean, const: false }
+        code: { type: string }
+        message: { type: string }
     UnitInput:
       type: object
       additionalProperties: false
-      required: [externalCode, name, level]
+      required: [externalCode, name]
       properties:
-        externalCode:
-          type: string
-          minLength: 1
-          maxLength: 100
-          example: KHOA-CNTT
-        name:
-          type: string
-          minLength: 1
-          maxLength: 150
-          example: Khoa Công nghệ thông tin
-        parentCode:
-          type: [string, 'null']
-          maxLength: 100
-          description: externalCode của đơn vị cha; null với đơn vị gốc.
-        level:
-          type: integer
-          minimum: 1
-          maximum: 3
-          description: 1 = trường, 2 = khoa, 3 = lớp hành chính.
+        externalCode: { type: string, minLength: 1, maxLength: 100 }
+        name: { type: string, minLength: 1, maxLength: 150 }
+        parentCode: { type: [string, 'null'], maxLength: 100 }
     UserInput:
       type: object
       additionalProperties: false
       required: [code, fullname, role, unitCode]
       properties:
-        code:
-          type: string
-          minLength: 1
-          maxLength: 50
-          example: '2312345'
-        fullname:
-          type: string
-          minLength: 1
-          maxLength: 150
-          example: Nguyễn Văn A
-        role:
-          type: string
-          enum: [participant, organizer]
-        unitCode:
-          type: string
-          minLength: 1
-          maxLength: 100
-          description: externalCode của đơn vị người dùng.
+        code: { type: string, minLength: 1, maxLength: 50 }
+        fullname: { type: string, minLength: 1, maxLength: 150 }
+        role: { type: string, enum: [organizer, participant] }
+        unitCode: { type: string, minLength: 1, maxLength: 100 }
+    CourseInput:
+      type: object
+      required: [externalCode, name, lecturerCode, studentCodes]
+      properties:
+        externalCode: { type: string, minLength: 1, maxLength: 100 }
+        name: { type: string, minLength: 1, maxLength: 150 }
+        lecturerCode: { type: string, minLength: 1, maxLength: 50 }
+        studentCodes:
+          type: array
+          minItems: 1
+          items: { type: string }
     SyncResult:
       type: object
-      additionalProperties: false
       required: [created, updated, unchanged, failed]
       properties:
-        created:
-          type: integer
-          minimum: 0
-        updated:
-          type: integer
-          minimum: 0
-        unchanged:
-          type: integer
-          minimum: 0
+        created: { type: integer, minimum: 0 }
+        updated: { type: integer, minimum: 0 }
+        unchanged: { type: integer, minimum: 0 }
         failed:
           type: array
           items:
             type: object
-            additionalProperties: false
             required: [key, code, message]
             properties:
-              key:
-                type: string
-              code:
-                type: string
-              message:
-                type: string
-    SyncResultEnvelope:
-      type: object
-      additionalProperties: false
-      required: [success, data]
-      properties:
-        success:
-          type: boolean
-          const: true
-        data:
-          $ref: '#/components/schemas/SyncResult'
-    CreateSessionRequest:
+              key: { type: string }
+              code: { type: string }
+              message: { type: string }
+    CreateSessionInput:
       type: object
       additionalProperties: false
       required:
-        - externalId
-        - lecturerCode
-        - title
-        - latitude
-        - longitude
-        - radius
-        - openAt
-        - closeAt
-        - studentCodes
+        [
+          externalId,
+          lecturerCode,
+          title,
+          latitude,
+          longitude,
+          radius,
+          openAt,
+          closeAt,
+          studentCodes,
+        ]
       properties:
-        externalId:
-          type: string
-          minLength: 1
-          maxLength: 100
-        lecturerCode:
-          type: string
-          minLength: 1
-          maxLength: 50
-        title:
-          type: string
-          minLength: 1
-          maxLength: 255
-        latitude:
-          type: number
-          minimum: -90
-          maximum: 90
-        longitude:
-          type: number
-          minimum: -180
-          maximum: 180
-        radius:
-          type: number
-          exclusiveMinimum: 0
-          description: Bán kính tính bằng mét.
-        openAt:
-          type: string
-          format: date-time
-        closeAt:
-          type: string
-          format: date-time
-          description: Phải sau openAt và ở tương lai.
+        externalId: { type: string, minLength: 1, maxLength: 100 }
+        lecturerCode: { type: string, minLength: 1, maxLength: 50 }
+        title: { type: string, minLength: 1, maxLength: 255 }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        radius: { type: number, exclusiveMinimum: 0 }
+        openAt: { type: string, format: date-time }
+        closeAt: { type: string, format: date-time }
         studentCodes:
           type: array
           minItems: 1
           maxItems: 5000
           uniqueItems: true
-          items:
-            type: string
-            minLength: 1
-            maxLength: 50
+          items: { type: string, minLength: 1, maxLength: 50 }
     Session:
       type: object
-      additionalProperties: false
       required:
-        [externalId, title, status, openAt, closeAt, finalized, participantCount]
+        [
+          externalId,
+          title,
+          status,
+          openAt,
+          closeAt,
+          participantCount,
+          finalized,
+        ]
       properties:
-        externalId:
-          type: string
-        title:
-          type: string
-        status:
-          type: string
-          enum: [pending, open, closed, cancelled]
-        openAt:
-          type: string
-          format: date-time
-        closeAt:
-          type: string
-          format: date-time
-        participantCount:
-          type: integer
-          minimum: 0
-          description: Số người trong roster hiện tại của phiên.
-        finalized:
-          type: boolean
-          description: Phiên cancelled luôn có finalized bằng false.
-    SessionEnvelope:
+        externalId: { type: string }
+        title: { type: string }
+        status: { type: string, enum: [pending, open, closed, cancelled] }
+        openAt: { type: string, format: date-time }
+        closeAt: { type: string, format: date-time }
+        participantCount: { type: integer, minimum: 0 }
+        finalized: { type: boolean }
+    Records:
       type: object
-      additionalProperties: false
-      required: [success, data]
+      required: [externalId, finalized, records]
       properties:
-        success:
-          type: boolean
-          const: true
-        data:
-          $ref: '#/components/schemas/Session'
-    AttendanceRecordResult:
-      type: object
-      additionalProperties: false
-      required: [code, fullname, status, checkedInAt]
-      properties:
-        code:
-          type: string
-        fullname:
-          type: string
-        status:
-          type: string
-          enum: [absent, present, late, excused]
-        checkedInAt:
-          type: [string, 'null']
-          format: date-time
-    RecordsEnvelope:
-      type: object
-      additionalProperties: false
-      required: [success, data]
-      properties:
-        success:
-          type: boolean
-          const: true
-        data:
-          type: object
-          additionalProperties: false
-          required: [externalId, finalized, records]
-          properties:
-            externalId:
-              type: string
-            finalized:
-              type: boolean
-            records:
-              type: array
-              items:
-                $ref: '#/components/schemas/AttendanceRecordResult'
-    SessionFinalizedEvent:
-      type: object
-      additionalProperties: false
-      required: [eventId, type, occurredAt, data]
-      properties:
-        eventId:
-          type: string
-          format: uuid
-        type:
-          type: string
-          const: session.finalized
-        occurredAt:
-          type: string
-          format: date-time
-        data:
-          type: object
-          additionalProperties: false
-          required: [externalId, records]
-          properties:
-            externalId:
-              type: string
-            records:
-              type: array
-              items:
-                $ref: '#/components/schemas/AttendanceRecordResult'
+        externalId: { type: string }
+        finalized: { type: boolean }
+        records:
+          type: array
+          items:
+            type: object
+            required: [code, fullname, status, checkedInAt]
+            properties:
+              code: { type: string }
+              fullname: { type: string }
+              status: { type: string, enum: [absent, present, late, excused] }
+              checkedInAt: { type: [string, 'null'], format: date-time }

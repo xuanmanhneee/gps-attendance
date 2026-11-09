@@ -7,6 +7,8 @@ export interface IUserRepository {
 
   findByIds(ids: number[], ctx?: ITransactionContext): Promise<User[]>;
 
+  findByCodes(codes: string[], ctx?: ITransactionContext): Promise<User[]>;
+
   findByCode(
     code: string,
     ctx?: ITransactionContext,
@@ -22,4 +24,10 @@ export interface IUserRepository {
   findAll(ctx?: ITransactionContext): Promise<User[]>;
 
   create(data: CreateUserDto, ctx?: ITransactionContext): Promise<User>;
+
+  update(
+    id: number,
+    data: Partial<Pick<User, 'fullname' | 'role' | 'unitId'>>,
+    ctx?: ITransactionContext,
+  ): Promise<User>;
 }

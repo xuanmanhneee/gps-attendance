@@ -95,10 +95,11 @@ model UserTag {
 }
 
 model Unit {
-  id       Int    @id @default(autoincrement()) @map("id")
-  parentId Int?   @map("parent_id")
-  name     String @db.VarChar(150)
-  level    Int
+  id           Int     @id @default(autoincrement()) @map("id")
+  parentId     Int?    @map("parent_id")
+  externalCode String? @unique @map("external_code") @db.VarChar(100)
+  name         String  @db.VarChar(150)
+  level        Int
 
   parent   Unit?  @relation("UnitHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children Unit[] @relation("UnitHierarchy")
@@ -133,24 +134,38 @@ model User {
 }
 
 model AttendanceSession {
-  id        Int           @id @default(autoincrement())
-  title     String        @db.VarChar(255)
-  latitude  Decimal       @db.Decimal(10, 7)
-  longitude Decimal       @db.Decimal(10, 7)
-  radius    Decimal       @db.Decimal(8, 2)
-  openAt    DateTime      @map("open_at")
-  closeAt   DateTime      @map("close_at")
-  status    SessionStatus @default(pending)
-  createdBy Int           @map("created_by")
-  createdAt DateTime      @default(now()) @map("created_at")
-  updatedAt DateTime      @updatedAt @map("updated_at")
+  id                     Int           @id @default(autoincrement())
+  title                  String        @db.VarChar(255)
+  latitude               Decimal       @db.Decimal(10, 7)
+  longitude              Decimal       @db.Decimal(10, 7)
+  radius                 Decimal       @db.Decimal(8, 2)
+  openAt                 DateTime      @map("open_at")
+  closeAt                DateTime      @map("close_at")
+  status                 SessionStatus @default(pending)
+  createdBy              Int           @map("created_by")
+  createdAt              DateTime      @default(now()) @map("created_at")
+  updatedAt              DateTime      @updatedAt @map("updated_at")
+  finalizedAt            DateTime?     @map("finalized_at")
 
   creator           User               @relation("SessionCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   attendanceRecords AttendanceRecord[]
+  integrationLink   IntegrationSessionLink?
 
   @@index([createdBy])
   @@index([openAt, closeAt])
   @@map("attendance_sessions")
+}
+
+model IntegrationSessionLink {
+  id                     Int                @id @default(autoincrement())
+  externalId             String             @unique @map("external_id") @db.VarChar(100)
+  requestFingerprint     String             @map("request_fingerprint") @db.Char(64)
+  attendanceSessionId    Int?               @unique @map("attendance_session_id")
+  createdAt              DateTime           @default(now()) @map("created_at")
+
+  attendanceSession AttendanceSession? @relation(fields: [attendanceSessionId], references: [id], onDelete: SetNull)
+
+  @@map("integration_session_links")
 }
 
 model AttendanceRecord {

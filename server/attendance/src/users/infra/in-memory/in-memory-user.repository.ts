@@ -23,6 +23,11 @@ export class InMemoryUserRepository implements IUserRepository {
     return this.users.filter((user) => idSet.has(user.id));
   }
 
+  async findByCodes(codes: string[]): Promise<User[]> {
+    const codeSet = new Set(codes);
+    return this.users.filter((user) => codeSet.has(user.code));
+  }
+
   async findByCode(
     code: string,
     _ctx?: ITransactionContext,
@@ -78,5 +83,16 @@ export class InMemoryUserRepository implements IUserRepository {
     this.users.push(user);
 
     return user;
+  }
+
+  async update(
+    id: number,
+    data: Partial<Pick<User, 'fullname' | 'role' | 'unitId'>>,
+  ): Promise<User> {
+    const index = this.users.findIndex((user) => user.id === id);
+    if (index < 0) throw new Error(`User ${id} not found`);
+    const updated = { ...this.users[index], ...data, updatedAt: new Date() };
+    this.users[index] = updated;
+    return updated;
   }
 }

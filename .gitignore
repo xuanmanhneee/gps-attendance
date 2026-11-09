@@ -7,7 +7,8 @@ build/
 .expo/
 .pnpm-store/
 .expo-shared/
-.vscode
+.vscode/*
+!.vscode/settings.json
 .github/*
 .clinerules
 .clinerules/*
@@ -17,3 +18,4 @@ build/
 *.code-workspace
 
 server/attendance/src/prisma/generated/
+server/lms/*.sqlite

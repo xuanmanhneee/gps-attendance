@@ -34,6 +34,7 @@ describe('AttendanceSessionsService', () => {
   let records: {
     initializeForSession: jest.Mock;
     clearSessionBuffer: jest.Mock;
+    flushSessionToDb: jest.Mock;
   };
   let reviews: { clearSession: jest.Mock; updateSessionExpiry: jest.Mock };
 
@@ -82,6 +83,7 @@ describe('AttendanceSessionsService', () => {
     records = {
       initializeForSession: jest.fn(),
       clearSessionBuffer: jest.fn(),
+      flushSessionToDb: jest.fn(),
     };
     reviews = {
       clearSession: jest.fn(),
@@ -100,6 +102,20 @@ describe('AttendanceSessionsService', () => {
   });
 
   afterEach(() => jest.useRealTimers());
+
+  it('chỉ đánh dấu finalized sau khi flush record thành công', async () => {
+    const session = await seed(min(-60), min(-30));
+    const finalize = (
+      service as unknown as {
+        finalizeSession: (id: number) => Promise<void>;
+      }
+    ).finalizeSession.bind(service);
+
+    await finalize(session.id);
+
+    expect(records.flushSessionToDb).toHaveBeenCalledWith(session.id);
+    expect((await repo.findById(session.id))?.finalizedAt).toEqual(NOW);
+  });
 
   describe('khởi tạo roster có thể chạy lại', () => {
     const initialize = (sessionId: number) =>

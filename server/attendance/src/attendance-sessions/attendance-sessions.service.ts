@@ -76,6 +76,17 @@ export class AttendanceSessionsService {
       'attendance:init-roster',
       async (payload) => this.initializeRoster(payload.sessionId),
     );
+    this.jobScheduler.onJob<{ sessionId: number }>(
+      'attendance:flush',
+      async (payload) => this.finalizeSession(payload.sessionId),
+    );
+  }
+
+  private async finalizeSession(sessionId: number): Promise<void> {
+    await this.attendanceRecordsService.flushSessionToDb(sessionId);
+    await this.attendanceSessionRepository.update(sessionId, {
+      finalizedAt: new Date(),
+    });
   }
 
   async create(

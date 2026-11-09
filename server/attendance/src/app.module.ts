@@ -17,6 +17,7 @@ import { AllExceptionsFilter } from './common/filters/all-exception.filter';
 import { UnitOfWorkModule } from '#common/unit-of-work/unit-of-work.module';
 import { UnitModule } from '#units/units.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
+import { IntegrationModule } from './integration/integration.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
     UnitOfWorkModule,
     UnitModule,
     AuditLogModule,
+    IntegrationModule,
   ],
   controllers: [AppController],
   providers: [

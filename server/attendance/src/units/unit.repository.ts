@@ -5,6 +5,10 @@ import { ITransactionContext } from '#common/unit-of-work/unit-of-work.interface
 interface IUnitRepository {
   findById(id: number, ctx?: ITransactionContext): Promise<Unit | null>;
   findByIds(ids: number[], ctx?: ITransactionContext): Promise<Unit[]>;
+  findByExternalCode(
+    code: string,
+    ctx?: ITransactionContext,
+  ): Promise<Unit | null>;
   findAll(ctx?: ITransactionContext): Promise<Unit[]>;
 
   create(
@@ -12,6 +16,7 @@ interface IUnitRepository {
       name: string;
       parentId: number | null;
       level: number;
+      externalCode?: string | null;
     },
     ctx?: ITransactionContext,
   ): Promise<Unit>;
@@ -22,6 +27,7 @@ interface IUnitRepository {
       name?: string;
       parentId?: number | null;
       level?: number;
+      externalCode?: string | null;
     },
     ctx?: ITransactionContext,
   ): Promise<Unit>;

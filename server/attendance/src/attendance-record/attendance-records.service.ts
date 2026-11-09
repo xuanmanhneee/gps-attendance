@@ -1,8 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { IJobScheduler } from '#job-scheduler/job-scheduler.interface';
-import { JOB_SCHEDULER } from '#job-scheduler/job-scheduler.token';
-
 import { AttendanceRecord, MarkPresentInput } from './attendance-record.model';
 import { LOGGER_FACTORY } from '../common/logging/logger.token';
 import { ILogger } from '../common/logging/logger.interface';
@@ -29,21 +26,11 @@ export class AttendanceRecordsService {
     @Inject(ATTENDANCE_RECORD_BUFFER)
     private readonly attendanceRecordBuffer: IAttendanceRecordBuffer,
 
-    @Inject(JOB_SCHEDULER)
-    private readonly jobScheduler: IJobScheduler,
-
     @Inject(LOGGER_FACTORY)
     loggerFactory: ILoggerFactory,
     private readonly redisService: RedisService,
   ) {
     this.logger = loggerFactory.create(AttendanceRecordsService.name);
-  }
-
-  onModuleInit() {
-    this.jobScheduler.onJob<{ sessionId: number }>(
-      'attendance:flush',
-      (payload) => this.flushSessionToDb(payload.sessionId),
-    );
   }
 
   // Đẩy toàn bộ record của 1 session từ buffer (Redis) xuống Postgres,

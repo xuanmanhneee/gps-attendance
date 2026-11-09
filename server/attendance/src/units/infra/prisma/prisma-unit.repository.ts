@@ -26,12 +26,24 @@ export class PrismaUnitRepository implements IUnitRepository {
     return this.client(ctx).unit.findMany({ where: { id: { in: ids } } });
   }
 
+  findByExternalCode(
+    externalCode: string,
+    ctx?: ITransactionContext,
+  ): Promise<Unit | null> {
+    return this.client(ctx).unit.findUnique({ where: { externalCode } });
+  }
+
   findAll(ctx?: ITransactionContext): Promise<Unit[]> {
     return this.client(ctx).unit.findMany();
   }
 
   create(
-    data: { name: string; parentId: number | null; level: number },
+    data: {
+      name: string;
+      parentId: number | null;
+      level: number;
+      externalCode?: string | null;
+    },
     ctx?: ITransactionContext,
   ): Promise<Unit> {
     return this.client(ctx).unit.create({ data });
@@ -39,7 +51,12 @@ export class PrismaUnitRepository implements IUnitRepository {
 
   update(
     id: number,
-    data: { name?: string; parentId?: number | null; level?: number },
+    data: {
+      name?: string;
+      parentId?: number | null;
+      level?: number;
+      externalCode?: string | null;
+    },
     ctx?: ITransactionContext,
   ): Promise<Unit> {
     return this.client(ctx).unit.update({ where: { id }, data });

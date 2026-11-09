@@ -19,6 +19,10 @@ export class UsersService {
     return this.userRepository.findByIds(ids);
   }
 
+  findByCodes(codes: string[]): Promise<User[]> {
+    return this.userRepository.findByCodes(codes);
+  }
+
   async findByCode(code: string): Promise<User | undefined> {
     return this.userRepository.findByCode(code);
   }
@@ -33,5 +37,29 @@ export class UsersService {
 
   async findAll(): Promise<User[]> {
     return this.userRepository.findAll();
+  }
+
+  async upsertByCode(input: {
+    code: string;
+    fullname: string;
+    role: User['role'];
+    unitId: number;
+  }): Promise<'created' | 'updated' | 'unchanged'> {
+    const existing = await this.userRepository.findByCode(input.code);
+    if (!existing) {
+      await this.userRepository.create(input);
+      return 'created';
+    }
+
+    if (
+      existing.fullname === input.fullname &&
+      existing.role === input.role &&
+      existing.unitId === input.unitId
+    ) {
+      return 'unchanged';
+    }
+
+    await this.userRepository.update(existing.id, input);
+    return 'updated';
   }
 }

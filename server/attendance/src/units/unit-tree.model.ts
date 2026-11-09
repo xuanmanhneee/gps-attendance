@@ -2,6 +2,7 @@ import { Unit } from './unit.model';
 
 export class UnitNode implements Unit {
   id: number;
+  externalCode: string | null;
   name: string;
   parentId: number | null;
   level: number;
@@ -10,6 +11,7 @@ export class UnitNode implements Unit {
 
   constructor(unit: Unit) {
     this.id = unit.id;
+    this.externalCode = unit.externalCode;
     this.name = unit.name;
     this.parentId = unit.parentId;
     this.level = unit.level;

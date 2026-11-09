@@ -1,0 +1,14 @@
+{
+  "tasks": {
+    "dev": "deno run --watch --env-file=.env --allow-env --allow-net --allow-read --allow-write src/main.ts",
+    "start": "deno run --env-file=.env --allow-env --allow-net --allow-read --allow-write src/main.ts",
+    "check": "deno check src/main.ts",
+    "test": "deno test --allow-env src/http/lms-router.test.ts"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  }
+}

@@ -32,6 +32,12 @@ Một organizer tạo và quản lý phiên; participant đăng nhập, xem phi�
 | 7 | [phase-07-chat-luong-va-van-hanh](phase-07-chat-luong-va-van-hanh.md) | CI, tích hợp, tải, quan sát, runbook | Có bằng chứng test và ngưỡng vận hành |
 | 8 | [phase-08-trien-khai-va-pilot](phase-08-trien-khai-va-pilot.md) | Staging, backup, phát hành, pilot, rollback | Go/no-go đạt và pilot được nghiệm thu |
 
+## Task handoff LMS
+
+- [LMS-01 — Hoàn thiện vertical slice LMS tối thiểu](lms-01-minimum-demo-handoff.md):
+  làm chắc luồng giảng viên, roster, chọn địa điểm, tạo phiên và mock
+  integration; không xây academic core hoặc LMS thật.
+
 ## Cách đọc mức ưu tiên
 
 - **P0**: điều kiện bắt buộc trước khi dùng dữ liệu thật hoặc mở hệ thống cho người ngoài nhóm phát triển. Hoàn thành P0 theo thứ tự phụ thuộc, kể cả task P0 nằm ở phase cuối.

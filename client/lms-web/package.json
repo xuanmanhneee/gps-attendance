@@ -1,0 +1,9 @@
+{
+  "name": "@gps-attendance/lms-web",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "tsc -b && vite build", "typecheck": "tsc -b" },
+  "dependencies": { "react": "19.1.0", "react-dom": "19.1.0" },
+  "devDependencies": { "@types/react": "~19.1.0", "@types/react-dom": "~19.1.0", "@vitejs/plugin-react": "^6.0.4", "typescript": "~6.0.2", "vite": "^8.2.0" }
+}

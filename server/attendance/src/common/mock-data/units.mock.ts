@@ -1,6 +1,6 @@
 import { Unit } from '#units/unit.model';
 
-export const mockUnits: Unit[] = [
+const rawMockUnits: Omit<Unit, 'externalCode'>[] = [
   // ===== Trường Đại học =====
   {
     id: 1,
@@ -131,3 +131,8 @@ export const mockUnits: Unit[] = [
     level: 1,
   },
 ];
+
+export const mockUnits: Unit[] = rawMockUnits.map((unit) => ({
+  ...unit,
+  externalCode: null,
+}));

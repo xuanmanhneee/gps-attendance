@@ -87,6 +87,7 @@ export class PrismaAttendanceSessionRepository implements IAttendanceSessionRepo
       createdBy: record.createdBy,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
+      finalizedAt: record.finalizedAt,
     };
   }
 }

@@ -13,6 +13,8 @@
     "dev:admin": "pnpm --filter @gps-attendance/admin-dashboard dev",
     "predev:mobile": "pnpm build:shared",
     "dev:mobile": "pnpm --filter @gps-attendance/mobile-client dev",
+    "dev:lms": "deno task --cwd server/lms dev",
+    "dev:lms-web": "pnpm --filter @gps-attendance/lms-web dev",
     "dev:shared": "pnpm --filter @gps-attendance/shared dev",
     "build:shared": "pnpm --filter @gps-attendance/shared build",
     "build:attendance": "pnpm build:shared && pnpm --filter @gps-attendance/attendance build",

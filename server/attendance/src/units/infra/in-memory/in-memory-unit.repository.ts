@@ -22,6 +22,11 @@ export class InMemoryUnitRepository implements IUnitRepository {
     return Promise.resolve(units.map((unit) => this.clone(unit)));
   }
 
+  findByExternalCode(externalCode: string): Promise<Unit | null> {
+    const unit = this.units.find((item) => item.externalCode === externalCode);
+    return Promise.resolve(unit ? this.clone(unit) : null);
+  }
+
   findAll(): Promise<Unit[]> {
     return Promise.resolve(this.units.map((unit) => this.clone(unit)));
   }
@@ -30,9 +35,11 @@ export class InMemoryUnitRepository implements IUnitRepository {
     name: string;
     parentId: number | null;
     level: number;
+    externalCode?: string | null;
   }): Promise<Unit> {
     const unit: Unit = {
       id: this.nextId++,
+      externalCode: data.externalCode ?? null,
       name: data.name,
       parentId: data.parentId,
       level: data.level,
@@ -49,6 +56,7 @@ export class InMemoryUnitRepository implements IUnitRepository {
       name?: string;
       parentId?: number | null;
       level?: number;
+      externalCode?: string | null;
     },
   ): Promise<Unit> {
     const index = this.units.findIndex((unit) => unit.id === id);
@@ -67,6 +75,9 @@ export class InMemoryUnitRepository implements IUnitRepository {
       }),
       ...(data.level !== undefined && {
         level: data.level,
+      }),
+      ...(data.externalCode !== undefined && {
+        externalCode: data.externalCode,
       }),
     };
 

@@ -21,6 +21,7 @@ export class InMemoryAttendanceSessionRepository implements IAttendanceSessionRe
       status: 'pending',
       createdAt: now,
       updatedAt: now,
+      finalizedAt: null,
     };
     this.sessions.set(session.id, session);
     return session;

@@ -1,6 +1,7 @@
 // src/account/account.service.ts
 import { Injectable, Inject } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'node:crypto';
 import { UNIT_OF_WORK } from '#common/unit-of-work/unit-of-work.token';
 import { IUnitOfWork } from '#common/unit-of-work/unit-of-work.interface';
 import { USER_REPOSITORY } from '#user/user.repository.token';
@@ -63,5 +64,16 @@ export class AccountService {
 
   async findByUserId(userId: number): Promise<Account | undefined> {
     return this.accountRepository.findByUserId(userId);
+  }
+
+  async provisionForUser(userId: number, username: string): Promise<{ account: Account; created: boolean }> {
+    const existing = await this.accountRepository.findByUserId(userId);
+    if (existing) return { account: existing, created: false };
+    const account = await this.accountRepository.create({
+      userId,
+      username,
+      passwordHash: await bcrypt.hash(randomBytes(32).toString('hex'), 10),
+    });
+    return { account, created: true };
   }
 }

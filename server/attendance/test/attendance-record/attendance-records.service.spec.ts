@@ -1,5 +1,4 @@
 import { ILoggerFactory } from '../../src/common/logging/logger.factory';
-import { IJobScheduler } from '../../src/job-scheduler/job-scheduler.interface';
 import { RedisService } from '../../src/redis/redis.service';
 import { IAttendanceRecordBuffer } from '../../src/attendance-record/attendance-record.buffer';
 import { AttendanceRecord } from '../../src/attendance-record/attendance-record.model';
@@ -89,12 +88,10 @@ describe('AttendanceRecordsService', () => {
         verbose: jest.fn(),
       })),
     };
-    const jobScheduler = {} as IJobScheduler;
     const redisService = {} as RedisService;
     const service = new AttendanceRecordsService(
       repository,
       buffer,
-      jobScheduler,
       loggerFactory,
       redisService,
     );
@@ -163,7 +160,6 @@ describe('AttendanceRecordsService', () => {
     const service = new AttendanceRecordsService(
       repository,
       buffer,
-      {} as IJobScheduler,
       loggerFactory,
       {} as RedisService,
     );
@@ -196,7 +192,6 @@ describe('AttendanceRecordsService', () => {
     const service = new AttendanceRecordsService(
       repository,
       buffer,
-      {} as IJobScheduler,
       {
         create: () => ({
           log: jest.fn(),

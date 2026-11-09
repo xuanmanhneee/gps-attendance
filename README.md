@@ -20,10 +20,12 @@ Hệ thống điểm danh tự động sử dụng định vị GPS thời gian 
 ```
 gps-attendance/
 ├── server/
-│   └── attendance/                # Backend API (NestJS) — @gps-attendance/attendance
+│   ├── attendance/                # Backend API (NestJS) — @gps-attendance/attendance
+│   └── lms/                       # LMS demo (Deno + SQLite) — server
 ├── client/
 │   ├── admin-dashboard/           # Web dashboard cho giảng viên/quản trị (React + Vite)
-│   └── mobile-client/             # Ứng dụng di động cho sinh viên (Expo / React Native)
+│   ├── mobile-client/             # Ứng dụng di động cho sinh viên (Expo / React Native)
+│   └── lms-web/                   # Web client của LMS demo (React + Vite)
 └── packages/
     └── shared/                    # Type/DTO dùng chung giữa server, admin, mobile — @gps-attendance/shared
 ```
@@ -137,6 +139,18 @@ pnpm dev:mobile
 Quét mã QR hiện trên terminal bằng app **Expo Go** để chạy thử trên điện thoại thật (khuyến nghị dùng thiết bị thật thay vì emulator, vì tính năng GPS/anti-spoofing cần thiết bị thật để hoạt động và kiểm thử chính xác).
 
 > Nếu điện thoại và máy tính không cùng mạng WiFi, dùng `expo start --tunnel` (chạy trong `client/mobile-client`), hoặc kết nối qua USB bằng `adb reverse tcp:8081 tcp:8081`.
+
+### 4. LMS demo (integration)
+
+Sau khi cấu hình cùng `INTEGRATION_API_KEY` cho attendance server và fake LMS:
+
+```bash
+pnpm dev:lms
+pnpm dev:lms-web
+```
+
+API mặc định chạy tại `http://localhost:3100`, web tại `http://localhost:5174`.
+Chi tiết luồng demo nằm trong `server/lms/README.md`.
 
 ## Build & dọn cache
 
