@@ -84,7 +84,7 @@ describe('AttendanceCheckInService concurrent requests', () => {
         findById: jest.fn().mockResolvedValue(session),
         findByIds: jest.fn().mockResolvedValue([]),
       } as never,
-      { validate: jest.fn().mockReturnValue({ status: 'VALID' }) } as never,
+      { validate: jest.fn().mockResolvedValue({ status: 'VALID' }) } as never,
       recordsService as never,
       reviews,
       { evaluate: jest.fn().mockResolvedValue({ isTooMany: false }) } as never,
@@ -149,7 +149,7 @@ describe('AttendanceCheckInService concurrent requests', () => {
   });
 
   it('lưu REVIEW candidate riêng, giữ record absent và không giữ thiết bị', async () => {
-    (service as any).attendanceValidationService.validate.mockReturnValue({
+    (service as any).attendanceValidationService.validate.mockResolvedValue({
       status: 'REVIEW',
       reasons: ['LOW_CONFIDENCE_SCORE'],
     });
@@ -171,7 +171,7 @@ describe('AttendanceCheckInService concurrent requests', () => {
       }),
     ]);
 
-    (service as any).attendanceValidationService.validate.mockReturnValue({
+    (service as any).attendanceValidationService.validate.mockResolvedValue({
       status: 'VALID',
     });
     await expect(
@@ -187,7 +187,7 @@ describe('AttendanceCheckInService concurrent requests', () => {
   });
 
   it('không ghi buffer khi validation trả REJECTED', async () => {
-    (service as any).attendanceValidationService.validate.mockReturnValue({
+    (service as any).attendanceValidationService.validate.mockResolvedValue({
       status: 'REJECTED',
       reasons: ['MOCK_LOCATION'],
     });

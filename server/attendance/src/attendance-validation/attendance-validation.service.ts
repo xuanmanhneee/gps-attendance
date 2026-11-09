@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  AttendanceValidationReason,
-  AttendanceValidationStatus,
-} from '@gps-attendance/shared';
+import { AttendanceValidationReason } from '@gps-attendance/shared';
 
 import {
   AttendanceValidationInput,
@@ -27,7 +24,9 @@ export class AttendanceValidationService {
     private readonly locationTimestampCheck: LocationTimestampCheck,
   ) {}
 
-  validate(input: AttendanceValidationInput): AttendanceValidationResult {
+  async validate(
+    input: AttendanceValidationInput,
+  ): Promise<AttendanceValidationResult> {
     const mockLocationResult = this.mockLocationCheck.evaluate(input.location);
 
     if (mockLocationResult.coefficient === 0) {
@@ -50,7 +49,7 @@ export class AttendanceValidationService {
     const reasons: AttendanceValidationReason[] = [];
 
     score +=
-      this.integrityCheck.evaluate(input.integrity).coefficient *
+      (await this.integrityCheck.evaluate(input)).coefficient *
       this.INTEGRITY_WEIGHT;
 
     const locationResult = this.locationCheck.evaluate(

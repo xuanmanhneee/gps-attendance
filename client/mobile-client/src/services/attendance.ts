@@ -3,29 +3,37 @@ import { attendanceCheckInApi } from '@/api';
 import { isMockLocationForced } from './dev-mode';
 import { getCurrentLocation } from './location';
 import { buildDeviceInfo } from './device-info';
-import { getIntegrity } from './integrity';
+import { getIntegrity } from '@/modules/integrity';
 
 // Phần dữ liệu thiết bị, không phụ thuộc sessionId
-export async function collectCheckInContext() {
-  const [location, device, integrity] = await Promise.all([
+export async function collectCheckInContext(sessionId?: number) {
+  const [location, device] = await Promise.all([
     getCurrentLocation(),
     buildDeviceInfo(),
-    getIntegrity(),
   ]);
 
   // Dev mode: ép cờ mock location để thử nhánh server từ chối
   // (REJECTED / MOCK_LOCATION) mà không cần app giả lập GPS.
-  return {
+  const context = {
     location: isMockLocationForced()
       ? { ...location, isMockLocation: true }
       : location,
     device,
-    integrity,
+  };
+
+  return {
+    ...context,
+    integrity:
+      sessionId === undefined
+        ? { integrityToken: null }
+        : await getIntegrity({ sessionId, ...context }),
   };
 }
 
-export async function buildCheckInPayload(sessionId: number): Promise<CheckInRequest> {
-  return { sessionId, ...(await collectCheckInContext()) };
+export async function buildCheckInPayload(
+  sessionId: number,
+): Promise<CheckInRequest> {
+  return { sessionId, ...(await collectCheckInContext(sessionId)) };
 }
 
 export async function checkIn(sessionId: number): Promise<CheckInResponse> {

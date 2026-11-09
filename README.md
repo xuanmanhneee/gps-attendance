@@ -49,6 +49,7 @@ gps-attendance/
   Repo đã pin sẵn version pnpm trong `package.json` (`packageManager`), corepack sẽ tự dùng đúng version, không cần cài thủ công.
 - App **Expo Go** trên điện thoại (Android/iOS) để chạy thử `mobile-client` mà không cần build native
   > Dự án đang dùng **Expo SDK 54** để đảm bảo tương thích với bản Expo Go hiện có trên CH Play/App Store. Nếu bản Expo Go trên máy bạn không khớp SDK, vào store cập nhật Expo Go lên bản mới nhất hoặc kiểm tra lại version SDK của project trong `client/mobile-client/package.json`.
+  > Play Integrity thật cần bản Android build bằng package/signing của dự án và đã liên kết Play Console; Expo Go chỉ phù hợp để chạy các phần còn lại của app.
 - **Docker** — bắt buộc để chạy PostgreSQL cho `server/attendance`.
 
 ## Cài đặt

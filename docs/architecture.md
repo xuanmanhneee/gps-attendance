@@ -72,10 +72,14 @@ src/
 │   ├── dev-mode.ts             # cờ "Chế độ dev" + ép mock location
 │   ├── device-id.ts            # deviceId ổn định (AndroidId / iOS vendorId / UUID)
 │   ├── device-info.ts          # buildDeviceInfo -> Device
-│   ├── integrity.ts            # getIntegrity -> stub (Play Integrity/App Attest sau)
 │   ├── location.ts             # getCurrentLocation -> Location (expo-location)
 │   ├── storage.ts              # SecureStore (web -> localStorage)
 │   └── token.ts                # lưu/khôi phục/xoá JWT
+├── modules/integrity/          # Contract + adapter theo platform
+│   ├── integrity-provider.ts
+│   ├── android-integrity.provider.ts # Play Integrity Standard
+│   ├── unsupported-integrity.provider.ts # iOS/web fallback
+│   └── index.ts                # Public API của module
 ├── hooks/
 │   ├── use-check-in-context.ts # state location/device/integrity + refresh/reset
 │   └── use-now.ts              # "now" tự cập nhật tại mốc openAt/closeAt + foreground
@@ -95,7 +99,7 @@ theme/                          # Design token DUY NHẤT (root): colors, spacin
 Screen (app/**)
   → Components (ui/, feature)
   → Context (useAuth) / Hooks (use-check-in-context)
-  → services/* (location, device, integrity)
+  → services/* (attendance, location, device) / modules/integrity
   → api/*  (httpClient)
   → @gps-attendance/shared (type + FetchHttpClient)
   → Backend (/v0/...)
@@ -103,8 +107,8 @@ Screen (app/**)
 
 - **Auth**: `AuthProvider` khôi phục token từ secure storage lúc khởi động,
   gọi `GET /v0/users/me` để lấy profile; `isSignedIn = !!user`.
-- **Check-in**: `services/attendance.ts` gom song song location + device +
-  integrity (`Promise.all`) → build `CheckInRequest` → `POST /v0/attendance/check-in`.
+- **Check-in**: `services/attendance.ts` lấy location + device, tạo request hash,
+  rồi gọi adapter integrity → build `CheckInRequest` → `POST /v0/attendance/check-in`.
 
 ### 3.3 API contract mobile đang dùng
 
@@ -144,15 +148,11 @@ Danh sách đầy đủ endpoint, payload, quyền và error code nằm tại
   để trạng thái + nút khớp server. **Không** tự tính giờ ở client — server là
   nguồn chân lý, tránh lệch giờ máy và lặp lại logic đã gây bug `cancelled`.
 
-Chưa xong:
-
-- `integrity.ts` vẫn là stub (trả `null`) — xem mục 5.
-
 ## 5. Gap / nợ kỹ thuật (cần xử lý để khép kín luồng)
 
 | #   | Mức | Mô tả                                                              | Vị trí                      |
 | --- | --- | ------------------------------------------------------------------ | --------------------------- |
-| 1   | 🟡  | `integrity.ts` trả `null` (chưa có Play Integrity/App Attest thật) | `src/services/integrity.ts` |
+| 1   | 🟡  | Android đã có Play Integrity; iOS adapter hiện trả `null`          | `src/modules/integrity/`    |
 | 2   | 🟡  | Chưa auto refresh token khi 401                                    | `src/api/http.ts`           |
 | 3   | 🟢  | Chưa có tab Lịch sử điểm danh                                      | `src/app/(tabs)/`           |
 
@@ -194,9 +194,9 @@ bằng dữ liệu thật → nhận kết quả → cập nhật trạng thái.
   sang `theme/`.
 - Viết lại `STRUCTURE.md` cho khớp thực tế.
 
-### Ngoài scope (giai đoạn 2)
+### Ngoài scope
 
-- Play Integrity (Android) / App Attest (iOS) thật trong `integrity.ts`.
+- App Attest thật cho iOS.
 - Tab Lịch sử điểm danh.
 - GPS "follow" liên tục / cập nhật khoảng cách realtime.
 - Auto refresh token khi 401.
@@ -212,5 +212,10 @@ pnpm dev:mobile     # quét QR bằng Expo Go (dùng thiết bị thật cho GPS
 
 - Cấu hình `EXPO_PUBLIC_API_URL` trong `client/mobile-client/.env`
   (mẫu: `.env.example`).
+- Play Integrity Android cần đặt `android.package` trong `client/mobile-client/app.json`,
+  build app bằng signing đã đăng ký Play Console, rồi cấu hình cùng một Google
+  Cloud project/package ở `EXPO_PUBLIC_GOOGLE_CLOUD_PROJECT_NUMBER` phía mobile
+  và `PLAY_INTEGRITY_PACKAGE_NAME` + Google Application Credentials phía server.
+  Khi chưa có `PLAY_INTEGRITY_PACKAGE_NAME`, server giữ hệ số integrity local cũ.
 - GPS/anti-spoofing cần thiết bị thật để kiểm thử chính xác.
 - Lint mobile: `pnpm --filter @gps-attendance/mobile-client lint`.

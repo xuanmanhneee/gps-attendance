@@ -71,6 +71,32 @@ export interface CheckInRequest {
   integrity: DeviceIntegrity;
 }
 
+export type CheckInIntegrityInput = Pick<
+  CheckInRequest,
+  'sessionId' | 'location' | 'device'
+>;
+
+export function serializeCheckInIntegrityInput(
+  input: CheckInIntegrityInput,
+): string {
+  return JSON.stringify({
+    version: 1,
+    sessionId: input.sessionId,
+    location: {
+      latitude: input.location.latitude,
+      longitude: input.location.longitude,
+      accuracy: input.location.accuracy,
+      timestamp: input.location.timestamp,
+      isMockLocation: input.location.isMockLocation,
+    },
+    device: {
+      deviceId: input.device.deviceId,
+      platform: input.device.platform,
+      model: input.device.model,
+    },
+  });
+}
+
 export type CheckInResponse =
   | {
       status: 'VALID';

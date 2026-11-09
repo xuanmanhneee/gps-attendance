@@ -32,17 +32,19 @@ const input = {
 };
 
 describe('AttendanceValidationService', () => {
-  it('rejects an invalid location timestamp before scoring', () => {
+  it('rejects an invalid location timestamp before scoring', async () => {
     const integrityCheck = { evaluate: jest.fn() };
     const locationCheck = { evaluate: jest.fn() };
     const service = new AttendanceValidationService(
       integrityCheck as never,
       { evaluate: jest.fn().mockReturnValue({ coefficient: 1 }) } as never,
       locationCheck as never,
-      { evaluate: jest.fn().mockReturnValue({ isValid: false, ageMs: 60_000 }) } as never,
+      {
+        evaluate: jest.fn().mockReturnValue({ isValid: false, ageMs: 60_000 }),
+      } as never,
     );
 
-    expect(service.validate(input)).toEqual({
+    await expect(service.validate(input)).resolves.toEqual({
       status: 'REJECTED',
       reasons: ['INVALID_LOCATION_TIMESTAMP'],
     });

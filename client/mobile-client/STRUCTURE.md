@@ -50,10 +50,15 @@ client/mobile-client/
 │   │   ├── 📄 dev-mode.ts             # cờ "Chế độ dev" + ép mock location (trang Dev)
 │   │   ├── 📄 device-id.ts            # deviceId ổn định (AndroidId / iOS vendorId / UUID)
 │   │   ├── 📄 device-info.ts          # buildDeviceInfo → Device
-│   │   ├── 📄 integrity.ts            # getIntegrity → stub (Play Integrity/App Attest sau)
 │   │   ├── 📄 location.ts             # getCurrentLocation → Location (expo-location)
 │   │   ├── 📄 storage.ts              # SecureStore (web → localStorage)
 │   │   └── 📄 token.ts                # lưu/khôi phục/xoá JWT
+│   │
+│   ├── 📁 modules/integrity/          # Boundary có thể tách package sau
+│   │   ├── 📄 integrity-provider.ts   # Contract chung cho platform adapter
+│   │   ├── 📄 android-integrity.provider.ts # Play Integrity Standard
+│   │   ├── 📄 unsupported-integrity.provider.ts # iOS/web fallback
+│   │   └── 📄 index.ts                # Public API duy nhất của module
 │   │
 │   └── 📄 global.css                  # Global styles
 │
@@ -71,7 +76,7 @@ client/mobile-client/
 Screen (app/**)
   → Components (components/ui, feature)
   → Context (useAuth) / Hooks (use-check-in-context, use-now)
-  → services/* (location, device, integrity)
+  → services/* (attendance, location, device) / modules/integrity
   → api/* (httpClient)
   → @gps-attendance/shared (type + FetchHttpClient)
   → Backend Server (/v0/...)
@@ -115,15 +120,16 @@ Screen (app/**)
 
 #### Dev (`app/dev.tsx`)
 - Trang ẩn, chỉ vào được khi bật "Chế độ dev" ở Profile
-- Card `DebugDeviceCard`: GPS, độ chính xác, deviceId, model, mock location,
-  integrity token — dữ liệu lấy từ `useCheckInContext` ở màn hình rồi truyền
+- Card `DebugDeviceCard`: GPS, độ chính xác, deviceId, model, mock location.
+  Integrity token chỉ được tạo khi có `sessionId`, nên trang dev không tạo token
+  không gắn với một lần điểm danh thật. Dữ liệu lấy từ `useCheckInContext` rồi truyền
   xuống card qua prop `context` (card chỉ hiển thị, không tự gọi hook)
 - Nhóm "Tuỳ chỉnh":
   - Công tắc "Giả lập mock location" → ép `isMockLocation = true` trong payload
     điểm danh (`services/attendance.ts`); server trả `REJECTED / MOCK_LOCATION`.
     Tắt "Chế độ dev" ở Profile sẽ xoá luôn cờ này
   - "Đổi deviceId mới" → `resetDeviceId()` sinh `debug-<uuid>` rồi đọc lại
-  - "Làm mới dữ liệu thiết bị" → đọc lại GPS/device/integrity
+  - "Làm mới dữ liệu thiết bị" → đọc lại GPS/device
 
 ### Components
 

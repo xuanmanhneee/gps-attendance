@@ -89,7 +89,7 @@ export class AttendanceCheckInService {
       return { status: 'REJECTED', reasons: ['TOO_MANY_ATTEMPTS'] };
     }
 
-    const validation = this.attendanceValidationService.validate({
+    const validation = await this.attendanceValidationService.validate({
       session,
       userId,
       checkedInAt,

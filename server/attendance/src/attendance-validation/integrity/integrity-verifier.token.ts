@@ -1,0 +1,1 @@
+export const INTEGRITY_VERIFIER = Symbol('INTEGRITY_VERIFIER');

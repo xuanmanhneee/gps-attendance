@@ -96,12 +96,12 @@
     "validMinimumScore": 80,
     "reviewMinimumScore": 60,
 
-    // Hệ số tạm đang được IntegrityCheck sử dụng trong lúc chưa verify thật
-    // Play Integrity / App Attest. Khi có verifier thật, thay cả schema lẫn logic này,
-    // không tiếp tục coi việc token có/không là kết quả integrity cuối cùng.
-    "temporaryIntegrityCoefficients": {
-      "tokenPresent": 0.7,
-      "tokenMissing": 0.5
+    // Verifier Android dùng verdict đã được Google giải mã và xác minh. Giá trị
+    // verificationDisabled giữ hành vi local cũ khi chưa cấu hình Play Integrity.
+    "integrityCoefficients": {
+      "verified": 1,
+      "unverified": 0,
+      "verificationDisabled": 0.5
     }
   }
 }
