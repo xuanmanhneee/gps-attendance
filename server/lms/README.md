@@ -28,6 +28,7 @@ pnpm dev:lms-web
 
 Yêu cầu Deno >= 2.2 vì SQLite dùng `node:sqlite`. Copy `.env.example` thành
 biến môi trường tương ứng; Attendance server cần cùng `INTEGRATION_API_KEY`.
+`ATTENDANCE_API_URL` là địa chỉ LMS dùng để chuyển tiếp năm route của mobile.
 
 Web LMS chạy tại `http://localhost:5174`, Deno API chạy tại `http://localhost:3100`.
 Trên web: đồng bộ dữ liệu trước, rồi tạo phiên từ lớp học. Mã ngoài của phiên
@@ -41,5 +42,6 @@ LMS web chỉ cho phép role `organizer` đăng nhập. Sinh viên vẫn có tro
 roster để đồng bộ sang Attendance nhưng sử dụng mobile client, không dùng LMS web.
 
 Giao diện gồm đăng nhập, bảng điều khiển, danh sách khóa học, tạo/hủy phiên điểm
-danh theo tòa nhà và báo cáo từng lời gọi. Hiện LMS dùng mock gateway hoàn toàn,
-nhưng request/response vẫn bám theo hợp đồng trong `docs/integration/integration-openapi.yaml`.
+danh theo tòa nhà và báo cáo từng lời gọi. LMS gọi Attendance API thật theo
+`ATTENDANCE_INTEGRATION_URL`; lỗi kết nối hoặc API key được trả về giao diện,
+không tự chuyển sang dữ liệu mock.

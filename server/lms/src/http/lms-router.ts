@@ -2,6 +2,8 @@ import type { CourseService } from "../courses/course.service.ts";
 import type { AttendanceIntegration } from "../integration/attendance.integration.ts";
 import type { CreateLmsSessionInput } from "../database/lms.repository.ts";
 import type { AuthService } from "../auth/auth.service.ts";
+import { proxyMobileRequest } from "./mobile-proxy.ts";
+
 export function createLmsRouter(
   courses: CourseService,
   integration: AttendanceIntegration,
@@ -24,6 +26,9 @@ export function createLmsRouter(
     }
     const url = new URL(request.url);
     try {
+      const mobileResponse = await proxyMobileRequest(request);
+      if (mobileResponse) return mobileResponse;
+
       if (request.method === "POST" && url.pathname === "/api/auth/login") {
         const body = await request.json() as {
           username?: string;

@@ -12,7 +12,7 @@ import {
   saveTokens,
 } from '../services/token';
 
-const baseUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
+const baseUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3100';
 const authenticatedClient = createHttpClient(baseUrl, getAccessToken);
 
 export const unauthenticatedHttpClient = createHttpClient(baseUrl);

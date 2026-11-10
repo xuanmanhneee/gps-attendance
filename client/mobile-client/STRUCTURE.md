@@ -77,7 +77,8 @@ Screen (app/**)
   → api/attendance.api.ts (platform adapter + httpClient)
   → @gps-attendance/attendance-client (orchestration điểm danh)
   → @gps-attendance/shared (type + FetchHttpClient)
-  → Backend Server (/v0/...)
+  → LMS mobile proxy (/v0/...)
+  → Attendance Server (/v0/...)
 ```
 
 ## 🎯 Key Features
@@ -89,7 +90,7 @@ Screen (app/**)
 - Provides `useAuth()` hook for access anywhere
 
 ### API Layer (`api/`)
-- **http.ts**: `httpClient` tạo từ `createHttpClient()` của shared, inject `Authorization: Bearer`
+- **http.ts**: `httpClient` gọi LMS mobile proxy và inject `Authorization: Bearer`
 - **auth.api.ts**: login / logout / refreshToken
 - **user.api.ts**: getProfile
 - **attendance.api.ts**: bind package điểm danh với httpClient và adapter
@@ -219,7 +220,7 @@ eas build --platform android  # Android
 ## 🔐 Security Notes
 
 - JWT token lưu bằng `expo-secure-store` (`services/storage.ts`, fallback localStorage trên web)
-- Token sent in Authorization header for authenticated requests
+- Token được gửi qua LMS mobile proxy tới Attendance trong header Authorization
 - API timeout: 30 seconds
 - Error handling and user feedback for API failures
 

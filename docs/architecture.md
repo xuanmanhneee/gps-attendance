@@ -102,7 +102,8 @@ Screen (app/**)
   → api/attendance.api.ts (platform adapter + httpClient)
   → @gps-attendance/attendance-client
   → @gps-attendance/shared (type + FetchHttpClient)
-  → Backend (/v0/...)
+  → LMS mobile proxy (/v0/...)
+  → Attendance backend (/v0/...)
 ```
 
 - **Auth**: `AuthProvider` khôi phục token từ secure storage lúc khởi động,
@@ -113,6 +114,9 @@ Screen (app/**)
   location, device và integrity adapter theo nền tảng.
 
 ### 3.3 API contract mobile đang dùng
+
+Mobile gọi các path dưới đây trên LMS. LMS chỉ cho phép đúng các route này và
+chuyển tiếp nguyên JWT, body, status cùng `ApiResponse<T>` tới Attendance.
 
 | #   | Method | Path                             | Guard                             | Response type (shared)          |
 | --- | ------ | -------------------------------- | --------------------------------- | ------------------------------- |
@@ -209,6 +213,7 @@ bằng dữ liệu thật → nhận kết quả → cập nhật trạng thái.
 pnpm install
 pnpm build:shared
 pnpm dev:server     # http://localhost:3000 (cần docker compose up -d cho Postgres/Redis)
+pnpm dev:lms        # http://localhost:3100, proxy mobile sang Attendance
 pnpm dev:mobile     # quét QR bằng Expo Go (dùng thiết bị thật cho GPS)
 ```
 

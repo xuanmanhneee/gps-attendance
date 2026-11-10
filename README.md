@@ -133,6 +133,8 @@ Mặc định chạy tại `http://localhost:5173`.
 
 ### 3. Mobile Client (Expo)
 
+Khởi động Attendance và LMS trước; mobile gọi API qua LMS tại cổng `3100`.
+
 ```bash
 pnpm dev:mobile
 ```
@@ -143,7 +145,7 @@ Quét mã QR hiện trên terminal bằng app **Expo Go** để chạy thử tr�
 
 ### 4. LMS demo (integration)
 
-Sau khi cấu hình cùng `INTEGRATION_API_KEY` cho attendance server và fake LMS:
+Sau khi cấu hình cùng `INTEGRATION_API_KEY` cho attendance server và LMS:
 
 ```bash
 pnpm dev:lms

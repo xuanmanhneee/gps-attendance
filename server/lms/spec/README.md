@@ -57,7 +57,7 @@ SqliteLmsRepository
   ├── CourseService
   └── StudentService
         └── AttendanceIntegration
-              └── MockAttendanceGateway
+              └── RealAttendanceGateway
 
 CourseService + AttendanceIntegration + AuthService
   └── createLmsRouter
@@ -178,13 +178,10 @@ GET  /sessions/{externalId}/records
 POST /sessions/{externalId}/cancel
 ```
 
-`MockAttendanceGateway` là implementation đang được inject. Nó không gọi
-Attendance server nhưng giữ cùng payload, response shape nghiệp vụ và report
-operation.
-
-`RealAttendanceGateway` và `HybridAttendanceGateway` vẫn có trong source để
-tham khảo, nhưng không được khởi tạo. Không bật lại trước khi contract test với
-Attendance thật đạt.
+`RealAttendanceGateway` là implementation được inject khi chạy LMS. Nó gọi
+Attendance server theo URL và API key trong môi trường. Lỗi từ API thật được
+trả về caller, không fallback sang mock. `MockAttendanceGateway` chỉ dùng trong
+test để router không phụ thuộc tiến trình Attendance.
 
 ### Định danh phiên
 
@@ -212,6 +209,7 @@ Copy `server/lms/.env.example` thành `.env` nếu chưa có:
 
 ```dotenv
 ATTENDANCE_INTEGRATION_URL=http://localhost:3000/v1/integration
+ATTENDANCE_API_URL=http://localhost:3000
 INTEGRATION_API_KEY=demo-integration-key
 LMS_DATABASE_PATH=./lms.sqlite
 ```
@@ -242,13 +240,13 @@ pnpm build
 4. Attendance tự tạo ID session và ánh xạ bằng `externalId`.
 5. Địa điểm được chọn lúc tạo phiên, không gắn cứng vào lớp.
 6. Sinh viên tồn tại để sync/mobile nhưng không đăng nhập LMS web.
-7. Mock gateway là mặc định cho tới khi có quyết định bật API thật.
+7. Gateway thật là mặc định; không fallback sang mock khi đồng bộ thất bại.
 8. Thêm module trong project hiện tại; không tạo shared package mới.
 
 ## 11. Giới hạn đã biết
 
 - `classes` chưa tách `Course`, `CourseSection` và `AcademicTerm`.
-- Auth session và mock Attendance session chỉ nằm trong RAM.
+- Auth session chỉ nằm trong RAM.
 - Password hashing chỉ phù hợp demo.
 - Router chưa dùng `ApiResponse<T>` và error code namespaced.
 - Chưa có token exchange LMS → Attendance cho mobile.
@@ -261,9 +259,8 @@ pnpm build
 1. Thực hiện
    [`LMS-01`](../../../plans/lms-01-minimum-demo-handoff.md) để hoàn thiện
    validation, response contract và trạng thái UI của vertical slice.
-2. Viết contract test giữa `RealAttendanceGateway` và OpenAPI.
-3. Chỉ sau đó mới bật Attendance thật bằng cấu hình deployment.
-4. Tạo task riêng cho token exchange nếu cần mobile đăng nhập qua LMS.
+2. Bổ sung contract test tự động giữa `RealAttendanceGateway` và OpenAPI.
+3. Tạo task riêng cho token exchange nếu cần mobile đăng nhập qua LMS.
 
 ## 13. Tham khảo nhánh hợp nhất
 

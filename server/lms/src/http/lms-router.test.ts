@@ -5,6 +5,7 @@ import { AttendanceIntegration } from "../integration/attendance.integration.ts"
 import { MockAttendanceGateway } from "../integration/attendance.gateway.ts";
 import { StudentService } from "../students/student.service.ts";
 import { createLmsRouter } from "./lms-router.ts";
+import { proxyMobileRequest } from "./mobile-proxy.ts";
 
 const expect = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
@@ -123,4 +124,49 @@ Deno.test("login protects LMS routes and returns seeded data", async () => {
   } finally {
     database.close();
   }
+});
+
+Deno.test("mobile proxy forwards only the supported Attendance routes", async () => {
+  let receivedUrl = "";
+  let receivedAuthorization = "";
+  let receivedBody = "";
+  const response = await proxyMobileRequest(
+    new Request("http://lms.test/v0/attendance/check-in", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer participant-token",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ sessionId: 7 }),
+    }),
+    "http://attendance.test/",
+    async (input, init) => {
+      receivedUrl = input.toString();
+      receivedAuthorization = new Headers(init?.headers).get(
+        "authorization",
+      ) ?? "";
+      receivedBody = await new Response(init?.body).text();
+      return Response.json({ success: true, data: { status: "VALID" } });
+    },
+  );
+
+  expect(
+    receivedUrl === "http://attendance.test/v0/attendance/check-in",
+    "proxy must target Attendance",
+  );
+  expect(
+    receivedAuthorization === "Bearer participant-token",
+    "proxy must preserve the JWT",
+  );
+  expect(
+    receivedBody === JSON.stringify({ sessionId: 7 }),
+    "proxy must preserve the request body",
+  );
+  expect(response?.status === 200, "proxy must preserve the response status");
+
+  const blocked = await proxyMobileRequest(
+    new Request("http://lms.test/v0/users"),
+    "http://attendance.test",
+  );
+  expect(blocked === null, "proxy must reject routes outside the allowlist");
 });
