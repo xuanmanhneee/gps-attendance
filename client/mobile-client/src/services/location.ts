@@ -1,5 +1,5 @@
 import * as ExpoLocation from 'expo-location';
-import type { Location } from '@gps-attendance/shared';
+import type { Location } from '@gps-attendance/attendance-client';
 
 export class LocationPermissionError extends Error {
   constructor() {

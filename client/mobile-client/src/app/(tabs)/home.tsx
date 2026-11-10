@@ -13,44 +13,18 @@ import {
 
 import type {
   AttendanceCheckInReason,
-  AttendanceStatus,
   MyAttendanceSessionResponse,
-  SessionStatus,
-} from '@gps-attendance/shared';
+  ParticipantSessionStatus,
+} from '@gps-attendance/attendance-client';
+import {
+  canCheckIn,
+  getParticipantSessionStatus,
+} from '@gps-attendance/attendance-client';
 
-import { attendanceSessionsApi } from '../../api/attendance-sessions.api';
+import { attendanceApi } from '../../api/attendance.api';
 import { useNow } from '../../hooks/use-now';
-import { checkIn } from '../../services/attendance';
 import { LocationPermissionError } from '../../services/location';
 import { colors } from '../../../theme';
-
-// Trạng thái phiên nhìn từ phía người tham gia. Dẫn xuất từ type của shared (không
-// chép tay) để khi server thêm SessionStatus mới thì switch dưới đây hết
-// exhaustive và TS báo lỗi ngay, thay vì âm thầm rơi vào nhánh sai.
-// 'open' không nằm trong union: phiên đang mở thì trạng thái hiển thị chính là
-// `myAttendance.status`.
-type ParticipantSessionStatus = Exclude<SessionStatus, 'open'> | AttendanceStatus;
-
-function getParticipantSessionStatus(
-  session: MyAttendanceSessionResponse,
-): ParticipantSessionStatus {
-  // 'cancelled' là stored state do người tổ chức set, phải kiểm tra TRƯỚC khi
-  // xét theo giờ/điểm danh — nếu không sẽ bị tính đè thành 'absent' và hiện
-  // như thể người tham gia còn điểm danh được.
-  if (session.status === 'cancelled') {
-    return 'cancelled';
-  }
-
-  if (session.status === 'pending') {
-    return 'pending';
-  }
-
-  if (session.status === 'closed') {
-    return 'closed';
-  }
-
-  return session.myAttendance.status;
-}
 
 function getParticipantSessionStatusLabel(status: ParticipantSessionStatus): string {
   switch (status) {
@@ -202,7 +176,7 @@ export default function HomeScreen() {
   const syncedAtRef = useRef(now);
 
   const fetchSessions = useCallback(async () => {
-    setSessions(await attendanceSessionsApi.getSessions());
+    setSessions(await attendanceApi.getSessions());
   }, []);
 
   const loadSessions = useCallback(async () => {
@@ -252,8 +226,7 @@ export default function HomeScreen() {
       setCheckingInId(sessionId);
 
       try {
-        // Payload thật: GPS + device + integrity lấy trong services/attendance.
-        const result = await checkIn(sessionId);
+        const result = await attendanceApi.checkIn(sessionId);
 
         if (result.status === 'VALID') {
           setSessions((current) =>
@@ -352,7 +325,7 @@ export default function HomeScreen() {
         }
         renderItem={({ item }) => {
           const status = getParticipantSessionStatus(item);
-          const canCheckIn = status === 'absent';
+          const isCheckInAllowed = canCheckIn(status);
           const isCheckingIn = checkingInId === item.id;
           const statusStyle = getStatusStyle(status);
 
@@ -400,9 +373,9 @@ export default function HomeScreen() {
                 activeOpacity={0.8}
                 style={[
                   styles.button,
-                  (!canCheckIn || isCheckingIn) && styles.buttonDisabled,
+                  (!isCheckInAllowed || isCheckingIn) && styles.buttonDisabled,
                 ]}
-                disabled={!canCheckIn || isCheckingIn}
+                disabled={!isCheckInAllowed || isCheckingIn}
                 onPress={() => handleCheckIn(item.id)}
               >
                 {isCheckingIn ? (

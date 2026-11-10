@@ -12,7 +12,7 @@ export function getDevMode() {
   return devMode;
 }
 
-/** Cờ này được đọc lúc dựng payload điểm danh (services/attendance.ts). */
+/** Cờ này được đọc bởi platform adapter lúc dựng payload điểm danh. */
 export function isMockLocationForced() {
   return mockLocationForced;
 }

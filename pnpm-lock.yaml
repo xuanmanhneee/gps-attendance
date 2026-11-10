@@ -146,6 +146,9 @@ importers:
       '@expo/vector-icons':
         specifier: ^15.1.1
         version: 15.1.1(expo-font@14.0.12(expo@54.0.37)(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.10)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.7)(@types/react@19.1.10)(react@19.1.0))(react@19.1.0)
+      '@gps-attendance/attendance-client':
+        specifier: workspace:*
+        version: link:../../packages/attendance-client
       '@gps-attendance/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -255,6 +258,19 @@ importers:
       rimraf:
         specifier: ^6.1.3
         version: 6.1.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/attendance-client:
+    dependencies:
+      '@gps-attendance/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      tsx:
+        specifier: ^4.23.13
+        version: 4.23.13
       typescript:
         specifier: 5.9.3
         version: 5.9.3
