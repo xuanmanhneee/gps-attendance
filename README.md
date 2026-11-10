@@ -27,6 +27,7 @@ gps-attendance/
 │   ├── mobile-client/             # Ứng dụng di động cho sinh viên (Expo / React Native)
 │   └── lms-web/                   # Web client của LMS demo (React + Vite)
 └── packages/
+    ├── attendance-client/         # Client framework-agnostic cho luồng điểm danh mobile
     └── shared/                    # Type/DTO dùng chung giữa server, admin, mobile — @gps-attendance/shared
 ```
 

@@ -19,6 +19,7 @@ Là **pnpm workspace monorepo** — dùng chung 1 `pnpm-lock.yaml` ở root.
 | Admin      | `client/admin-dashboard` | React + Vite + TS                      | Giảng viên/quản trị tạo phiên, xem kết quả |
 | Mobile     | `client/mobile-client`   | Expo SDK 54 (React Native 0.81)        | Sinh viên điểm danh                        |
 | Shared     | `packages/shared`        | TypeScript thuần                       | Type/DTO + HTTP client dùng chung          |
+| Attendance client | `packages/attendance-client` | TypeScript thuần              | Client tái sử dụng cho luồng điểm danh mobile |
 
 Luồng nghiệp vụ: giảng viên tạo **phiên điểm danh** (thời gian, toạ độ tâm,
 bán kính) → sinh viên mở app trong khung thời gian, app lấy GPS → server kiểm
@@ -62,24 +63,22 @@ src/
 │   ├── http.ts                 # httpClient (base URL từ EXPO_PUBLIC_API_URL)
 │   ├── auth.api.ts             # login / logout / refreshToken
 │   ├── user.api.ts             # getProfile
-│   ├── attendance-sessions.api.ts  # getSessions
-│   ├── attendance-check-in.api.ts  # checkIn
+│   ├── attendance.api.ts       # bind package điểm danh với httpClient
 │   └── index.ts                # barrel
 ├── context/
 │   └── auth-context.tsx        # AuthProvider + useAuth (user, token, login, logout)
 ├── services/                   # Logic thiết bị/vị trí (không phụ thuộc React)
-│   ├── attendance.ts           # collectCheckInContext / buildCheckInPayload / checkIn
 │   ├── dev-mode.ts             # cờ "Chế độ dev" + ép mock location
 │   ├── device-id.ts            # deviceId ổn định (AndroidId / iOS vendorId / UUID)
 │   ├── device-info.ts          # buildDeviceInfo -> Device
 │   ├── location.ts             # getCurrentLocation -> Location (expo-location)
 │   ├── storage.ts              # SecureStore (web -> localStorage)
 │   └── token.ts                # lưu/khôi phục/xoá JWT
-├── modules/integrity/          # Contract + adapter theo platform
+├── modules/integrity/          # Contract + adapter integrity theo platform
 │   ├── integrity-provider.ts
 │   ├── android-integrity.provider.ts # Play Integrity Standard
 │   ├── unsupported-integrity.provider.ts # iOS/web fallback
-│   └── index.ts                # Public API của module
+│   └── index.ts
 ├── hooks/
 │   ├── use-check-in-context.ts # state location/device/integrity + refresh/reset
 │   └── use-now.ts              # "now" tự cập nhật tại mốc openAt/closeAt + foreground
@@ -99,16 +98,19 @@ theme/                          # Design token DUY NHẤT (root): colors, spacin
 Screen (app/**)
   → Components (ui/, feature)
   → Context (useAuth) / Hooks (use-check-in-context)
-  → services/* (attendance, location, device) / modules/integrity
-  → api/*  (httpClient)
+  → services/* (location, device) / modules/integrity
+  → api/attendance.api.ts (platform adapter + httpClient)
+  → @gps-attendance/attendance-client
   → @gps-attendance/shared (type + FetchHttpClient)
   → Backend (/v0/...)
 ```
 
 - **Auth**: `AuthProvider` khôi phục token từ secure storage lúc khởi động,
   gọi `GET /v0/users/me` để lấy profile; `isSignedIn = !!user`.
-- **Check-in**: `services/attendance.ts` lấy location + device, tạo request hash,
-  rồi gọi adapter integrity → build `CheckInRequest` → `POST /v0/attendance/check-in`.
+- **Check-in**: package `attendance-client` điều phối location + device, gọi
+  adapter integrity → build `CheckInRequest` → `POST /v0/attendance/check-in`.
+  Package sở hữu API contract và attendance types; app chỉ cung cấp HTTP,
+  location, device và integrity adapter theo nền tảng.
 
 ### 3.3 API contract mobile đang dùng
 
@@ -138,7 +140,7 @@ Danh sách đầy đủ endpoint, payload, quyền và error code nằm tại
   — nhánh `cancelled` xét TRƯỚC để không bị tính đè thành `absent`).
 - Nút điểm danh chỉ enable khi `status === 'absent'`; nhãn nút đổi theo trạng thái
   (`getCheckInButtonLabel`) nên phiên `closed`/`cancelled`/`pending` không còn hiện
-  "Điểm danh ngay"; gọi `checkIn(sessionId)` (`services/attendance`) →
+  "Điểm danh ngay"; gọi `attendanceApi.checkIn(sessionId)` →
   GPS/device/integrity thật.
 - Kết quả: `VALID` → set `present` + alert thành công; `REVIEW`/`REJECTED` →
   alert `getCheckInFailureMessage(reasons)`; `LocationPermissionError` → alert
@@ -171,8 +173,8 @@ bằng dữ liệu thật → nhận kết quả → cập nhật trạng thái.
 
 ### B1 — Wire dữ liệu thật vào điểm danh ✅
 
-- `home.tsx` gọi `checkIn(sessionId)` từ `services/attendance` (GPS + device +
-  integrity gom trong service), không còn payload stub.
+- `home.tsx` gọi `attendanceApi.checkIn(sessionId)`; package gom GPS + device +
+  integrity qua platform adapter, không còn payload stub.
 - Bắt `LocationPermissionError` (alert xin quyền vị trí) và lỗi API chung.
 - `VALID` → set `present` + alert thành công; `REVIEW`/`REJECTED` → alert
   `getCheckInFailureMessage(reasons)`.
@@ -194,7 +196,7 @@ bằng dữ liệu thật → nhận kết quả → cập nhật trạng thái.
   sang `theme/`.
 - Viết lại `STRUCTURE.md` cho khớp thực tế.
 
-### Ngoài scope
+### Ngoài scope (giai đoạn 2)
 
 - App Attest thật cho iOS.
 - Tab Lịch sử điểm danh.
@@ -212,10 +214,5 @@ pnpm dev:mobile     # quét QR bằng Expo Go (dùng thiết bị thật cho GPS
 
 - Cấu hình `EXPO_PUBLIC_API_URL` trong `client/mobile-client/.env`
   (mẫu: `.env.example`).
-- Play Integrity Android cần đặt `android.package` trong `client/mobile-client/app.json`,
-  build app bằng signing đã đăng ký Play Console, rồi cấu hình cùng một Google
-  Cloud project/package ở `EXPO_PUBLIC_GOOGLE_CLOUD_PROJECT_NUMBER` phía mobile
-  và `PLAY_INTEGRITY_PACKAGE_NAME` + Google Application Credentials phía server.
-  Khi chưa có `PLAY_INTEGRITY_PACKAGE_NAME`, server giữ hệ số integrity local cũ.
 - GPS/anti-spoofing cần thiết bị thật để kiểm thử chính xác.
 - Lint mobile: `pnpm --filter @gps-attendance/mobile-client lint`.
