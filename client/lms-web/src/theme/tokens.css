@@ -1,0 +1,25 @@
+:root {
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  color: #17231c;
+  background: #f4f7f5;
+  font-synthesis: none;
+  --primary-900: #153b2a;
+  --primary-800: #1d5136;
+  --primary-700: #286b43;
+  --primary-600: #328653;
+  --primary-100: #e5f2e9;
+  --accent: #e9782f;
+  --surface: #ffffff;
+  --surface-muted: #f7f9f7;
+  --border: #dce5df;
+  --text: #17231c;
+  --muted: #68776d;
+  --success: #277a46;
+  --warning: #a8630d;
+  --danger: #b33d36;
+  --info: #286b86;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --shadow-overlay: 0 24px 70px rgb(11 45 27 / 18%);
+}
