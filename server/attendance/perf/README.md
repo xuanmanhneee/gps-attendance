@@ -29,6 +29,18 @@ same 1,000 requests over ten seconds, set `LOAD_TIME_UNIT=10s` before running
 `LOAD_VUS`. A failed `dropped_iterations` threshold means k6 did not send the
 intended load.
 
+To send every check-in at the same moment (one virtual user per student,
+like a whole class pressing the button when the session opens), set
+`LOAD_MODE=burst`. The p95 threshold defaults to 1,000 ms; override it with
+`PERF_P95_MS`. k6 also reports `proxy_first_byte_ms`, `upstream_connect_ms`
+and `upstream_header_ms` from the load balancer headers.
+
+```powershell
+$env:LOAD_MODE = 'burst'
+docker compose -f docker-compose.perf.yml run --rm load
+Remove-Item Env:LOAD_MODE
+```
+
 The default session closes ten minutes after `prepare`. Once it closes and
 the scheduler has run (it polls every ten seconds), verify PostgreSQL:
 

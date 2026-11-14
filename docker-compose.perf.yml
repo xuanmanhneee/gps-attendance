@@ -141,6 +141,8 @@ services:
       API_URL: http://load-balancer
       LOAD_TIME_UNIT: "${LOAD_TIME_UNIT:-1m}"
       LOAD_VUS: "${LOAD_VUS:-100}"
+      LOAD_MODE: "${LOAD_MODE:-rate}"
+      P95_MS: "${PERF_P95_MS:-1000}"
     volumes:
       - perf_data:/data:ro
       - ./server/attendance/perf:/scripts:ro
