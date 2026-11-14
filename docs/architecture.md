@@ -167,8 +167,7 @@ Chưa xong:
 | --- | --- | ------------------------------------------------------------------ | --------------------------- |
 | 1   | 🟡  | `integrity.ts` trả `null` (chưa có Play Integrity/App Attest thật) | `src/services/integrity.ts` |
 | 2   | 🟡  | `restoreAuth` xoá token với **mọi** lỗi, kể cả timeout: mở app lúc server quá tải là bị đăng xuất | `src/context/auth-context.tsx` |
-| 3   | 🟡  | Roster lấy mọi user khớp criteria, kể cả `organizer` cùng unit (server) | `server/attendance/src/users/user-filter.service.ts` |
-| 4   | 🟢  | Chưa có tab Lịch sử điểm danh                                      | `src/app/(tabs)/`           |
+| 3   | 🟢  | Chưa có tab Lịch sử điểm danh                                      | `src/app/(tabs)/`           |
 
 Auto refresh token khi 401 đã có (xem mục 3.2).
 

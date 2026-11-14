@@ -59,8 +59,10 @@ Các endpoint trả `void` hiện chỉ có field `success` sau khi serialize.
 exclude. Khi phiên đang mở chỉ được sửa `closeAt`; sau khi roster được khởi tạo
 thì không được sửa criteria.
 
-Roster gồm mọi user khớp criteria, **kể cả `organizer`** cùng unit hoặc tag
-(hiện chưa lọc theo role). Roster được khởi tạo lúc `openAt − 5 phút`: nếu
+Roster gồm mọi user khớp criteria, không phân biệt role: criteria là nơi quyết
+định ai thuộc phiên, server không lọc thêm. Lưu ý đăng nhập mobile chỉ dành cho
+`participant`, nên user role khác có trong roster sẽ ở trạng thái `absent` trừ
+khi được xử lý thủ công. Roster được khởi tạo lúc `openAt − 5 phút`: nếu
 thời điểm đó đã qua khi tạo phiên, việc khởi tạo chạy ngay trong request
 `POST`; nếu chưa, job `attendance:init-roster` chạy đúng thời điểm đó.
 
