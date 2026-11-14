@@ -59,6 +59,11 @@ Các endpoint trả `void` hiện chỉ có field `success` sau khi serialize.
 exclude. Khi phiên đang mở chỉ được sửa `closeAt`; sau khi roster được khởi tạo
 thì không được sửa criteria.
 
+Roster gồm mọi user khớp criteria, **kể cả `organizer`** cùng unit hoặc tag
+(hiện chưa lọc theo role). Roster được khởi tạo lúc `openAt − 5 phút`: nếu
+thời điểm đó đã qua khi tạo phiên, việc khởi tạo chạy ngay trong request
+`POST`; nếu chưa, job `attendance:init-roster` chạy đúng thời điểm đó.
+
 ## Check-in
 
 ### `POST /v0/attendance/check-in`
@@ -211,6 +216,17 @@ Các endpoint unit hiện là public và base path là `/units`.
 | `POST`  | `/units`      | `{ name, parentId? }`  | `Unit`               |
 | `PATCH` | `/units/:id`  | `{ name?, parentId? }` | `Unit`               |
 
+## Health
+
+| Method | Path      | Quyền  | Data trả về                                                                 |
+| ------ | --------- | ------ | --------------------------------------------------------------------------- |
+| `GET`  | `/health` | Public | `{ status: 'ok', checks: { database: 'up', redis: 'up' } }` |
+
+Kiểm tra PostgreSQL (`SELECT 1`) và Redis (`PING`), mỗi bên tối đa 2 giây.
+Khi một bên không phản hồi, trả HTTP 503 với code `SERVICE_UNAVAILABLE` và
+message nêu tên phụ thuộc bị lỗi. Dùng cho healthcheck Docker và `/healthz`
+của nginx trong stack perf. Route không có tiền tố `/v0`.
+
 ## Error code liên quan attendance review
 
 | Code                                         | Ý nghĩa                                          |
@@ -223,3 +239,10 @@ Các endpoint unit hiện là public và base path là `/units`.
 
 Các nhóm code còn lại được định nghĩa tại
 `packages/shared/src/api/response/codes/`.
+
+Hai code trong `CommonErrorCode` chỉ do client (`FetchHttpClient`) tự sinh với
+`status = 0`, server không bao giờ trả về: `REQUEST_TIMEOUT` (quá 30 giây) và
+`NETWORK_ERROR` (không kết nối được). Response lỗi không theo dạng
+`ApiResponse` (ví dụ trang 502 của nginx) thành `UNKNOWN_ERROR` với HTTP status
+gốc. `isRetryableApiError()` trả `true` cho hai code trên và cho status 429,
+502, 503, 504.

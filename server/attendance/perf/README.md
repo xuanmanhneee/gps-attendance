@@ -62,6 +62,36 @@ docker compose -f docker-compose.perf.yml run --rm -e LOAD_USERS=3 prepare
 docker compose -f docker-compose.perf.yml run --rm --entrypoint k6 load run /scripts/check-in-race.js
 ```
 
+To measure session creation including roster initialization (a session that
+opens immediately, so the `POST` writes the whole roster to Redis), run after
+`prepare`. It prints per-run latency and roster size, then cancels each
+session. Set `ROSTER_RUNS` (default 5) for more runs.
+
+```powershell
+docker compose -f docker-compose.perf.yml run --rm roster
+```
+
+To measure read APIs, run `read` after `prepare`. It sends
+`GET /v0/attendance-sessions/me` with a different student token each request
+(`READ_PARTICIPANT_RATE`, default 100 req/s) and rotates the organizer reads
+(created-by-me, session detail, session reviews, review history;
+`READ_ORGANIZER_RATE`, default 10 req/s) for `READ_DURATION` (default `1m`).
+
+```powershell
+docker compose -f docker-compose.perf.yml run --rm read
+```
+
+`GET /me` cost depends on how many sessions are open, not on the Redis key
+count. To reproduce a busy hour, seed extra open buffers and device keys as
+described in `RESULTS-2026-11-15.md`.
+
+After scaling `PERF_API_REPLICAS` down, restart the load balancer
+(`docker compose -f docker-compose.perf.yml restart load-balancer`); nginx
+keeps the removed instance's address and returns 502 for part of the
+requests until then. Rebuilding the API image leaves old layers behind; run
+`docker builder prune -f` afterwards so Docker Desktop's disk does not fill
+up.
+
 To run several API instances behind the load balancer, set
 `PERF_API_REPLICAS` (default 1). Each instance opens up to `PERF_DB_POOL_MAX`
 PostgreSQL connections (default 15); keep `replicas × pool` below the
