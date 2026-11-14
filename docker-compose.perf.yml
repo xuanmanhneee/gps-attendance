@@ -133,6 +133,19 @@ services:
       api:
         condition: service_healthy
 
+  # Đo thời gian tạo phiên kèm khởi tạo roster (chạy sau `prepare`).
+  roster:
+    image: gps-attendance-perf-api:local
+    profiles: ["tools"]
+    command: ["pnpm", "exec", "tsx", "scripts/measure-roster-init.ts"]
+    environment:
+      <<: *api_environment
+      API_URL: http://load-balancer
+      ROSTER_RUNS: "${ROSTER_RUNS:-5}"
+    depends_on:
+      load-balancer:
+        condition: service_healthy
+
   load:
     image: grafana/k6:latest
     profiles: ["load"]
