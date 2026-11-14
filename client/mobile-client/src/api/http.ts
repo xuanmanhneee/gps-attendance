@@ -40,7 +40,9 @@ async function refreshSession(): Promise<void> {
   try {
     await refreshPromise;
   } catch (error) {
-    await removeTokens();
+    // Chỉ xoá token khi refresh token bị từ chối (401) hoặc không còn. Lỗi
+    // mạng / 5xx / timeout thì giữ token để lần sau còn thử lại được.
+    if (isUnauthorized(error) || !getRefreshToken()) await removeTokens();
     throw error;
   } finally {
     refreshPromise = null;

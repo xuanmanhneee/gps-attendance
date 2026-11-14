@@ -106,11 +106,18 @@ Screen (app/**)
 ```
 
 - **Auth**: `AuthProvider` khôi phục token từ secure storage lúc khởi động,
-  gọi `GET /v0/users/me` để lấy profile; `isSignedIn = !!user`.
+  gọi `GET /v0/users/me` để lấy profile; `isSignedIn = !!user`. Chỉ lỗi xác
+  thực (401 sau khi refresh thất bại) mới xoá token. Lỗi tạm thời
+  (`isRetryableApiError`: timeout, mất mạng, 429/502/503/504) được thử lại
+  tối đa 3 lần với backoff luỹ thừa + jitter (500 ms × 2^n × 0.5–1.5); nếu
+  vẫn lỗi hoặc gặp lỗi khác thì giữ token, đặt `profileUnavailable = true` và
+  `app/index.tsx` hiện màn hình "Thử lại" (`retryProfile()`) thay vì đẩy về
+  `/login`.
 - **Refresh token**: `api/http.ts` bọc mọi request đã đăng nhập bằng
   `requestWithRefresh`. Gặp 401 thì gọi `/v0/user/auth/refresh` một lần (các
   request đồng thời dùng chung một lần refresh) rồi thử lại; refresh thất bại
-  thì xoá token.
+  thì xoá token, nhưng chỉ khi refresh bị từ chối bằng 401 (hoặc không còn
+  refresh token); lỗi mạng/5xx/timeout khi refresh giữ nguyên token.
 - **Check-in**: package `attendance-client` điều phối location + device, gọi
   adapter integrity → build `CheckInRequest` → `POST /v0/attendance/check-in`.
   Package sở hữu API contract và attendance types; app chỉ cung cấp HTTP,
@@ -166,10 +173,14 @@ Chưa xong:
 | #   | Mức | Mô tả                                                              | Vị trí                      |
 | --- | --- | ------------------------------------------------------------------ | --------------------------- |
 | 1   | 🟡  | `integrity.ts` trả `null` (chưa có Play Integrity/App Attest thật) | `src/services/integrity.ts` |
-| 2   | 🟡  | `restoreAuth` xoá token với **mọi** lỗi, kể cả timeout: mở app lúc server quá tải là bị đăng xuất | `src/context/auth-context.tsx` |
 | 3   | 🟢  | Chưa có tab Lịch sử điểm danh                                      | `src/app/(tabs)/`           |
 
 Auto refresh token khi 401 đã có (xem mục 3.2).
+
+Đã xử lý (15/11/2026): `restoreAuth` không còn xoá token với mọi lỗi. Lỗi tạm
+thời được thử lại có backoff + jitter, sau đó hiện màn hình thử lại; chỉ 401
+sau refresh mới đăng xuất (mục 3.2). `refreshSession` cũng chỉ xoá token khi
+bị 401. Chưa có cache profile cục bộ nên mất mạng thì chưa vào được app.
 
 Đã xử lý ở B1–B3: payload điểm danh thật; xoá `attendance-modal.tsx` /
 `gps-status-card.tsx` / `attendance-session-card.tsx` (dead + stale); xoá starter
