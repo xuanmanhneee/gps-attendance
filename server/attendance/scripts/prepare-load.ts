@@ -156,6 +156,15 @@ async function main(): Promise<void> {
     latitude: 10,
     longitude: 106,
     closeAt: closeAt.toISOString(),
+    // Giảng viên tạo phiên, dùng cho k6 đo các API đọc phía giảng viên.
+    organizer: {
+      userId: lecturer.id,
+      token: jwt.sign({
+        sub: lecturer.id,
+        username: 'load-lecturer',
+        role: 'organizer',
+      }),
+    },
     users: students.map((student, index) => ({
       userId: student.id,
       deviceId: `load-device-${String(index + 1).padStart(6, '0')}`,

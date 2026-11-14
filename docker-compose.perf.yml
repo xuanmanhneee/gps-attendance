@@ -163,6 +163,24 @@ services:
       load-balancer:
         condition: service_healthy
 
+  # Đo các API đọc của sinh viên và giảng viên (chạy sau `prepare`).
+  read:
+    image: grafana/k6:latest
+    profiles: ["load"]
+    entrypoint: ["k6", "run", "/scripts/read-api.js"]
+    environment:
+      API_URL: http://load-balancer
+      READ_DURATION: "${READ_DURATION:-1m}"
+      READ_PARTICIPANT_RATE: "${READ_PARTICIPANT_RATE:-100}"
+      READ_ORGANIZER_RATE: "${READ_ORGANIZER_RATE:-10}"
+      P95_MS: "${PERF_P95_MS:-1000}"
+    volumes:
+      - perf_data:/data:ro
+      - ./server/attendance/perf:/scripts:ro
+    depends_on:
+      load-balancer:
+        condition: service_healthy
+
 volumes:
   perf_postgres:
   perf_redis:
