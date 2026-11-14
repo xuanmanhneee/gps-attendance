@@ -31,11 +31,17 @@ import { UpdateAttendanceSessionDto } from './dto/update-attendance-session.dto'
 import {
   criteriaKeyFor,
   rosterInitializedKeyFor,
+  sessionCacheKeyFor,
 } from './attendance-session-keys';
 import { REVIEW_RESOLUTION_WINDOW_MS } from '../attendance-review/attendance-review.constants';
 import { AttendanceReviewService } from '../attendance-review/attendance-review.service';
 
 const ROSTER_INIT_BUFFER_MS = 5 * 60 * 1000;
+
+// Session được đọc ở mọi request check-in. Cache trong Redis để cú check-in
+// đồng loạt không dồn hết vào PostgreSQL. Mọi thao tác ghi session đều ghi đè
+// cache (write-through), TTL chỉ là lưới an toàn nếu ghi cache thất bại.
+const SESSION_CACHE_TTL_SECONDS = 60 * 60;
 
 /** true nếu đã tới (hoặc qua) thời điểm khởi tạo roster */
 const isRosterInitDue = (session: AttendanceSession): boolean =>
@@ -115,6 +121,7 @@ export class AttendanceSessionsService {
       closeAt,
       createdBy,
     });
+    await this.cacheSession(session);
 
     await this.redisService.set(
       criteriaKeyFor(session.id),
@@ -212,6 +219,7 @@ export class AttendanceSessionsService {
       openAt,
       closeAt,
     });
+    await this.cacheSession(updated);
 
     if (dto.participantCriteria) {
       await this.redisService.set(
@@ -264,9 +272,10 @@ export class AttendanceSessionsService {
     }
 
     // 3. Ghi
-    await this.attendanceSessionRepository.update(sessionId, {
+    const cancelled = await this.attendanceSessionRepository.update(sessionId, {
       status: 'cancelled',
     });
+    await this.cacheSession(cancelled);
 
     await this.jobScheduler.cancel(`init-roster:${sessionId}`);
     await this.jobScheduler.cancel(`flush:${sessionId}`);
@@ -314,6 +323,9 @@ export class AttendanceSessionsService {
   }
 
   async findById(id: number): Promise<AttendanceSession> {
+    const cached = await this.getCachedSession(id);
+    if (cached) return this.withComputedStatus(cached);
+
     const session = await this.attendanceSessionRepository.findById(id);
 
     if (!session) {
@@ -322,6 +334,10 @@ export class AttendanceSessionsService {
         message: `Không tìm thấy session id=${id}`,
       });
     }
+
+    // NX: nếu một thao tác ghi vừa cập nhật cache trong lúc đang đọc DB thì
+    // không ghi đè bằng bản cũ hơn.
+    await this.trySetCache(session, true);
 
     return this.withComputedStatus(session);
   }
@@ -415,6 +431,79 @@ export class AttendanceSessionsService {
         { sessionId },
         `flush:${sessionId}`,
       );
+    }
+  }
+
+  private async cacheSession(session: AttendanceSession): Promise<void> {
+    if (await this.trySetCache(session, false)) return;
+
+    // Không ghi được bản mới thì xoá bản cũ để lần đọc sau lấy lại từ DB.
+    try {
+      await this.redisService.del(sessionCacheKeyFor(session.id));
+    } catch (error) {
+      this.logger.error(
+        `Không xoá được cache session ${session.id}; cache có thể cũ tối đa ${SESSION_CACHE_TTL_SECONDS}s`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
+  private async trySetCache(
+    session: AttendanceSession,
+    ifNotExists: boolean,
+  ): Promise<boolean> {
+    try {
+      await this.redisService.set(
+        sessionCacheKeyFor(session.id),
+        JSON.stringify(session),
+        { ttlSec: SESSION_CACHE_TTL_SECONDS, ifNotExists },
+      );
+      return true;
+    } catch (error) {
+      this.logger.warn(
+        `Không ghi được cache session ${session.id}: ${(error as Error).message}`,
+      );
+      return false;
+    }
+  }
+
+  // Lỗi Redis hoặc dữ liệu cache hỏng không được làm hỏng request: rơi về DB.
+  private async getCachedSession(
+    id: number,
+  ): Promise<AttendanceSession | null> {
+    let raw: string | null;
+    try {
+      raw = await this.redisService.get(sessionCacheKeyFor(id));
+    } catch (error) {
+      this.logger.warn(
+        `Không đọc được cache session ${id}: ${(error as Error).message}`,
+      );
+      return null;
+    }
+    if (!raw) return null;
+
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const session: AttendanceSession = {
+        ...(parsed as unknown as AttendanceSession),
+        openAt: new Date(parsed.openAt as string),
+        closeAt: new Date(parsed.closeAt as string),
+        createdAt: new Date(parsed.createdAt as string),
+        updatedAt: new Date(parsed.updatedAt as string),
+      };
+      if (
+        session.id !== id ||
+        Number.isNaN(session.openAt.getTime()) ||
+        Number.isNaN(session.closeAt.getTime())
+      ) {
+        throw new Error('dữ liệu không khớp');
+      }
+      return session;
+    } catch (error) {
+      this.logger.warn(
+        `Cache session ${id} không hợp lệ, đọc lại từ DB: ${(error as Error).message}`,
+      );
+      return null;
     }
   }
 

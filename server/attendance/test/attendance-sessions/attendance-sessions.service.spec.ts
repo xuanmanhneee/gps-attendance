@@ -49,6 +49,10 @@ describe('AttendanceSessionsService', () => {
       createdBy: OWNER,
     });
 
+  // findById ghi cache session, nên chỉ kiểm tra riêng các lần ghi criteria.
+  const criteriaWrites = () =>
+    redis.set.mock.calls.filter(([key]) => String(key).endsWith(':criteria'));
+
   const patch = (id: number, dto: object, userId = OWNER) =>
     service.update(id, dto as UpdateAttendanceSessionDto, userId);
 
@@ -340,7 +344,7 @@ describe('AttendanceSessionsService', () => {
       );
 
       expect(code).toBe(AttendanceSessionErrorCode.INVALID_CRITERIA);
-      expect(redis.set).not.toHaveBeenCalled();
+      expect(criteriaWrites()).toHaveLength(0);
       expect((await repo.findById(s.id))!.radius).toBe(100);
     });
   });
@@ -352,7 +356,7 @@ describe('AttendanceSessionsService', () => {
 
       const code = await codeOf(patch(s.id, { participantCriteria: {} }));
       expect(code).toBe(AttendanceSessionErrorCode.CRITERIA_LOCKED);
-      expect(redis.set).not.toHaveBeenCalled();
+      expect(criteriaWrites()).toHaveLength(0);
     });
 
     it('vẫn sửa được trường thường', async () => {
@@ -424,7 +428,78 @@ describe('AttendanceSessionsService', () => {
       patch(s.id, { participantCriteria: {}, openAt: min(200).toISOString() }),
     ).rejects.toThrow(ConflictException.name ? Error : Error);
 
-    expect(redis.set).not.toHaveBeenCalled();
+    expect(criteriaWrites()).toHaveLength(0);
     expect(scheduler.schedule).not.toHaveBeenCalled();
+  });
+
+  describe('cache session trong Redis', () => {
+    const cacheKey = (id: number) => `attendance:session:${id}:context`;
+
+    it('đọc lần hai lấy từ cache, không gọi repository', async () => {
+      const s = await seed(min(-10), min(60));
+      const findById = jest.spyOn(repo, 'findById');
+
+      await service.findById(s.id);
+      await service.findById(s.id);
+
+      expect(findById).toHaveBeenCalledTimes(1);
+      expect(redis.set).toHaveBeenCalledWith(
+        cacheKey(s.id),
+        expect.any(String),
+        { ttlSec: 3600, ifNotExists: true },
+      );
+    });
+
+    it('tính lại status theo giờ hiện tại khi đọc từ cache', async () => {
+      const s = await seed(min(10), min(60));
+      expect((await service.findById(s.id)).status).toBe('pending');
+
+      jest.setSystemTime(min(20));
+
+      const cached = await service.findById(s.id);
+      expect(cached.status).toBe('open');
+      expect(cached.openAt).toEqual(min(10));
+    });
+
+    it('update ghi đè cache bằng bản mới', async () => {
+      const s = await seed(min(60), min(180));
+      await service.findById(s.id);
+
+      await patch(s.id, { title: 'Buổi 2' });
+
+      jest.spyOn(repo, 'findById').mockRejectedValue(new Error('không gọi DB'));
+      expect((await service.findById(s.id)).title).toBe('Buổi 2');
+    });
+
+    it('cancel ghi trạng thái cancelled vào cache', async () => {
+      const s = await seed(min(60), min(180));
+      await service.findById(s.id);
+
+      await service.cancel(s.id, OWNER);
+
+      jest.spyOn(repo, 'findById').mockRejectedValue(new Error('không gọi DB'));
+      expect((await service.findById(s.id)).status).toBe('cancelled');
+    });
+
+    it('Redis lỗi khi đọc thì rơi về repository', async () => {
+      const s = await seed(min(-10), min(60));
+      redis.get.mockRejectedValueOnce(new Error('Redis down'));
+
+      await expect(service.findById(s.id)).resolves.toMatchObject({
+        id: s.id,
+        status: 'open',
+      });
+    });
+
+    it('cache hỏng thì đọc lại từ repository', async () => {
+      const s = await seed(min(-10), min(60));
+      await redis.set(cacheKey(s.id), '{not json');
+      const findById = jest.spyOn(repo, 'findById');
+
+      await expect(service.findById(s.id)).resolves.toMatchObject({
+        id: s.id,
+      });
+      expect(findById).toHaveBeenCalledTimes(1);
+    });
   });
 });
