@@ -7,6 +7,9 @@ export const CommonErrorCode = {
   CONFLICT: 'CONFLICT',                   // 409 — generic
   TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS', // 429
   UNKNOWN_ERROR: 'UNKNOWN_ERROR',         // fallback cuối cùng nếu không map được status nào
+  // Hai code dưới chỉ do client tự sinh (status = 0), server không bao giờ trả về
+  REQUEST_TIMEOUT: 'REQUEST_TIMEOUT',     // request vượt quá thời gian chờ, client đã huỷ
+  NETWORK_ERROR: 'NETWORK_ERROR',         // không kết nối được tới máy chủ
 } as const;
 
 export type CommonErrorCode = (typeof CommonErrorCode)[keyof typeof CommonErrorCode];

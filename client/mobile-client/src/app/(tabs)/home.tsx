@@ -20,6 +20,7 @@ import {
   canCheckIn,
   getParticipantSessionStatus,
 } from '@gps-attendance/attendance-client';
+import { isRetryableApiError } from '@gps-attendance/shared';
 
 import { attendanceApi } from '../../api/attendance.api';
 import { useNow } from '../../hooks/use-now';
@@ -182,8 +183,13 @@ export default function HomeScreen() {
   const loadSessions = useCallback(async () => {
     try {
       await fetchSessions();
-    } catch {
-      Alert.alert('Lỗi', 'Không tải được danh sách phiên điểm danh');
+    } catch (error) {
+      Alert.alert(
+        'Lỗi',
+        isRetryableApiError(error)
+          ? error.message
+          : 'Không tải được danh sách phiên điểm danh',
+      );
     }
   }, [fetchSessions]);
 
@@ -261,6 +267,8 @@ export default function HomeScreen() {
             'Chưa có quyền vị trí',
             'Vui lòng cấp quyền truy cập vị trí để điểm danh.',
           );
+        } else if (isRetryableApiError(error)) {
+          showAlert('Điểm danh chưa được ghi nhận', error.message);
         } else {
           showAlert('Điểm danh thất bại', 'Không thể thực hiện điểm danh.');
         }
