@@ -141,8 +141,12 @@ describe('RedisAttendanceRecordBuffer session flush', () => {
 
     expect(redisService.eval).toHaveBeenCalledWith(
       expect.stringContaining("redis.call('DEL', KEYS[1], KEYS[2])"),
-      ['attendance:buffer:4', 'attendance:buffer-flushing:4'],
-      [],
+      [
+        'attendance:buffer:4',
+        'attendance:buffer-flushing:4',
+        'attendance:open-buffers',
+      ],
+      ['4'],
     );
   });
 });
@@ -174,19 +178,20 @@ describe('RedisAttendanceRecordBuffer roster insert', () => {
       string[],
       string[],
     ][];
-    expect(calls.map(([, , args]) => args.length)).toEqual([1000, 1000, 2]);
-    for (const [script, keys] of calls) {
+    expect(calls.map(([, , args]) => args.length)).toEqual([1001, 1001, 3]);
+    for (const [script, keys, args] of calls) {
       expect(script).toContain('HSETNX');
-      expect(keys).toEqual(['attendance:buffer:7']);
+      expect(keys).toEqual(['attendance:buffer:7', 'attendance:open-buffers']);
+      expect(args[0]).toBe('7');
     }
     const [, , firstArgs] = calls[0];
-    expect(firstArgs[0]).toBe('1');
-    expect(JSON.parse(firstArgs[1])).toMatchObject({
+    expect(firstArgs[1]).toBe('1');
+    expect(JSON.parse(firstArgs[2])).toMatchObject({
       userId: 1,
       status: 'absent',
     });
     const [, , lastArgs] = calls[2];
-    expect(lastArgs[0]).toBe('1001');
+    expect(lastArgs[1]).toBe('1001');
   });
 
   it('không gọi Redis khi roster rỗng', async () => {
@@ -196,5 +201,109 @@ describe('RedisAttendanceRecordBuffer roster insert', () => {
     await buffer.insertRecordsIfAbsent([]);
 
     expect(redisService.eval).not.toHaveBeenCalled();
+  });
+});
+
+describe('RedisAttendanceRecordBuffer open-buffers index', () => {
+  const stored = (sessionId: number, userId: number) =>
+    JSON.stringify({
+      sessionId,
+      userId,
+      status: 'absent',
+      checkedInAt: null,
+      latitude: null,
+      longitude: null,
+      accuracy: null,
+      updateBy: null,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+  it('findByUser chỉ đọc buffer trong tập chỉ mục, không SCAN', async () => {
+    const redisService = {
+      smembers: jest.fn().mockResolvedValue(['3', '8']),
+      eval: jest.fn().mockResolvedValue(['', stored(8, 5)]),
+      scan: jest.fn(),
+    } as unknown as RedisService;
+    const buffer = new RedisAttendanceRecordBuffer(redisService);
+
+    const records = await buffer.findByUser(5);
+
+    expect(redisService.scan).not.toHaveBeenCalled();
+    expect(redisService.smembers).toHaveBeenCalledWith(
+      'attendance:open-buffers',
+    );
+    expect(redisService.eval).toHaveBeenCalledWith(
+      expect.stringContaining('HGET'),
+      ['attendance:buffer:3', 'attendance:buffer:8'],
+      ['5'],
+    );
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ sessionId: 8, userId: 5 });
+  });
+
+  it('findByUser không gọi Lua khi không có buffer nào mở', async () => {
+    const redisService = {
+      smembers: jest.fn().mockResolvedValue([]),
+      eval: jest.fn(),
+    } as unknown as RedisService;
+    const buffer = new RedisAttendanceRecordBuffer(redisService);
+
+    await expect(buffer.findByUser(5)).resolves.toEqual([]);
+    expect(redisService.eval).not.toHaveBeenCalled();
+  });
+
+  it('ghi roster và xoá buffer cùng cập nhật tập chỉ mục', async () => {
+    const redisService = {
+      eval: jest.fn().mockResolvedValue(0),
+    } as unknown as RedisService;
+    const buffer = new RedisAttendanceRecordBuffer(redisService);
+
+    await buffer.insertRecordsIfAbsent([
+      {
+        sessionId: 7,
+        userId: 1,
+        status: 'absent',
+        checkedInAt: null,
+        latitude: null,
+        longitude: null,
+        accuracy: null,
+        updateBy: null,
+      },
+    ]);
+    await buffer.completeSessionFlush(7);
+
+    const calls = (redisService.eval as jest.Mock).mock.calls as [
+      string,
+      string[],
+      string[],
+    ][];
+    expect(calls[0][0]).toContain('SADD');
+    expect(calls[0][1]).toEqual([
+      'attendance:buffer:7',
+      'attendance:open-buffers',
+    ]);
+    expect(calls[0][2][0]).toBe('7');
+    expect(calls[1][0]).toContain('SREM');
+    expect(calls[1][1]).toContain('attendance:open-buffers');
+    expect(calls[1][2]).toEqual(['7']);
+  });
+
+  it('lúc khởi động nạp các buffer có sẵn vào tập chỉ mục', async () => {
+    const redisService = {
+      scan: jest
+        .fn()
+        .mockResolvedValueOnce(['17', ['attendance:buffer:3']])
+        .mockResolvedValueOnce(['0', ['attendance:buffer:12']]),
+      sadd: jest.fn(),
+    } as unknown as RedisService;
+    const buffer = new RedisAttendanceRecordBuffer(redisService);
+
+    await buffer.onModuleInit();
+
+    expect(redisService.sadd).toHaveBeenCalledWith(
+      'attendance:open-buffers',
+      '3',
+      '12',
+    );
   });
 });

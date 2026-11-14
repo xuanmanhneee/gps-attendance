@@ -132,6 +132,8 @@ async function main(): Promise<void> {
       }),
     );
   }
+  // Giống RedisAttendanceRecordBuffer: tập chỉ mục cho findByUser.
+  pipeline.sadd('attendance:open-buffers', String(session.id));
   const results = await pipeline.exec();
   if (!results || results.some(([error]) => error)) {
     throw new Error('Failed to populate Redis attendance buffer');

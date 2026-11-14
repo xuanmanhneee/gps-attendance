@@ -1,5 +1,5 @@
 // infra/redis/redis-attendance-record.buffer.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
 import {
   AttendanceRecord,
@@ -13,6 +13,9 @@ import {
 import { RedisService } from '../../../redis/redis.service'; // chỉnh path đúng theo project
 
 const keyFor = (sessionId: number) => `attendance:buffer:${sessionId}`;
+// Tập sessionId đang có buffer. findByUser đọc tập này thay vì SCAN toàn bộ
+// keyspace (gồm cả hàng nghìn key device của mỗi phiên).
+const OPEN_BUFFERS_KEY = 'attendance:open-buffers';
 const flushingKeyFor = (sessionId: number) =>
   `attendance:buffer-flushing:${sessionId}`;
 const deviceKeyFor = (sessionId: number, deviceId: string) =>
@@ -51,12 +54,24 @@ const RESOLVE_REVIEW_RECORD_SCRIPT = `
   return {3, previousStatus, cjson.encode(rec)}
 `;
 
-// HSETNX cho cả lô trong một lần gọi: ARGV là các cặp (userId, record).
+// HSETNX cho cả lô trong một lần gọi: ARGV[1] là sessionId, sau đó là các
+// cặp (userId, record). Ghi sessionId vào tập chỉ mục trong cùng thao tác.
 const INSERT_RECORDS_IF_ABSENT_SCRIPT = `
-  for i = 1, #ARGV, 2 do
+  redis.call('SADD', KEYS[2], ARGV[1])
+  for i = 2, #ARGV, 2 do
     redis.call('HSETNX', KEYS[1], ARGV[i], ARGV[i + 1])
   end
   return 0
+`;
+
+// Lấy record của một user ở mọi buffer trong một lần gọi. Phần tử rỗng là
+// buffer không có user đó (Lua cắt mảng tại nil nên không trả nil).
+const FIND_BY_USER_SCRIPT = `
+  local result = {}
+  for i, key in ipairs(KEYS) do
+    result[i] = redis.call('HGET', key, ARGV[1]) or ''
+  end
+  return result
 `;
 
 // Số record mỗi lần gọi script. Lua chặn Redis trong lúc chạy, nên chia lô
@@ -69,12 +84,38 @@ const BEGIN_SESSION_FLUSH_SCRIPT = `
 `;
 
 const COMPLETE_SESSION_FLUSH_SCRIPT = `
+  redis.call('SREM', KEYS[3], ARGV[1])
   return redis.call('DEL', KEYS[1], KEYS[2])
 `;
 
 @Injectable()
-export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
+export class RedisAttendanceRecordBuffer
+  implements IAttendanceRecordBuffer, OnModuleInit
+{
   constructor(private readonly redisService: RedisService) {}
+
+  // Buffer tạo trước khi có tập chỉ mục (bản cũ đang chạy lúc deploy) chưa
+  // nằm trong tập; quét một lần lúc khởi động để sinh viên không mất phiên
+  // đang mở trên màn hình của mình.
+  async onModuleInit(): Promise<void> {
+    const sessionIds: string[] = [];
+    let cursor = '0';
+    do {
+      const [next, keys] = await this.redisService.scan(
+        cursor,
+        'attendance:buffer:[0-9]*',
+        1000,
+      );
+      cursor = next;
+      for (const key of keys) {
+        sessionIds.push(key.slice('attendance:buffer:'.length));
+      }
+    } while (cursor !== '0');
+
+    if (sessionIds.length > 0) {
+      await this.redisService.sadd(OPEN_BUFFERS_KEY, ...sessionIds);
+    }
+  }
 
   async getRecord(
     sessionId: number,
@@ -85,27 +126,22 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
   }
 
   async findByUser(userId: number): Promise<AttendanceRecord[]> {
-    // Không có index theo userId trong buffer; quét toàn bộ session key
-    // đang mở. Chấp nhận được vì số session mở cùng lúc luôn nhỏ, và
-    // buffer chỉ tồn tại tạm thời (bị xoá ngay sau flush).
-    const result: AttendanceRecord[] = [];
-    let cursor = '0';
+    const sessionIds = await this.redisService.smembers(OPEN_BUFFERS_KEY);
+    if (sessionIds.length === 0) return [];
 
-    do {
-      const [next, keys] = await this.redisService.scan(
-        cursor,
-        'attendance:buffer:[0-9]*',
-        100,
-      );
-      cursor = next;
+    const result = await this.redisService.eval(
+      FIND_BY_USER_SCRIPT,
+      sessionIds.map((id) => keyFor(Number(id))),
+      [String(userId)],
+    );
+    if (!Array.isArray(result)) {
+      throw new Error(`Unexpected find-by-user result: ${String(result)}`);
+    }
 
-      for (const key of keys) {
-        const raw = await this.redisService.hget(key, String(userId));
-        if (raw) result.push(this.deserialize(raw));
-      }
-    } while (cursor !== '0');
-
-    return result;
+    return result
+      .map(String)
+      .filter((raw) => raw !== '')
+      .map((raw) => this.deserialize(raw));
   }
 
   async findBySession(sessionId: number): Promise<AttendanceRecord[]> {
@@ -122,6 +158,7 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
       String(record.userId),
       JSON.stringify(full),
     );
+    await this.redisService.sadd(OPEN_BUFFERS_KEY, String(record.sessionId));
   }
 
   async insertRecordsIfAbsent(
@@ -140,8 +177,8 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
       for (let i = 0; i < args.length; i += INSERT_BATCH_SIZE * 2) {
         await this.redisService.eval(
           INSERT_RECORDS_IF_ABSENT_SCRIPT,
-          [keyFor(sessionId)],
-          args.slice(i, i + INSERT_BATCH_SIZE * 2),
+          [keyFor(sessionId), OPEN_BUFFERS_KEY],
+          [String(sessionId), ...args.slice(i, i + INSERT_BATCH_SIZE * 2)],
         );
       }
     }
@@ -250,8 +287,8 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
   async completeSessionFlush(sessionId: number): Promise<void> {
     await this.redisService.eval(
       COMPLETE_SESSION_FLUSH_SCRIPT,
-      [keyFor(sessionId), flushingKeyFor(sessionId)],
-      [],
+      [keyFor(sessionId), flushingKeyFor(sessionId), OPEN_BUFFERS_KEY],
+      [String(sessionId)],
     );
   }
 
