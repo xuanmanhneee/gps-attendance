@@ -6,6 +6,7 @@ export const CommonErrorCode = {
   NOT_FOUND: 'NOT_FOUND',                 // 404 — generic, khi không có domain-specific code
   CONFLICT: 'CONFLICT',                   // 409 — generic
   TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS', // 429
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE', // 503 — phụ thuộc (DB, Redis) không phản hồi
   UNKNOWN_ERROR: 'UNKNOWN_ERROR',         // fallback cuối cùng nếu không map được status nào
   // Hai code dưới chỉ do client tự sinh (status = 0), server không bao giờ trả về
   REQUEST_TIMEOUT: 'REQUEST_TIMEOUT',     // request vượt quá thời gian chờ, client đã huỷ
