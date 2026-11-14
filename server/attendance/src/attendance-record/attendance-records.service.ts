@@ -90,22 +90,22 @@ export class AttendanceRecordsService {
     sessionId: number,
     userIds: number[],
   ): Promise<void> {
-    for (const userId of userIds) {
-      await this.attendanceRecordBuffer.insertRecordIfAbsent({
+    await this.attendanceRecordBuffer.insertRecordsIfAbsent(
+      userIds.map((userId) => ({
         sessionId,
         userId,
-        status: 'absent',
+        status: 'absent' as const,
         checkedInAt: null,
         latitude: null,
         longitude: null,
         accuracy: null,
         updateBy: null,
-      });
+      })),
+    );
 
-      this.logger.log(
-        `Attendance record ensured: sessionId=${sessionId}, userId=${userId}, status=absent`,
-      );
-    }
+    this.logger.log(
+      `Attendance records ensured: sessionId=${sessionId}, users=${userIds.length}, status=absent`,
+    );
   }
 
   async markPresent(

@@ -27,8 +27,9 @@ export interface IAttendanceRecordBuffer {
   findBySession(sessionId: number): Promise<AttendanceRecord[]>;
   upsertRecord(record: Omit<AttendanceRecord, 'updatedAt'>): Promise<void>;
   // Chỉ tạo record còn thiếu; retry khởi tạo roster không ghi đè check-in.
-  insertRecordIfAbsent(
-    record: Omit<AttendanceRecord, 'updatedAt'>,
+  // Nhận cả danh sách để implementation ghi theo lô thay vì từng record.
+  insertRecordsIfAbsent(
+    records: Omit<AttendanceRecord, 'updatedAt'>[],
   ): Promise<void>;
   // Ghi present và giữ device trong một thao tác nguyên tử. Service kiểm tra
   // thời gian, vị trí và quyền trước khi gọi; buffer chỉ bảo đảm trạng thái ghi.

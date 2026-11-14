@@ -146,3 +146,55 @@ describe('RedisAttendanceRecordBuffer session flush', () => {
     );
   });
 });
+
+describe('RedisAttendanceRecordBuffer roster insert', () => {
+  const absent = (sessionId: number, userId: number) => ({
+    sessionId,
+    userId,
+    status: 'absent' as const,
+    checkedInAt: null,
+    latitude: null,
+    longitude: null,
+    accuracy: null,
+    updateBy: null,
+  });
+
+  it('ghi roster theo lô 500 record mỗi lần gọi Lua, dùng HSETNX', async () => {
+    const redisService = {
+      eval: jest.fn().mockResolvedValue(0),
+    } as unknown as RedisService;
+    const buffer = new RedisAttendanceRecordBuffer(redisService);
+
+    await buffer.insertRecordsIfAbsent(
+      Array.from({ length: 1001 }, (_, i) => absent(7, i + 1)),
+    );
+
+    const calls = (redisService.eval as jest.Mock).mock.calls as [
+      string,
+      string[],
+      string[],
+    ][];
+    expect(calls.map(([, , args]) => args.length)).toEqual([1000, 1000, 2]);
+    for (const [script, keys] of calls) {
+      expect(script).toContain('HSETNX');
+      expect(keys).toEqual(['attendance:buffer:7']);
+    }
+    const [, , firstArgs] = calls[0];
+    expect(firstArgs[0]).toBe('1');
+    expect(JSON.parse(firstArgs[1])).toMatchObject({
+      userId: 1,
+      status: 'absent',
+    });
+    const [, , lastArgs] = calls[2];
+    expect(lastArgs[0]).toBe('1001');
+  });
+
+  it('không gọi Redis khi roster rỗng', async () => {
+    const redisService = { eval: jest.fn() } as unknown as RedisService;
+    const buffer = new RedisAttendanceRecordBuffer(redisService);
+
+    await buffer.insertRecordsIfAbsent([]);
+
+    expect(redisService.eval).not.toHaveBeenCalled();
+  });
+});

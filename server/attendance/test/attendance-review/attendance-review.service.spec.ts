@@ -25,7 +25,7 @@ describe('AttendanceReviewService', () => {
 
   const createFixture = async () => {
     const records = new InMemoryAttendanceRecordStore();
-    await records.insertRecordIfAbsent(absent);
+    await records.insertRecordsIfAbsent([absent]);
     const recordService = {
       getBySessionAndUser: (sessionId: number, userId: number) =>
         records.getRecord(sessionId, userId),

@@ -43,11 +43,13 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     sessionMap.set(record.userId, { ...record, updatedAt: new Date() });
   }
 
-  async insertRecordIfAbsent(
-    record: Omit<AttendanceRecord, 'updatedAt'>,
+  async insertRecordsIfAbsent(
+    records: Omit<AttendanceRecord, 'updatedAt'>[],
   ): Promise<void> {
-    if (!(await this.getRecord(record.sessionId, record.userId))) {
-      await this.upsertRecord(record);
+    for (const record of records) {
+      if (!(await this.getRecord(record.sessionId, record.userId))) {
+        await this.upsertRecord(record);
+      }
     }
   }
 

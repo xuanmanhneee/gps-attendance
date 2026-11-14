@@ -40,7 +40,7 @@ describe('AttendanceRecordsService', () => {
         bufferedRecord ? [{ ...bufferedRecord }] : [],
       ),
       upsertRecord: jest.fn(),
-      insertRecordIfAbsent: jest.fn(),
+      insertRecordsIfAbsent: jest.fn(),
       resolveReviewRecord: jest.fn(),
       tryMarkPresentAndClaimDevice: jest.fn(async (input) => {
         if (sessionIsFlushing) return 'session-flushing';

@@ -51,6 +51,18 @@ const RESOLVE_REVIEW_RECORD_SCRIPT = `
   return {3, previousStatus, cjson.encode(rec)}
 `;
 
+// HSETNX cho cả lô trong một lần gọi: ARGV là các cặp (userId, record).
+const INSERT_RECORDS_IF_ABSENT_SCRIPT = `
+  for i = 1, #ARGV, 2 do
+    redis.call('HSETNX', KEYS[1], ARGV[i], ARGV[i + 1])
+  end
+  return 0
+`;
+
+// Số record mỗi lần gọi script. Lua chặn Redis trong lúc chạy, nên chia lô
+// để một lớp lớn không làm các check-in khác phải chờ lâu.
+const INSERT_BATCH_SIZE = 500;
+
 const BEGIN_SESSION_FLUSH_SCRIPT = `
   redis.call('SET', KEYS[2], '1')
   return redis.call('HVALS', KEYS[1])
@@ -112,15 +124,27 @@ export class RedisAttendanceRecordBuffer implements IAttendanceRecordBuffer {
     );
   }
 
-  async insertRecordIfAbsent(
-    record: Omit<AttendanceRecord, 'updatedAt'>,
+  async insertRecordsIfAbsent(
+    records: Omit<AttendanceRecord, 'updatedAt'>[],
   ): Promise<void> {
-    const full: AttendanceRecord = { ...record, updatedAt: new Date() };
-    await this.redisService.hsetnx(
-      keyFor(record.sessionId),
-      String(record.userId),
-      JSON.stringify(full),
-    );
+    const updatedAt = new Date();
+    const bySession = new Map<number, string[]>();
+    for (const record of records) {
+      const args = bySession.get(record.sessionId) ?? [];
+      const full: AttendanceRecord = { ...record, updatedAt };
+      args.push(String(record.userId), JSON.stringify(full));
+      bySession.set(record.sessionId, args);
+    }
+
+    for (const [sessionId, args] of bySession) {
+      for (let i = 0; i < args.length; i += INSERT_BATCH_SIZE * 2) {
+        await this.redisService.eval(
+          INSERT_RECORDS_IF_ABSENT_SCRIPT,
+          [keyFor(sessionId)],
+          args.slice(i, i + INSERT_BATCH_SIZE * 2),
+        );
+      }
+    }
   }
 
   async tryMarkPresentAndClaimDevice(
