@@ -12,6 +12,7 @@ import {
   LATITUDE_MIN,
   LONGITUDE_MAX,
   LONGITUDE_MIN,
+  RADIUS_MAX,
   RADIUS_MIN,
   type SessionFormValues,
 } from '../../utils/attendance-sessions/session-form';
@@ -135,6 +136,7 @@ export const SessionLocationFields = ({
             <input
               type="number"
               min={RADIUS_MIN}
+              max={RADIUS_MAX}
               step={10}
               inputMode="numeric"
               aria-invalid={Boolean(errors.radius)}
@@ -144,6 +146,10 @@ export const SessionLocationFields = ({
                   Number.isFinite(value) || t('sessions.form.radiusRequired'),
                 min: {
                   value: RADIUS_MIN,
+                  message: t('sessions.form.radiusInvalid'),
+                },
+                max: {
+                  value: RADIUS_MAX,
                   message: t('sessions.form.radiusInvalid'),
                 },
               })}

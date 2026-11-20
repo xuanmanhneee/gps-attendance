@@ -21,6 +21,7 @@ import { toast } from 'react-toastify';
 import type { AttendanceSessionResponse } from '@gps-attendance/shared';
 
 import { attendanceSessionsApi } from '../api/attendance-sessions.api';
+import { SessionCancelDialog } from '../components/sessions/SessionCancelDialog';
 import {
   logSessionError,
   resolveSessionErrorKey,
@@ -37,12 +38,20 @@ const OrganizerSessionsView = () => {
   });
 
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [sessionToCancel, setSessionToCancel] =
+    useState<AttendanceSessionResponse | null>(null);
 
-  const handleCancel = async (session: AttendanceSessionResponse) => {
-    if (!window.confirm(t('sessions.card.cancelConfirm'))) return;
-    setCancellingId(session.id);
+  const handleOpenCancelDialog = (session: AttendanceSessionResponse) => {
+    if (cancellingId !== null) return;
+    setSessionToCancel(session);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!sessionToCancel) return;
+    const targetId = sessionToCancel.id;
+    setCancellingId(targetId);
     try {
-      await attendanceSessionsApi.cancel(session.id);
+      await attendanceSessionsApi.cancel(targetId);
       toast.success(t('sessions.cancelSuccess'));
       await reload();
     } catch (error) {
@@ -50,6 +59,7 @@ const OrganizerSessionsView = () => {
       toast.error(t(resolveSessionErrorKey(error, 'cancel')));
     } finally {
       setCancellingId(null);
+      setSessionToCancel(null);
     }
   };
 
@@ -114,7 +124,7 @@ const OrganizerSessionsView = () => {
                 key={group.dateKey}
                 group={group}
                 ref={idx === anchorIndex ? anchorRef : undefined}
-                onCancel={handleCancel}
+                onCancel={handleOpenCancelDialog}
                 cancellingId={cancellingId}
               />
             ))}
@@ -122,6 +132,13 @@ const OrganizerSessionsView = () => {
         )}
       </ScrollArea>
       </Panel>
+
+      <SessionCancelDialog
+        session={sessionToCancel}
+        isSubmitting={cancellingId !== null}
+        onConfirm={() => void handleConfirmCancel()}
+        onClose={() => setSessionToCancel(null)}
+      />
     </>
   );
 };

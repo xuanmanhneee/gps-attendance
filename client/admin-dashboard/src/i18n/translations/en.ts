@@ -337,7 +337,14 @@ export const en: Record<TranslationKey, string> = {
   'sessions.card.edit': 'Edit',
   'sessions.card.cancel': 'Cancel session',
   'sessions.card.cancelling': 'Cancelling...',
-  'sessions.card.cancelConfirm': 'Cancel this session? It cannot be reopened.',
+  'sessions.cancelDialog.titleOpen': 'Cancel ongoing session?',
+  'sessions.cancelDialog.titlePending': 'Cancel attendance session?',
+  'sessions.cancelDialog.warningOpen':
+    'Session "{title}" is currently ongoing. Attendance records already recorded for this session will be deleted and cannot be restored. The session cannot be reopened after cancellation.',
+  'sessions.cancelDialog.warningPending':
+    'Session "{title}" has not started yet. Once cancelled, the session cannot be reopened.',
+  'sessions.cancelDialog.confirm': 'Cancel session',
+  'sessions.cancelDialog.keep': 'Keep session',
   'sessions.cancelSuccess': 'Session cancelled',
   // ---- Session detail ----
   'sessionDetail.loading': 'Loading session details...',

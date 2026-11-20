@@ -13,13 +13,25 @@
 | 1 | P04-07 Dọn điều hướng, Login, ErrorBoundary, lazy load | 9 | P2 | [x] — hoàn thành toàn bộ 9 thẻ (.1 đến .8) |
 | 2 | P04-01 Hoàn thiện wizard tạo phiên | 7 | P1 | [~] — main đã làm một phần; chỉ rà và bù phần thiếu |
 | 3 | P04-03 Sửa/huỷ phiên (`/sessions/:id/edit`) | 7 | P1 | [~] — xuanmanhneee đã làm trang sửa; còn .2 .3 .4 .6 |
-| 4 | P07-03 Test UI theo rủi ro | 5 | P1 | [ ] — chờ quyết định |
+| 4 | P07-03 Test UI theo rủi ro | 5 (+1 tuỳ chọn) | P1 | [ ] — đã chọn A |
 | 5 | P07-07 Rà bảo mật phía dashboard | 7 | P1 | [ ] |
 | 6 | P03-02 Đăng xuất thu hồi phiên | 4 | P0 | [ ] — chờ backend P01-06 |
 | 7 | P05-02 / P05-05 `/users` và `/statistics` thật | 5 | P1 | [ ] — chờ backend P05-01, P05-04 |
-| 8 | P04-04 / 05 / 06 Kết quả gần thực, duyệt `REVIEW`, xuất file | 5 | P1 | [ ] — backend duyệt REVIEW đã có; P04-05.1 cần đối chiếu (có thể đã có UI) |
+| 8 | P04-04 / 05 / 06 Kết quả gần thực, duyệt `REVIEW`, xuất file | 9 | P1 | [ ] — P04-05 (UI duyệt REVIEW) đã đối chiếu: CHƯA có UI, chia 5 thẻ .1 đến .5; P04-04, P04-06 còn chờ API |
 
-Thứ tự khuyên làm (cập nhật 06/11): 1 (làm .4 khôi phục trước, rồi .1, .5b, .6, .7, .8) → 3 → 2 → 8 (P04-05.1, sau khi đối chiếu) → 5 → 4 (sau khi quyết định). Task 6, 7 chỉ làm khi backend xong và hợp đồng API đã được điền.
+**Thứ tự làm (cập nhật 07/11, theo mức độ phụ thuộc backend):** làm hết nhóm A rồi mới sang B, rồi C.
+
+- **Nhóm A — thuần frontend, không cần backend làm thêm** (API đã có hoặc chỉ đọc server để đối chiếu):
+  1. P04-03.4 cảnh báo huỷ phiên đang mở (rủi ro mất dữ liệu).
+  2. Task 2 P04-01: .1 → .2 → .3 → .5 → .6 → .7 → .4 → .8.
+  3. Task 3 P04-03: .2, .3, .5, .7 (sau khi người dùng quyết có sửa criteria không).
+  4. Task 5 P07-07: .1 đến .4, .6, .7 (rà soát và báo cáo); .5 chỉ là đề xuất gửi người làm backend.
+  5. Task 4 P07-03: đã chọn A (logic thuần), làm sau P07-03.1.
+- **Nhóm B — backend đã làm một phần:**
+  1. P04-05.1 → .5 UI duyệt `REVIEW` (API đã có; thiếu danh sách bản ghi phân trang).
+  2. P04-04.1 phần làm mới thủ công, polling, thời điểm tải (không cần backend); phần "trạng thái nguồn dữ liệu" chờ backend.
+  3. P04-03.6 xung đột khi sửa đồng thời: thẻ đọc server trước; nếu server không có version thì chuyển sang nhóm C.
+- **Nhóm C — chờ backend làm:** task 6 P03-02 (chờ P01-06), task 7 P05-02 và P05-05 (chờ P05-01, P05-04), P04-06 xuất file (chờ hợp đồng; có thể chuyển lên nhóm A nếu chấp nhận chỉ xuất dữ liệu đang xem), phần còn lại của P04-04.
 
 ## Đối chiếu với main (06/11)
 Nguồn: `sync-report.txt`, `commits-stat.txt` và báo cáo ĐỐI CHIẾU của Kilo tại `c80be75` (build xanh, test 120/120). Người làm song song: xuanmanhneee.
@@ -266,7 +278,8 @@ Tên file liên quan (theo tài liệu, xác nhận bằng `find`): `SessionCrea
 - **Bẫy hay gặp:** sửa thông điệp lỗi hiện có làm hỏng test cũ; đổi cách `NumberInput` giữ text làm mất khả năng gõ số thập phân.
 
 ### P04-01.1 — Validation toạ độ và bán kính
-- **Trạng thái:** SẴN SÀNG (chỉ bù) · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]
+- **Trạng thái:** ĐÃ XONG · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [x]
+- Bằng chứng: 08/11 · build xanh · test xanh (136 test) · file đã sửa: `SessionLocationFields.tsx`, `session-form.ts`, `session-form.test.ts`
 - **Đối chiếu 06/11:** đã có `validateRange` (`session-form.ts:118-174`), lat/lng/radius, NaN. Còn thiếu: test biên (lat 90/-90/90.0001, lng 180/-180/180.0001, radius âm, chuỗi rỗng); radius không có trần (`Number.MAX_SAFE_INTEGER`), chưa đối chiếu DTO server. Chỉ bổ sung test và đối chiếu DTO, không viết lại hàm.
 - **Đọc trước:** `session-form.ts` và test của nó; `SessionLocationFields.tsx`; DTO tạo phiên ở `server/` (CHỈ ĐỌC; tìm bằng grep trong thư mục attendance-sessions, đừng đoán tên); type request trong `packages/shared` (chỉ đọc).
 - **Việc cần làm:**
@@ -279,7 +292,8 @@ Tên file liên quan (theo tài liệu, xác nhận bằng `find`): `SessionCrea
 - **Commit gợi ý:** `fix(admin): bổ sung validation toạ độ và bán kính khi tạo phiên`
 
 ### P04-01.2 — Giờ, timezone và closeAt > openAt
-- **Trạng thái:** SẴN SÀNG (chỉ bù) · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]
+- **Trạng thái:** ĐÃ XONG · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [x]
+- Bằng chứng: 08/11 · build xanh · test xanh (152 test, đã thử nghiệm UTC / Asia/Ho_Chi_Minh / America/Los_Angeles) · file đã sửa: `session-form.ts`, `session-form.test.ts`, `PLAN.md`
 - **Đối chiếu 06/11:** đã có `combineLocalDateTime`, `isCloseAfterOpen` và test (`session-form.ts:106-116,176-185`). Còn thiếu: báo cáo cách chuyển giờ/múi giờ, xác nhận test không phụ thuộc múi giờ máy (so sánh bằng `Date.parse` trên chuỗi không có múi giờ). Không thêm rule openAt quá khứ nếu server không có.
 - **Đọc trước:** nơi chuyển giá trị ô nhập giờ sang chuỗi gửi API (grep `openAt` trong `session-form.ts` và page); DTO server (chỉ đọc) xem định dạng giờ yêu cầu.
 - **Việc cần làm:**
@@ -382,26 +396,28 @@ Sự thật về server (từ PROJECT_CONTEXT, AI phải xác minh lại ở cod
 - **Nghiệm thu:** `build`, `test` xanh; mở `/sessions/<id>/edit` không còn rơi vào NotFound; `grep attendanceSessionEdit` khớp route mới.
 - **Commit gợi ý:** `feat(admin): thêm route /sessions/:id/edit và trang khung`
 
-### P04-03.2 — Hàm thuần xác định field được sửa
-- **Trạng thái:** CẦN QUYẾT ĐỊNH · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]
-- **Đối chiếu 06/11:** chưa có hàm thuần; `SessionEditPage` đang tự tính `isOpen`. Cần tôi quyết: có thêm ô sửa criteria vào trang sửa không? Có thì hàm cần mốc roster (`ROSTER_INIT_BUFFER_MS` = 5 phút ở `attendance-sessions.service.ts:37`, `isRosterInitDue`); không thì hàm chỉ cần theo trạng thái và thẻ thu nhỏ. Cũng đọc: server cho role nào gọi update (để chốt guard admin).
-- **Đọc trước:** service `update` của attendance-sessions ở `server/` (CHỈ ĐỌC; lấy chính xác quy tắc theo trạng thái và thời điểm); kiểu `AttendanceSession` và detail ở client (`plannedParticipants !== null` nghĩa là roster chưa khởi tạo, xác nhận lại bằng code).
-- **Việc cần làm:** tạo hàm thuần trong `utils/` (ví dụ nhận session và `now`, trả về field nào sửa được) kèm test dạng bảng: pending trước giờ roster, pending sau giờ roster, open, closed, cancelled. Quy tắc phải khớp server; chỗ nào server không rõ thì hỏi.
-- **Không được làm:** làm UI; tự suy ra quy tắc không thấy trong code server.
-- **Nghiệm thu:** test phủ cả 5 trạng thái; `test` xanh.
+### P04-03.2 — Hàm thuần xác định field được sửa (theo trạng thái)
+- **Trạng thái:** SẴN SÀNG · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]
+- **Quyết định 07/11:** KHÔNG thêm ô sửa criteria vào trang sửa (giữ như hiện tại). Hàm chỉ xét theo trạng thái phiên, không cần mốc roster.
+- **Đối chiếu 06/11:** chưa có hàm thuần; `SessionEditPage` đang tự tính `isOpen`.
+- **Đọc trước:** service `update` của attendance-sessions ở `server/` (CHỈ ĐỌC; lấy chính xác quy tắc: open chỉ sửa được `closeAt`, ended trả 409, pending sửa được gì); server cho role nào gọi update (để chốt guard admin); kiểu `AttendanceSession` ở client.
+- **Việc cần làm:** tạo hàm thuần trong `utils/` (nhận session, trả về field nào sửa được) kèm test dạng bảng cho 4 trạng thái: pending, open, closed, cancelled. Quy tắc phải khớp server; chỗ nào server không rõ thì hỏi.
+- **Không được làm:** làm UI; xử lý criteria; tự suy ra quy tắc không thấy trong code server.
+- **Nghiệm thu:** test phủ cả 4 trạng thái; `test` xanh.
 - **Commit gợi ý:** `feat(admin): hàm xác định field được sửa theo trạng thái phiên`
 
-### P04-03.3 — Form sửa và gọi API update
+### P04-03.3 — Bù thông báo "không có thay đổi"
 - **Trạng thái:** CHỈ BÙ (sau .2) · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]
-- **Đối chiếu 06/11:** form, khoá field, `isDirty`/`isSubmitting`, map lỗi, toast sau API đã có (`SessionEditPage.tsx:203-243,468-477`). Còn thiếu: khi payload rỗng hàm `return` im lặng (`:226`), cần báo "không có thay đổi"; phần khoá criteria chỉ làm nếu .2 quyết có ô criteria.
-- **Đọc trước:** API `update` và `getCriteria` ở client `api/`; DTO update ở server (chỉ đọc; update toàn phần hay một phần?); `session-form.ts`, `SessionLocationFields`, `ParticipantCriteriaEditor` để dùng lại.
-- **Việc cần làm:** form sửa dùng lại component và validate sẵn có; field bị khoá (theo hàm ở .2) hiển thị disabled kèm giải thích; nút lưu chặn gửi lặp; lỗi map theo `ApiError.code`; thành công chỉ báo khi API thật sự thành công.
-- **Không được làm:** gửi field bị khoá lên server; viết lại validate; render `Error.message`.
-- **Nghiệm thu:** nêu payload thực tế gửi đi cho 2 trường hợp (phiên pending, phiên open); `build`, `test` xanh; vi/en đủ key.
-- **Commit gợi ý:** `feat(admin): form sửa phiên điểm danh`
+- **Đối chiếu 06/11:** form, khoá field, `isDirty`/`isSubmitting`, map lỗi, toast sau API đã có (`SessionEditPage.tsx:203-243,468-477`). Còn thiếu: khi payload rỗng hàm `return` im lặng (`:226`).
+- **Quyết định 07/11:** không làm khoá criteria (không có ô criteria trên trang sửa).
+- **Việc cần làm:** khi payload rỗng, hiện thông báo "không có thay đổi" (key vi/en đủ), không gọi API. Nếu .2 cho thấy khoá field hiện tại lệch quy tắc server thì báo, không tự sửa rộng.
+- **Không được làm:** gửi field bị khoá; viết lại validate; render `Error.message`.
+- **Nghiệm thu:** nêu hành vi khi bấm lưu mà không đổi gì; `build`, `test` xanh.
+- **Commit gợi ý:** `feat(admin): báo không có thay đổi khi lưu phiên`
 
 ### P04-03.4 — Huỷ phiên có cảnh báo tác động
-- **Trạng thái:** SẴN SÀNG · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]
+- **Trạng thái:** ĐÃ XONG · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [x]
+- Bằng chứng: 08/11 · build xanh · test xanh (120 test) · file đã sửa/tạo: `SessionCancelDialog.tsx`, `SessionsPage.tsx`, `vi.ts`, `en.ts`, `PLAN.md`
 - **Đối chiếu 06/11:** huỷ chỉ thấy ở `SessionsPage.tsx:41-52` với `window.confirm(t('sessions.card.cancelConfirm'))`, một câu chung cho mọi trạng thái. Kilo CHƯA kiểm tra `SessionDetailPage.tsx` (main sửa 223 dòng): grep `cancel` trên toàn `src` trước khi sửa để khỏi làm trùng.
 - **Đọc trước:** nơi gọi `cancel` hiện có (danh sách phiên, grep); service `cancel` ở server (chỉ đọc, xác nhận tác động lên phiên đang mở).
 - **Việc cần làm:** dùng lại API cancel. Hộp xác nhận có nội dung khác nhau theo trạng thái: phiên đang mở thì cảnh báo rõ dữ liệu điểm danh đã ghi sẽ mất (chỉ viết nếu server xác nhận đúng như vậy), phiên chưa mở thì cảnh báo nhẹ. Chặn bấm lặp.
@@ -439,25 +455,29 @@ Sự thật về server (từ PROJECT_CONTEXT, AI phải xác minh lại ở cod
 Nghiệm thu cả task: lỗi từng gây thành công giả, lộ menu, gửi lặp hoặc sai giờ có test tái hiện; chạy được trong CI.
 
 ### P07-03.1 — Chọn cách test
-- **Trạng thái:** CHỜ QUYẾT ĐỊNH (người điền, AI không được tự chọn) · **Chế độ:** CHẠY THẲNG sau khi điền · **Xong:** [ ]
-- **Lựa chọn:**
-  - A. Chỉ `node:test` cho logic thuần (đang dùng, không thêm dependency).
-  - B. Component test (cần thêm thư viện test, ví dụ Vitest + Testing Library).
-  - C. E2E (ví dụ Playwright, nặng hơn, cần môi trường chạy).
-- **Quyết định của tôi:** `____` (điền A, B hoặc C và lý do)
-- **Việc cần làm (sau khi điền):** ghi quyết định và lý do vào `PLAN.md`. Chỉ cài thư viện nếu quyết định là B hoặc C VÀ tôi cho phép rõ trong chat.
+- **Trạng thái:** ĐÃ QUYẾT ĐỊNH 07/11: **A** · **Chế độ:** CHẠY THẲNG · **Xong:** [ ]
+- **Quyết định:** A. Chỉ dùng `node:test` cho logic thuần, không thêm dependency. Lý do: không cần dựng backend/Postgres/Redis, chạy ổn định trong CI, hợp phạm vi đồ án. C (E2E/Playwright) để thành thẻ riêng ở cuối, tuỳ chọn (xem P07-03.6). B không chọn.
+- **Việc cần làm:** ghi quyết định và lý do trên vào `PLAN.md` (mục quyết định), ghi rõ C là việc tuỳ chọn sau cùng.
+- **Không được làm:** cài thêm thư viện nào.
 - **Nghiệm thu:** `PLAN.md` có mục quyết định.
+- **Commit gợi ý:** `docs(admin): chốt cách test UI theo rủi ro (A)`
 
-### P07-03.2 đến P07-03.5 — Các test theo rủi ro
-- **Trạng thái:** CHỜ P07-03.1 · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ] (mỗi thẻ một ô: .2 [ ] .3 [ ] .4 [ ] .5 [ ])
-- **Đọc trước:** theo cách test đã chọn ở .1; code đối tượng test.
-- **Việc cần làm (mỗi thẻ làm một mục):**
-  - .2 Wizard bước 1 và 2; nút gửi bị disable khi cần.
-  - .3 Menu hiển thị đúng theo role (admin, organizer).
-  - .4 Luồng login và tự refresh token khi gặp 401 (single-flight, thất bại thì phát `auth:expired`).
-  - .5 Không báo "thành công giả" khi API lỗi.
-- **Không được làm:** test chi tiết hiện thực (class CSS, cấu trúc DOM); sửa code sản phẩm để test qua.
-- **Nghiệm thu:** test mới đỏ khi cố ý phá hành vi tương ứng (nêu cách đã thử), xanh khi bình thường; `test` xanh; chạy được bằng lệnh duy nhất ở 0.4.
+### P07-03.2 đến P07-03.5 — Test logic thuần theo rủi ro
+- **Trạng thái:** SẴN SÀNG (sau .1) · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ] (mỗi thẻ một ô: .2 [ ] .3 [ ] .4 [ ] .5 [ ])
+- **Nguyên tắc:** chỉ test hàm thuần trong `utils/` và logic tách được khỏi React. Nếu hành vi nằm hẳn trong component/hook và không tách được thì GHI vào báo cáo là "không test được theo A", không tự cài thư viện, không sửa code sản phẩm để test qua.
+- **Đọc trước:** code đối tượng test; test hiện có (120 test/44 suite) để không trùng.
+- **Việc cần làm (mỗi thẻ một mục):**
+  - .2 Wizard bước 1 và 2: validate và điều kiện cho phép gửi/qua bước (hàm thuần).
+  - .3 Menu theo role (admin, organizer): kiểm tra dữ liệu `config/navigation.ts` (mục nào hiện cho role nào), khớp `RoleGuard` trong `AppRoutes.tsx`.
+  - .4 Refresh token khi 401: single-flight, thất bại thì phát `auth:expired` (test phần logic của http client nếu tách được, giả lập `fetch`).
+  - .5 Không báo "thành công giả": các hàm map kết quả/lỗi API sang thông báo; lỗi thì không ra thông báo thành công.
+- **Không được làm:** test chi tiết hiện thực (class CSS, cấu trúc DOM); sửa code sản phẩm để test qua; thêm dependency.
+- **Nghiệm thu:** test mới đỏ khi cố ý phá hành vi tương ứng (nêu cách đã thử), xanh khi bình thường; `test` xanh; chạy bằng lệnh duy nhất ở 0.4.
+
+### P07-03.6 — (Tuỳ chọn, làm cuối) Smoke test E2E bằng Playwright
+- **Trạng thái:** HOÃN · **Chế độ:** CHỈ LÀM KHI TÔI NÓI RÕ · **Xong:** [ ]
+- **Ghi chú:** cần backend + Postgres + Redis + seed chạy sẵn, cài Playwright (phải được tôi cho phép trong chat). Chỉ phủ luồng chính: đăng nhập, tạo phiên, xem phiên. Không đưa vào CI mặc định.
+- **Việc cần làm:** chưa giao. Khi tôi bật thẻ này, Kilo đọc và báo cáo kế hoạch trước, chưa cài gì.
 
 ---
 
@@ -597,16 +617,19 @@ HỢP ĐỒNG API STATISTICS (người điền): endpoint, tham số lọc (th�
 ---
 
 ## 8. P04-04, P04-05, P04-06 — Kết quả, duyệt, xuất file
-**Cập nhật 06/11:** backend duyệt `REVIEW` và audit đã có (`77e238a`). Danh sách phân trang vẫn chưa có (P04-04.1 và P04-06.1 còn chờ). Điền/đối chiếu hợp đồng với `docs/api.md` trước khi giao Kilo.
+**Cập nhật 07/11:** backend duyệt `REVIEW` và audit đã có (`77e238a`). Đối chiếu bằng code: dashboard CHƯA có hàm API, UI hay map lỗi cho review (`git grep review-requests` rỗng). Hợp đồng dưới đây đã khớp với controller và `docs/api.md`. Danh sách phân trang vẫn chưa có (P04-04.1 và P04-06.1 còn chờ).
 
 ```
-HỢP ĐỒNG API (từ PROJECT_CONTEXT mục 12, CHƯA đối chiếu với docs/api.md; AI phải xác minh ở controller và shared):
+HỢP ĐỒNG API (đã đối chiếu 07/11 với controller và docs/api.md: khớp; AI vẫn phải mở lại file khi làm thẻ):
 - POST /v0/attendance/review-requests (participant): { sessionId, note? } (note <= 300 ký tự)
 - GET /v0/attendance/sessions/:sessionId/review-requests (organizer tạo phiên): [{ sessionId, userId, student{code, role, fullname}, reasons[], note? }]
 - PATCH /v0/attendance/sessions/:sessionId/review-requests/:userId (organizer tạo phiên): { decision: 'approve' | 'reject', reason? } (reason <= 500 ký tự). approve -> present, reject -> giữ absent; cả hai khoá record và ghi audit.
 - Cửa sổ chốt: từ openAt đến closeAt + 10 phút. Dữ liệu review chỉ ở Redis.
 - Mã lỗi (AttendanceReviewErrorCode): COOLDOWN, USER_NOT_IN_SESSION, ALREADY_CHECKED_IN, RECORD_LOCKED, NOT_ELIGIBLE, REQUEST_NOT_FOUND, RESOLUTION_WINDOW_CLOSED.
+- Quyền: GET và PATCH chỉ organizer TẠO phiên đó (service kiểm tra ownership); admin nhận 403. `reason` ở PATCH là tuỳ chọn phía server.
 - Chưa có: danh sách bản ghi phân trang, trạng thái nguồn dữ liệu (buffer hay Postgres).
+
+QUYẾT ĐỊNH MẶC ĐỊNH 07/11 (đổi được nếu người dùng muốn): UI đặt trên `AttendanceRecordsPage`, chỉ organizer thấy và chỉ với phiên thuộc phạm vi `created-by-me`; admin không thấy UI; từ chối thì lý do BẮT BUỘC (1 đến 500 ký tự, kiểm ở client), duyệt thì lý do tuỳ chọn (tối đa 500); chỉ cho thao tác trong cửa sổ openAt đến closeAt + 10 phút.
 ```
 
 ### P04-04.1 — Làm mới gần thực và thời điểm tải
@@ -616,15 +639,45 @@ HỢP ĐỒNG API (từ PROJECT_CONTEXT mục 12, CHƯA đối chiếu với doc
 - **Không được làm:** polling cho phiên đã đóng; polling khi tab ẩn.
 - **Nghiệm thu:** `build`, `test` xanh; test cho logic quyết định có polling hay không.
 
-### P04-05.1 — Duyệt `REVIEW`
-- **Trạng thái:** CẦN ĐỐI CHIẾU TRƯỚC · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]
-- **Lưu ý 06/11:** `77e238a` sửa `SessionDetailPage.tsx` 223 dòng và `SessionsPage.tsx`; có thể xuanmanhneee đã làm một phần UI duyệt. `PROJECT_CONTEXT` ghi "chưa có UI duyệt" là từ commit message, CHƯA xác minh bằng code. Bước đầu tiên: `git grep -n -i "review" -- client/admin-dashboard/src`. Nếu UI đã có thì thẻ này thành "rà và bù".
-- **Đọc trước:** `docs/api.md` (mục review); controller review ở `server/attendance/src/attendance-check-in/attendance-check-in.controller.ts` (CHỈ ĐỌC); `packages/shared/src/api/response/codes/attendance-review.codes.ts`; types review trong `packages/shared` (CHỈ ĐỌC); `AttendanceRecordsPage`, `useAttendanceSessionDetail`; `api/` hiện có (đã có hàm gọi review chưa).
-- **Việc cần làm (nếu chưa có):** client API cho GET và PATCH review; trong màn kết quả điểm danh của organizer tạo phiên: danh sách yêu cầu (mã, họ tên, lý do hệ thống `reasons`, ghi chú), nút duyệt/từ chối, ô lý do, chặn double-submit, hiển thị người sửa và thời điểm nếu API trả, lỗi map theo `ApiError.code` (bảng mã ở hợp đồng), không báo thành công khi API lỗi, tải lại sau khi xử lý. `reasons` map sang nhãn i18n, mã lạ có nhãn mặc định.
-- **Cần tôi quyết:** lý do khi từ chối có bắt buộc không (hợp đồng: `reason?` tối đa 500 ký tự; kế hoạch ghi bắt buộc); admin có xem được không (backend: chỉ organizer tạo phiên).
-- **Không được làm:** sửa `server/` hoặc `packages/shared`; hiện lỗi thô; viết lại `AttendanceRecordsPage`.
-- **Nghiệm thu:** `build`, `test` xanh; vi/en đủ key; test cho hàm validate lý do (nếu có).
-- **Phối hợp:** hỏi xuanmanhneee ai làm UI này trước khi bắt đầu.
+### P04-05.1 — API client và shape guard (chưa có UI)
+- **Trạng thái:** SẴN SÀNG · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]
+- **Đối chiếu 07/11:** `api/attendance-sessions.api.ts` chỉ có `create`, `getAll`, `getCreatedByMe`, `getCreatedBy`, `getDetail`, `update`, `cancel`, `getCriteria`; chưa có hàm review.
+- **Đọc trước:** `api/attendance-sessions.api.ts` (mẫu `assertSessionId`, cách gọi `httpClient`); `types/attendance-session.ts` (mẫu `isXxx`/`parseXxx`); `packages/shared/src/types/attendance/attendance-record.types.ts` (kiểu review, CHỈ ĐỌC); controller review ở server (CHỈ ĐỌC, lấy path chính xác); `api/units.api.ts` (`patchUnit` tự viết vì `httpClient` chưa có `patch`).
+- **Việc cần làm:** (1) đề xuất tên và vị trí file API mới theo mẫu có sẵn, nêu trong báo cáo đọc và chờ duyệt; (2) hai hàm: lấy danh sách yêu cầu `GET /v0/attendance/sessions/:sessionId/review-requests` và xử lý `PATCH .../review-requests/:userId` với body `{ decision, reason? }`; (3) kiểm tra id là số nguyên dương trước khi ghép URL; (4) shape guard và parse danh sách: phần tử sai shape bị bỏ, không loại cả danh sách (giống `parseAttendanceSessionList`); (5) test cho guard. Nếu `httpClient` chưa có `patch`: báo cáo và DỪNG hỏi, không tự viết `fetch` mới.
+- **Không được làm:** UI, hook, sửa `packages/shared` hay `server/`, thêm thư viện.
+- **Nghiệm thu:** `build`, `test` xanh (nêu số test trước và sau); dán nguyên văn URL và method của hai hàm.
+- **Commit gợi ý:** `feat(admin): API client và shape guard cho duyệt review`
+
+### P04-05.2 — Logic thuần và i18n cho duyệt review
+- **Trạng thái:** CHỜ .1 · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]
+- **Đọc trước:** `components/sessions/session-errors.ts` và test của nó (mẫu `resolveSessionErrorKey`); `packages/shared/src/api/response/codes/attendance-review.codes.ts` (CHỈ ĐỌC); kiểu `AttendanceValidationReason` trong `packages/shared` (CHỈ ĐỌC, lấy đúng danh sách giá trị); `config/attendance-status.ts` (mẫu nhãn); `vi.ts`, `en.ts`; `attendance-review.constants.ts` ở server (CHỈ ĐỌC, hằng số cửa sổ chốt).
+- **Việc cần làm:** (1) hàm map `ApiError.code` sang key i18n cho 7 mã `AttendanceReviewErrorCode` và mã chung, có key mặc định cho mã lạ; (2) map từng giá trị `AttendanceValidationReason` sang key nhãn, giá trị lạ có nhãn mặc định; (3) `validateReviewReason(decision, reason)` theo quyết định mặc định (từ chối bắt buộc 1 đến 500 ký tự sau `trim`, duyệt tuỳ chọn tối đa 500), trả key lỗi hoặc `null`; (4) `isReviewWindowOpen(session, now)` nhận `now` làm tham số, cửa sổ openAt đến closeAt cộng 10 phút, ghi chú nguồn hằng số ở server; (5) key mới ở CẢ `vi.ts` và `en.ts` kèm test "mọi key trả về đều tồn tại" như mẫu có sẵn.
+- **Không được làm:** UI, hook; tự đặt hằng số cửa sổ chốt khi chưa thấy ở server; render `Error.message`.
+- **Nghiệm thu:** test phủ: từng mã lỗi, mã lạ, từng nhãn lý do, rỗng/toàn khoảng trắng/500/501 ký tự cho lý do, hai mép của cửa sổ (openAt trừ 1 phút, đúng openAt, đúng closeAt cộng 10 phút, cộng 10 phút 1 giây); `build`, `test` xanh.
+- **Commit gợi ý:** `feat(admin): logic thuần và i18n cho duyệt review`
+
+### P04-05.3 — Hook và danh sách yêu cầu (chỉ đọc)
+- **Trạng thái:** CHỜ .2 · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]
+- **Đọc trước:** `pages/AttendanceRecordsPage.tsx`; `hooks/useAttendanceSessionDetail` (mẫu race guard); `request-scope`/`load-tracker`; `components/attendance-records/` (cách tổ chức bảng); cách trang dùng `role` để rẽ nhánh admin/organizer.
+- **Việc cần làm:** hook lấy danh sách yêu cầu (state theo mẫu `toError`, race guard, không gọi API khi `enabled` sai); panel "Yêu cầu xác nhận" trên `AttendanceRecordsPage` chỉ hiện cho organizer và chỉ với phiên thuộc phạm vi `created-by-me`; mỗi dòng hiện mã, họ tên, lý do (đã dịch bằng hàm ở .2), ghi chú; trạng thái loading, lỗi (map `ApiError.code`), rỗng, thử lại; nút làm mới. CHƯA có nút duyệt.
+- **Không được làm:** nút duyệt/từ chối, polling, sửa bố cục bảng bản ghi hiện có, sửa `page-action-bar.tsx` hay `SessionDetailPage.tsx`.
+- **Nghiệm thu:** `build`, `test` xanh; nêu cách tự kiểm tra tay (đăng nhập `organizer01`, phiên của mình thấy panel; đăng nhập `admin01` không thấy).
+- **Commit gợi ý:** `feat(admin): danh sách yêu cầu review trên trang bản ghi điểm danh`
+
+### P04-05.4 — Duyệt và từ chối
+- **Trạng thái:** CHỜ .3 · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]
+- **Đọc trước:** panel và hook của .3; hàm ở .1 và .2; mẫu chặn gửi lặp theo từng đối tượng (`withPendingUser`, `canStartAssignmentMutation`); `components/ui/Dialog.tsx` (hộp thoại có sẵn).
+- **Việc cần làm:** mỗi dòng có nút Duyệt và Từ chối mở hộp xác nhận kèm ô lý do (validate bằng `validateReviewReason`); chặn gửi lặp theo từng người (một người đang xử lý thì khoá nút của người đó); lỗi map theo `ApiError.code`; toast thành công CHỈ sau khi API trả OK; sau xử lý tải lại danh sách yêu cầu và dữ liệu bản ghi đang xem; ngoài cửa sổ chốt (`isReviewWindowOpen` sai) thì ẩn nút và hiện lời giải thích; mã `RECORD_LOCKED` và `REQUEST_NOT_FOUND` hiện thông báo rồi tải lại danh sách.
+- **Không được làm:** gửi `reasons` lên server, sửa server hay shared, tự đóng hộp thoại khi API lỗi.
+- **Nghiệm thu:** `build`, `test` xanh; vi/en đủ key; nêu cách tự kiểm tra tay (bấm duyệt hai lần nhanh, từ chối không nhập lý do, phiên đã quá cửa sổ chốt).
+- **Commit gợi ý:** `feat(admin): duyệt và từ chối yêu cầu review`
+
+### P04-05.5 — Chốt P04-05
+- **Trạng thái:** CHỜ .1 đến .4 · **Chế độ:** CHẠY THẲNG · **Xong:** [ ]
+- **Việc cần làm:** chạy `build`, `test`, `typecheck`; cập nhật `ARCHITECTURE.md` (API, hook, trang bản ghi) và `PLAN.md` (đã xong P04-05, quyết định mặc định, phát hiện thêm); tick P04-05 trong mục 8 (task 8 vẫn mở vì P04-04 và P04-06 chờ API).
+- **Không được làm:** sửa code.
+- **Nghiệm thu:** `build`, `test`, `typecheck` xanh; `git --no-pager diff --stat` chỉ gồm file `.md`.
+- **Commit gợi ý:** `docs(admin): cập nhật tài liệu sau P04-05`
 
 ### P04-06.1 — Xuất CSV/XLSX
 - **Trạng thái:** CHỜ HỢP ĐỒNG · **Chế độ:** DỪNG SAU BÁO CÁO ĐỌC · **Xong:** [ ]

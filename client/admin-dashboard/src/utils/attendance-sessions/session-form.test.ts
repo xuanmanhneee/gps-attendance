@@ -9,8 +9,11 @@ import {
   combineLocalDateTime,
   createDefaultSessionFormValues,
   isCloseAfterOpen,
+  localDateTimeToIso,
   parseParticipantCodes,
+  RADIUS_MAX,
   resolveGeolocationErrorKey,
+  toLocalDateTimeInput,
   validateSessionForm,
   type SessionFormValues,
 } from './session-form.ts';
@@ -127,6 +130,187 @@ describe('validateSessionForm', () => {
     assert.equal(errors.longitude, 'sessions.form.longitudeInvalid');
   });
 
+  describe('toạ độ và bán kính (kiểm tra biên theo bảng)', () => {
+    const boundaryCases: Array<{
+      field: 'latitude' | 'longitude' | 'radius';
+      value: number;
+      expected: string | undefined;
+      label: string;
+    }> = [
+      {
+        field: 'latitude',
+        value: 90,
+        expected: undefined,
+        label: 'lat 90 (cận trên hợp lệ)',
+      },
+      {
+        field: 'latitude',
+        value: -90,
+        expected: undefined,
+        label: 'lat -90 (cận dưới hợp lệ)',
+      },
+      {
+        field: 'latitude',
+        value: 90.0001,
+        expected: 'sessions.form.latitudeInvalid',
+        label: 'lat 90.0001 (vượt cận trên)',
+      },
+      {
+        field: 'latitude',
+        value: -90.0001,
+        expected: 'sessions.form.latitudeInvalid',
+        label: 'lat -90.0001 (vượt cận dưới)',
+      },
+      {
+        field: 'longitude',
+        value: 180,
+        expected: undefined,
+        label: 'lng 180 (cận trên hợp lệ)',
+      },
+      {
+        field: 'longitude',
+        value: -180,
+        expected: undefined,
+        label: 'lng -180 (cận dưới hợp lệ)',
+      },
+      {
+        field: 'longitude',
+        value: 180.0001,
+        expected: 'sessions.form.longitudeInvalid',
+        label: 'lng 180.0001 (vượt cận trên)',
+      },
+      {
+        field: 'longitude',
+        value: -180.0001,
+        expected: 'sessions.form.longitudeInvalid',
+        label: 'lng -180.0001 (vượt cận dưới)',
+      },
+      {
+        field: 'radius',
+        value: 1,
+        expected: undefined,
+        label: 'radius 1 (cận dưới hợp lệ)',
+      },
+      {
+        field: 'radius',
+        value: RADIUS_MAX,
+        expected: undefined,
+        label: `radius ${RADIUS_MAX} (cận trên hợp lệ)`,
+      },
+      {
+        field: 'radius',
+        value: 0,
+        expected: 'sessions.form.radiusInvalid',
+        label: 'radius 0 (dưới RADIUS_MIN)',
+      },
+      {
+        field: 'radius',
+        value: -1,
+        expected: 'sessions.form.radiusInvalid',
+        label: 'radius -1 (số âm)',
+      },
+      {
+        field: 'radius',
+        value: -0.0001,
+        expected: 'sessions.form.radiusInvalid',
+        label: 'radius -0.0001 (số âm sát 0)',
+      },
+      {
+        field: 'radius',
+        value: RADIUS_MAX + 0.01,
+        expected: 'sessions.form.radiusInvalid',
+        label: 'radius RADIUS_MAX + 0.01 (vượt trần Decimal(8,2))',
+      },
+      {
+        field: 'radius',
+        value: Number.NaN,
+        expected: 'sessions.form.radiusRequired',
+        label: 'radius NaN (bắt buộc nhập)',
+      },
+      {
+        field: 'radius',
+        value: Number.POSITIVE_INFINITY,
+        expected: 'sessions.form.radiusRequired',
+        label: 'radius Infinity (không hữu hạn)',
+      },
+    ];
+
+    for (const { field, value, expected, label } of boundaryCases) {
+      it(label, () => {
+        const errors = validateSessionForm({ ...VALID_VALUES, [field]: value });
+        assert.equal(errors[field], expected);
+      });
+    }
+  });
+
+  describe('thời gian (kiểm tra biên theo bảng)', () => {
+    const timeCases: Array<{
+      openDate?: string;
+      openTime?: string;
+      closeDate?: string;
+      closeTime?: string;
+      expectedError: string | undefined;
+      label: string;
+    }> = [
+      {
+        closeTime: '08:00',
+        expectedError: 'sessions.form.timeRangeInvalid',
+        label: 'closeAt = openAt -> timeRangeInvalid',
+      },
+      {
+        closeTime: '07:30',
+        expectedError: 'sessions.form.timeRangeInvalid',
+        label: 'closeAt < openAt -> timeRangeInvalid',
+      },
+      {
+        closeTime: '08:01',
+        expectedError: undefined,
+        label: 'closeAt sau openAt đúng 1 phút -> không lỗi',
+      },
+      {
+        openTime: '',
+        expectedError: 'sessions.form.openTimeRequired',
+        label: 'thiếu openTime -> openTimeRequired',
+      },
+      {
+        openDate: '',
+        expectedError: 'sessions.form.openTimeRequired',
+        label: 'thiếu openDate -> openTimeRequired',
+      },
+      {
+        closeTime: '',
+        expectedError: 'sessions.form.closeTimeRequired',
+        label: 'thiếu closeTime -> closeTimeRequired',
+      },
+      {
+        closeDate: '',
+        expectedError: 'sessions.form.closeTimeRequired',
+        label: 'thiếu closeDate -> closeTimeRequired',
+      },
+      {
+        openDate: '2026-09-20',
+        openTime: '23:50',
+        closeDate: '2026-09-21',
+        closeTime: '00:30',
+        expectedError: undefined,
+        label: 'qua đêm hợp lệ -> không lỗi',
+      },
+    ];
+
+    for (const testCase of timeCases) {
+      it(testCase.label, () => {
+        const errors = validateSessionForm({
+          ...VALID_VALUES,
+          ...(testCase.openDate !== undefined && { openDate: testCase.openDate }),
+          ...(testCase.openTime !== undefined && { openTime: testCase.openTime }),
+          ...(testCase.closeDate !== undefined && { closeDate: testCase.closeDate }),
+          ...(testCase.closeTime !== undefined && { closeTime: testCase.closeTime }),
+        });
+        assert.equal(errors.closeTime, testCase.expectedError);
+      });
+    }
+  });
+
   it('má»i error key tráº£ vá» Ä‘á»u tá»“n táº¡i trong dictionary vi vÃ  en', () => {
     const samples: SessionFormValues[] = [
       {
@@ -161,8 +345,8 @@ describe('buildCreateSessionRequest', () => {
       latitude: 21.0278,
       longitude: 105.8342,
       radius: 50,
-      openAt: '2026-09-20T08:00',
-      closeAt: '2026-09-20T10:00',
+      openAt: new Date(2026, 8, 20, 8, 0).toISOString(),
+      closeAt: new Date(2026, 8, 20, 10, 0).toISOString(),
       participantCriteria: {
         codeFilter: {
           include: ['SV001', 'SV002'],
@@ -183,7 +367,7 @@ describe('buildUpdateSessionRequest', () => {
       {
         title: 'Tên mới',
         radius: 80,
-        closeAt: '2026-09-20T10:00',
+        closeAt: new Date(2026, 8, 20, 10, 0).toISOString(),
       },
     );
   });
@@ -195,7 +379,7 @@ describe('buildUpdateSessionRequest', () => {
         { title: true, latitude: true, openTime: true, closeTime: true },
         'open',
       ),
-      { closeAt: '2026-09-20T10:00' },
+      { closeAt: new Date(2026, 8, 20, 10, 0).toISOString() },
     );
   });
 });
@@ -250,5 +434,65 @@ describe('combineLocalDateTime', () => {
     );
     assert.equal(combineLocalDateTime('', '08:00'), '');
     assert.equal(combineLocalDateTime('2026-09-20', ''), '');
+  });
+});
+
+describe('localDateTimeToIso', () => {
+  it("chuỗi kết thúc bằng 'Z' đại diện thời điểm ISO UTC", () => {
+    const iso = localDateTimeToIso('2026-09-20', '08:00');
+    assert.ok(iso.endsWith('Z'));
+  });
+
+  it('round-trip bảo toàn đúng mốc thời gian tuyệt đối', () => {
+    const iso = localDateTimeToIso('2026-09-20', '08:00');
+    const expectedMs = new Date(2026, 8, 20, 8, 0).getTime();
+    assert.equal(new Date(iso).getTime(), expectedMs);
+  });
+
+  it('thiếu date hoặc time trả về chuỗi rỗng', () => {
+    assert.equal(localDateTimeToIso('', '08:00'), '');
+    assert.equal(localDateTimeToIso('2026-09-20', ''), '');
+    assert.equal(localDateTimeToIso('', ''), '');
+  });
+
+  it('ngày hoặc giờ không hợp lệ trả về chuỗi rỗng và không throw RangeError', () => {
+    assert.equal(localDateTimeToIso('invalid-date', '08:00'), '');
+    assert.equal(localDateTimeToIso('2026-09-20', 'invalid-time'), '');
+    assert.equal(localDateTimeToIso('abc', 'def'), '');
+    assert.equal(localDateTimeToIso('2026-13-45', '99:99'), '');
+  });
+
+  it('chuyển đúng các mốc giờ biên 00:00 và 23:59', () => {
+    assert.equal(
+      localDateTimeToIso('2026-09-20', '00:00'),
+      new Date(2026, 8, 20, 0, 0).toISOString(),
+    );
+    assert.equal(
+      localDateTimeToIso('2026-09-20', '23:59'),
+      new Date(2026, 8, 20, 23, 59).toISOString(),
+    );
+  });
+
+  it('chuyển đúng cho phiên qua đêm (2026-09-20 23:50 -> 2026-09-21 00:30)', () => {
+    const open = localDateTimeToIso('2026-09-20', '23:50');
+    const close = localDateTimeToIso('2026-09-21', '00:30');
+    assert.equal(open, new Date(2026, 8, 20, 23, 50).toISOString());
+    assert.equal(close, new Date(2026, 8, 21, 0, 30).toISOString());
+    assert.ok(new Date(close).getTime() > new Date(open).getTime());
+  });
+});
+
+describe('toLocalDateTimeInput và format pad số 0', () => {
+  it('toLocalDateTimeInput pad số 0 cho tháng, ngày, giờ, phút đơn lẻ', () => {
+    const d = new Date(2026, 0, 5, 4, 7); // 2026-01-05 04:07 local
+    assert.equal(toLocalDateTimeInput(d), '2026-01-05T04:07');
+  });
+
+  it('createDefaultSessionFormValues pad số 0 cho openDate và openTime', () => {
+    const defaults = createDefaultSessionFormValues(new Date(2026, 0, 5, 4, 7));
+    assert.equal(defaults.openDate, '2026-01-05');
+    assert.equal(defaults.openTime, '04:07');
+    assert.equal(defaults.closeDate, '2026-01-05');
+    assert.equal(defaults.closeTime, '06:07');
   });
 });

@@ -211,7 +211,14 @@ export const vi = {
   'sessions.card.edit': 'Sửa',
   'sessions.card.cancel': 'Huỷ phiên',
   'sessions.card.cancelling': 'Đang huỷ...',
-  'sessions.card.cancelConfirm': 'Huỷ phiên này? Phiên sẽ không thể mở lại.',
+  'sessions.cancelDialog.titleOpen': 'Huỷ phiên đang diễn ra?',
+  'sessions.cancelDialog.titlePending': 'Huỷ phiên điểm danh?',
+  'sessions.cancelDialog.warningOpen':
+    'Phiên "{title}" đang diễn ra. Điểm danh đã ghi nhận của phiên này sẽ bị xoá và không khôi phục được. Phiên không thể mở lại sau khi huỷ.',
+  'sessions.cancelDialog.warningPending':
+    'Phiên "{title}" chưa bắt đầu. Huỷ xong phiên sẽ không thể mở lại.',
+  'sessions.cancelDialog.confirm': 'Huỷ phiên',
+  'sessions.cancelDialog.keep': 'Giữ phiên',
   'sessions.cancelSuccess': 'Đã huỷ phiên',
 
   // ---- Sửa phiên ----

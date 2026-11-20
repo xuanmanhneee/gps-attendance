@@ -45,6 +45,10 @@ Ghi lại việc đã xong / còn lại / quyết định quan trọng để tas
 
 ### Còn lại / đề xuất
 
+- Chuẩn hoá múi giờ gửi API (P04-01.2): giờ gửi API từ wizard tạo/sửa phiên đã chuyển sang định dạng tuyệt đối ISO UTC kết thúc bằng 'Z' (`localDateTimeToIso`), thay vì chuỗi local không offset (`YYYY-MM-DDTHH:mm`) trước đây khiến server `new Date()` hiểu theo múi giờ máy chủ và có thể lệch 7 giờ nếu máy chủ chạy UTC.
+- Đề xuất cho phía server (P04-01.2): DTO nhận giờ nên yêu cầu rõ offset hoặc ghi rõ múi giờ máy chủ; ngoài ra client không chặn `closeAt` ở quá khứ trên form nhập (server đã có guard `closeAt.getTime() <= Date.now()` ném `INVALID_TIME_RANGE` được client map sang thông báo rõ ràng).
+- Nút huỷ ở `SessionDetailPage` chưa làm (hiện chỉ có ở danh sách phiên `SessionsPage`).
+- Phát hiện server: huỷ phiên `pending` đã qua mốc roster (`Date.now() >= session.openAt - ROSTER_INIT_BUFFER_MS`) thì `clearSessionBuffer` không được gọi (chỉ gọi khi `wasOpen`, `attendance-sessions.service.ts:248, 268-270`), buffer tạo bởi `initializeForSession` có thể tồn đọng trong Redis; cần đồng đội server xem lại.
 - Bước 2 nên thay bằng UI chọn lớp/đơn vị khi backend có filter tương ứng.
 - Chưa có `STRUCTURE.md` cho package này; nếu tạo thì cập nhật theo cấu trúc mới
   (`components/sessions/*`, `pages/SessionCreatePage.tsx`).

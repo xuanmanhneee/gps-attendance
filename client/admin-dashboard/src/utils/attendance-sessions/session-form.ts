@@ -107,6 +107,21 @@ export const parseParticipantCodes = (raw: string): string[] => {
 export const combineLocalDateTime = (date: string, time: string): string =>
   date && time ? `${date}T${time}` : '';
 
+/**
+ * Chuyển ngày và giờ local (từ input) sang chuỗi ISO UTC kết thúc bằng 'Z'.
+ *
+ * Trả về chuỗi rỗng khi thiếu ngày/giờ hoặc thời điểm không hợp lệ (không để
+ * `toISOString()` throw RangeError).
+ */
+export const localDateTimeToIso = (date: string, time: string): string => {
+  if (!date || !time) return '';
+
+  const parsed = new Date(`${date}T${time}`);
+  if (!Number.isFinite(parsed.getTime())) return '';
+
+  return parsed.toISOString();
+};
+
 /** `closeAt` phải sau `openAt`; so sánh trên timestamp local. */
 export const isCloseAfterOpen = (openAt: string, closeAt: string): boolean => {
   const open = Date.parse(openAt);
@@ -166,7 +181,7 @@ export const validateSessionForm = (
   const radiusError = validateRange(
     values.radius,
     RADIUS_MIN,
-    Number.MAX_SAFE_INTEGER,
+    RADIUS_MAX,
     'sessions.form.radiusRequired',
     'sessions.form.radiusInvalid',
   );
@@ -214,8 +229,8 @@ export const buildCreateSessionRequest = (
     latitude: values.latitude,
     longitude: values.longitude,
     radius: values.radius,
-    openAt: combineLocalDateTime(values.openDate, values.openTime),
-    closeAt: combineLocalDateTime(values.closeDate, values.closeTime),
+    openAt: localDateTimeToIso(values.openDate, values.openTime),
+    closeAt: localDateTimeToIso(values.closeDate, values.closeTime),
     participantCriteria: {
       ...(values.unitInclude.length > 0 || values.unitExclude.length > 0
         ? {
@@ -270,8 +285,8 @@ export const buildUpdateSessionRequest = (
   status: SessionStatus,
 ): UpdateAttendanceSessionRequest => {
   const request: UpdateAttendanceSessionRequest = {};
-  const openAt = combineLocalDateTime(values.openDate, values.openTime);
-  const closeAt = combineLocalDateTime(values.closeDate, values.closeTime);
+  const openAt = localDateTimeToIso(values.openDate, values.openTime);
+  const closeAt = localDateTimeToIso(values.closeDate, values.closeTime);
 
   if (status === 'open') {
     if (dirtyFields.closeDate || dirtyFields.closeTime) {
@@ -296,6 +311,7 @@ export const LATITUDE_MAX = 90;
 export const LONGITUDE_MIN = -180;
 export const LONGITUDE_MAX = 180;
 export const RADIUS_MIN = 1;
+export const RADIUS_MAX = 999999.99; // Khớp Decimal(8, 2) trong server/attendance/prisma/schema.prisma:140
 
 /** Bước nhảy bán kính hiển thị trên UI — bội số của 50 m. */
 export const RADIUS_STEP = 10;
