@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Device, DeviceIntegrity, Location } from '@gps-attendance/shared';
-import { collectCheckInContext } from '../services/attendance';
+import type {
+  Device,
+  DeviceIntegrity,
+  Location,
+} from '@gps-attendance/attendance-client';
+import { attendanceApi } from '../api/attendance.api';
 import { resetDeviceId } from '../services/device-id';
 
 type State = {
@@ -22,7 +26,10 @@ export function useCheckInContext() {
 
   const refresh = useCallback(async () => {
     try {
-      setState({ ...(await collectCheckInContext()), error: null });
+      setState({
+        ...(await attendanceApi.collectCheckInContext()),
+        error: null,
+      });
     } catch (e) {
       setState({
         ...EMPTY,

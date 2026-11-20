@@ -2,29 +2,20 @@ import { AttendanceRecord, MarkPresentInput } from './attendance-record.model';
 
 export type MarkPresentResult =
   | 'present'
-  | 'review'
   | 'already-present'
   | 'locked'
   | 'device-used'
   | 'record-missing'
   | 'session-flushing';
 
-export type RequestReviewResult =
-  | 'requested'
-  | 'record-missing'
-  | 'locked'
-  | 'not-eligible'
-  | 'session-flushing';
-
-export type ResolveReviewResult =
+export type ResolveAttendanceReviewRecordResult =
   | {
       status: 'resolved';
       record: AttendanceRecord;
       previousStatus: AttendanceRecord['status'];
     }
   | {
-      status:
-        'record-missing' | 'locked' | 'not-requested' | 'session-flushing';
+      status: 'record-missing' | 'locked' | 'session-flushing';
     };
 
 export interface IAttendanceRecordBuffer {
@@ -36,8 +27,9 @@ export interface IAttendanceRecordBuffer {
   findBySession(sessionId: number): Promise<AttendanceRecord[]>;
   upsertRecord(record: Omit<AttendanceRecord, 'updatedAt'>): Promise<void>;
   // Chỉ tạo record còn thiếu; retry khởi tạo roster không ghi đè check-in.
-  insertRecordIfAbsent(
-    record: Omit<AttendanceRecord, 'updatedAt'>,
+  // Nhận cả danh sách để implementation ghi theo lô thay vì từng record.
+  insertRecordsIfAbsent(
+    records: Omit<AttendanceRecord, 'updatedAt'>[],
   ): Promise<void>;
   // Ghi present và giữ device trong một thao tác nguyên tử. Service kiểm tra
   // thời gian, vị trí và quyền trước khi gọi; buffer chỉ bảo đảm trạng thái ghi.
@@ -46,17 +38,13 @@ export interface IAttendanceRecordBuffer {
     deviceId: string,
     deviceTtlSeconds: number,
   ): Promise<MarkPresentResult>;
-  requestReview(
-    sessionId: number,
-    userId: number,
-    note?: string,
-  ): Promise<RequestReviewResult>;
-  resolveReview(
+  resolveReviewRecord(
     sessionId: number,
     userId: number,
     decision: 'approve' | 'reject',
     resolverId: number,
-  ): Promise<ResolveReviewResult>;
+    candidateCreatedAt: Date,
+  ): Promise<ResolveAttendanceReviewRecordResult>;
   // Đóng quyền ghi và lấy snapshot trong cùng một thao tác nguyên tử.
   beginSessionFlush(sessionId: number): Promise<AttendanceRecord[]>;
   // Chỉ xoá buffer sau khi snapshot đã được lưu bền vững.

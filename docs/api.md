@@ -59,6 +59,13 @@ Các endpoint trả `void` hiện chỉ có field `success` sau khi serialize.
 exclude. Khi phiên đang mở chỉ được sửa `closeAt`; sau khi roster được khởi tạo
 thì không được sửa criteria.
 
+Roster gồm mọi user khớp criteria, không phân biệt role: criteria là nơi quyết
+định ai thuộc phiên, server không lọc thêm. Lưu ý đăng nhập mobile chỉ dành cho
+`participant`, nên user role khác có trong roster sẽ ở trạng thái `absent` trừ
+khi được xử lý thủ công. Roster được khởi tạo lúc `openAt − 5 phút`: nếu
+thời điểm đó đã qua khi tạo phiên, việc khởi tạo chạy ngay trong request
+`POST`; nếu chưa, job `attendance:init-roster` chạy đúng thời điểm đó.
+
 ## Check-in
 
 ### `POST /v0/attendance/check-in`
@@ -123,29 +130,13 @@ Reason có thể trả về:
 Review chỉ tồn tại trong Redis đến hết cửa sổ chốt 10 phút sau `closeAt`.
 Client không được gửi `reasons`.
 
-### Gửi yêu cầu
+### Danh sách review candidate
 
-`POST /v0/attendance/review-requests`
-
-- Quyền: JWT, `participant`.
-- Chỉ hợp lệ khi record vẫn `absent`, chưa khóa và có reasons từ lần check-in
-  `REVIEW` gần nhất.
-
-```json
-{
-  "sessionId": 1,
-  "note": "Em đang có mặt trong lớp"
-}
-```
-
-`note` là tùy chọn, tối đa 300 ký tự.
-
-### Danh sách yêu cầu
-
-`GET /v0/attendance/sessions/:sessionId/review-requests`
+`GET /v0/attendance/sessions/:sessionId/reviews`
 
 - Quyền: JWT, `organizer` tạo phiên.
-- Chỉ trả record có `reviewRequested = true` và chưa bị khóa.
+- Candidate được tạo tự động từ lần check-in trả `REVIEW`.
+- Client không cần gửi thêm request và không được gửi reasons.
 
 ```json
 [
@@ -157,15 +148,14 @@ Client không được gửi `reasons`.
       "role": "participant",
       "fullname": "Nguyễn Văn A"
     },
-    "reasons": ["LOW_CONFIDENCE_SCORE"],
-    "note": "Em đang có mặt trong lớp"
+    "reasons": ["LOW_CONFIDENCE_SCORE"]
   }
 ]
 ```
 
 ### Duyệt hoặc từ chối
 
-`PATCH /v0/attendance/sessions/:sessionId/review-requests/:userId`
+`PATCH /v0/attendance/sessions/:sessionId/reviews/:userId`
 
 - Quyền: JWT, `organizer` tạo phiên.
 - Chỉ xử lý từ `openAt` đến `closeAt + 10 phút`.
@@ -228,17 +218,33 @@ Các endpoint unit hiện là public và base path là `/units`.
 | `POST`  | `/units`      | `{ name, parentId? }`  | `Unit`               |
 | `PATCH` | `/units/:id`  | `{ name?, parentId? }` | `Unit`               |
 
+## Health
+
+| Method | Path      | Quyền  | Data trả về                                                                 |
+| ------ | --------- | ------ | --------------------------------------------------------------------------- |
+| `GET`  | `/health` | Public | `{ status: 'ok', checks: { database: 'up', redis: 'up' } }` |
+
+Kiểm tra PostgreSQL (`SELECT 1`) và Redis (`PING`), mỗi bên tối đa 2 giây.
+Khi một bên không phản hồi, trả HTTP 503 với code `SERVICE_UNAVAILABLE` và
+message nêu tên phụ thuộc bị lỗi. Dùng cho healthcheck Docker và `/healthz`
+của nginx trong stack perf. Route không có tiền tố `/v0`.
+
 ## Error code liên quan attendance review
 
 | Code                                         | Ý nghĩa                                          |
 | -------------------------------------------- | ------------------------------------------------ |
-| `ATTENDANCE_REVIEW_COOLDOWN`                 | Check-in lại trong thời gian cooldown            |
 | `ATTENDANCE_REVIEW_USER_NOT_IN_SESSION`      | Không có record của user trong phiên             |
 | `ATTENDANCE_REVIEW_ALREADY_CHECKED_IN`       | Record đã `present`                              |
 | `ATTENDANCE_REVIEW_RECORD_LOCKED`            | Organizer đã chốt record                         |
-| `ATTENDANCE_REVIEW_NOT_ELIGIBLE`             | Record không có reasons hợp lệ để yêu cầu review |
-| `ATTENDANCE_REVIEW_REQUEST_NOT_FOUND`        | Không có yêu cầu review đang chờ                 |
+| `ATTENDANCE_REVIEW_CANDIDATE_NOT_FOUND`      | Không có review candidate đang chờ                |
 | `ATTENDANCE_REVIEW_RESOLUTION_WINDOW_CLOSED` | Ngoài cửa sổ chốt hoặc buffer đang flush         |
 
 Các nhóm code còn lại được định nghĩa tại
 `packages/shared/src/api/response/codes/`.
+
+Hai code trong `CommonErrorCode` chỉ do client (`FetchHttpClient`) tự sinh với
+`status = 0`, server không bao giờ trả về: `REQUEST_TIMEOUT` (quá 30 giây) và
+`NETWORK_ERROR` (không kết nối được). Response lỗi không theo dạng
+`ApiResponse` (ví dụ trang 502 của nginx) thành `UNKNOWN_ERROR` với HTTP status
+gốc. `isRetryableApiError()` trả `true` cho hai code trên và cho status 429,
+502, 503, 504.

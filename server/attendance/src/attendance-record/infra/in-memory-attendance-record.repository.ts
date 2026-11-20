@@ -3,8 +3,7 @@ import { AttendanceRecord, MarkPresentInput } from '../attendance-record.model';
 import {
   IAttendanceRecordBuffer,
   MarkPresentResult,
-  RequestReviewResult,
-  ResolveReviewResult,
+  ResolveAttendanceReviewRecordResult,
 } from '#attendance-record/attendance-record.buffer';
 
 @Injectable()
@@ -44,11 +43,13 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     sessionMap.set(record.userId, { ...record, updatedAt: new Date() });
   }
 
-  async insertRecordIfAbsent(
-    record: Omit<AttendanceRecord, 'updatedAt'>,
+  async insertRecordsIfAbsent(
+    records: Omit<AttendanceRecord, 'updatedAt'>[],
   ): Promise<void> {
-    if (!(await this.getRecord(record.sessionId, record.userId))) {
-      await this.upsertRecord(record);
+    for (const record of records) {
+      if (!(await this.getRecord(record.sessionId, record.userId))) {
+        await this.upsertRecord(record);
+      }
     }
   }
 
@@ -65,22 +66,6 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     if (existing.status === 'present') return 'already-present';
     if (existing.status !== 'absent' || existing.updateBy !== null)
       return 'locked';
-
-    if (input.validationStatus === 'REVIEW') {
-      sessionMap!.set(input.userId, {
-        sessionId: input.sessionId,
-        userId: input.userId,
-        status: 'absent',
-        checkedInAt: null,
-        latitude: null,
-        longitude: null,
-        accuracy: null,
-        updateBy: null,
-        updatedAt: new Date(),
-        reasons: input.reasons,
-      });
-      return 'review';
-    }
 
     let usedDevices = this.usedDevicesBySession.get(input.sessionId);
     if (!usedDevices) {
@@ -104,46 +89,37 @@ export class InMemoryAttendanceRecordStore implements IAttendanceRecordBuffer {
     return 'present';
   }
 
-  async requestReview(
-    sessionId: number,
-    userId: number,
-    note?: string,
-  ): Promise<RequestReviewResult> {
-    if (this.flushingSessions.has(sessionId)) return 'session-flushing';
-    const record = this.recordsBySession.get(sessionId)?.get(userId);
-    if (!record) return 'record-missing';
-    if (record.updateBy !== null) return 'locked';
-    if (record.status !== 'absent' || !record.reasons?.length)
-      return 'not-eligible';
-    Object.assign(record, {
-      reviewRequested: true,
-      note,
-      updatedAt: new Date(),
-    });
-    return 'requested';
-  }
-
-  async resolveReview(
+  async resolveReviewRecord(
     sessionId: number,
     userId: number,
     decision: 'approve' | 'reject',
     resolverId: number,
-  ): Promise<ResolveReviewResult> {
+    candidateCreatedAt: Date,
+  ): Promise<ResolveAttendanceReviewRecordResult> {
     if (this.flushingSessions.has(sessionId))
       return { status: 'session-flushing' };
     const record = this.recordsBySession.get(sessionId)?.get(userId);
     if (!record) return { status: 'record-missing' };
     if (record.updateBy !== null) return { status: 'locked' };
-    if (record.status !== 'absent' || record.reviewRequested !== true) {
-      return { status: 'not-requested' };
+    if (record.status !== 'absent') {
+      return { status: 'locked' };
     }
     const previousStatus = record.status;
     Object.assign(record, {
       status: decision === 'approve' ? 'present' : 'absent',
+      ...(decision === 'approve'
+        ? {
+            checkedInAt: candidateCreatedAt,
+          }
+        : {}),
       updateBy: resolverId,
       updatedAt: new Date(),
     });
-    return { status: 'resolved', previousStatus, record: { ...record } };
+    return {
+      status: 'resolved',
+      previousStatus,
+      record: { ...record },
+    };
   }
 
   async beginSessionFlush(sessionId: number): Promise<AttendanceRecord[]> {

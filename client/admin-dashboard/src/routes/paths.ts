@@ -14,6 +14,7 @@ export const ROUTE_PATHS = {
   attendanceSessionDetail: '/sessions/:id',
   attendanceSessionEdit: '/sessions/:id/edit',
   attendanceRecords: '/attendance-records',
+  attendanceReviews: '/attendance-reviews',
   statistics: '/statistics',
 } as const;
 

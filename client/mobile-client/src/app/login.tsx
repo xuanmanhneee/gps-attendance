@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { isRetryableApiError } from '@gps-attendance/shared';
 import {
   Alert,
   Keyboard,
@@ -69,8 +70,13 @@ export default function LoginScreen() {
     try {
       await login(username.trim(), password);
       router.replace('/home');
-    } catch {
-      Alert.alert('Đăng nhập thất bại', 'Tên đăng nhập hoặc mật khẩu không đúng.');
+    } catch (error) {
+      Alert.alert(
+        'Đăng nhập thất bại',
+        isRetryableApiError(error)
+          ? error.message
+          : 'Tên đăng nhập hoặc mật khẩu không đúng.',
+      );
     }
   };
 

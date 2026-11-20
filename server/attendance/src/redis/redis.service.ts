@@ -84,6 +84,14 @@ export class RedisService implements OnModuleDestroy {
     return this.redis.scan(cursor, 'MATCH', matchPattern, 'COUNT', count);
   }
 
+  sadd(key: string, ...members: string[]): Promise<number> {
+    return this.redis.sadd(key, ...members);
+  }
+
+  smembers(key: string): Promise<string[]> {
+    return this.redis.smembers(key);
+  }
+
   zadd(key: string, score: number, member: string): Promise<number> {
     return this.redis.zadd(key, score, member);
   }
@@ -107,6 +115,10 @@ export class RedisService implements OnModuleDestroy {
       limitOffset,
       limitCount,
     );
+  }
+
+  ping(): Promise<string> {
+    return this.redis.ping();
   }
 
   async onModuleDestroy(): Promise<void> {

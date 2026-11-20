@@ -1,5 +1,5 @@
 import type { HttpClient, TokenProvider } from './http-client';
-import { ApiError, type ApiResponse } from './response';
+import { ApiError, CommonErrorCode, type ApiResponse } from './response';
 
 const API_TIMEOUT = 30000;
 
@@ -53,11 +53,28 @@ export class FetchHttpClient implements HttpClient {
     const timeout = setTimeout(() => controller.abort(), API_TIMEOUT);
 
     try {
-      const response = await fetch(`${this.baseUrl}${path}`, {
-        ...options,
-        headers,
-        signal: controller.signal,
-      });
+      let response: Response;
+      try {
+        response = await fetch(`${this.baseUrl}${path}`, {
+          ...options,
+          headers,
+          signal: controller.signal,
+        });
+      } catch {
+        // fetch chỉ reject khi không nhận được response: bị huỷ do timeout
+        // hoặc lỗi mạng. Đổi thành ApiError để UI hiển thị thông báo thử lại.
+        throw controller.signal.aborted
+          ? new ApiError(
+              CommonErrorCode.REQUEST_TIMEOUT,
+              'Máy chủ phản hồi quá lâu. Vui lòng thử lại.',
+              0,
+            )
+          : new ApiError(
+              CommonErrorCode.NETWORK_ERROR,
+              'Không kết nối được tới máy chủ. Vui lòng kiểm tra mạng và thử lại.',
+              0,
+            );
+      }
 
       const result = (await response
         .json()
@@ -72,7 +89,14 @@ export class FetchHttpClient implements HttpClient {
           throw new ApiError(result.code, result.message, response.status);
         }
 
-        throw new Error(`API request failed: ${response.status}`);
+        // Body không phải ApiResponse, ví dụ trang lỗi 502/504 của nginx khi quá tải
+        throw new ApiError(
+          CommonErrorCode.UNKNOWN_ERROR,
+          response.status >= 500 || response.status === 429
+            ? 'Máy chủ đang bận. Vui lòng thử lại sau ít phút.'
+            : `API request failed: ${response.status}`,
+          response.status,
+        );
       }
 
       return result.data;

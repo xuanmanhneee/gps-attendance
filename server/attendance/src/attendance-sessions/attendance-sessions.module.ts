@@ -9,6 +9,7 @@ import { RedisModule } from '#redis/redis.module';
 import { ATTENDANCE_SESSION_REPOSITORY } from './attendance-session.token';
 import { AttendanceSessionQueryService } from './attendance-session-query.service';
 import { PrismaAttendanceSessionRepository } from './infra/prisma/prisma-attendance-session.repository';
+import { AttendanceReviewModule } from '../attendance-review/attendance-review.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { PrismaAttendanceSessionRepository } from './infra/prisma/prisma-attenda
     UsersModule,
     GeoModule,
     AttendanceRecordModule,
+    AttendanceReviewModule,
     LoggingModule,
   ],
 

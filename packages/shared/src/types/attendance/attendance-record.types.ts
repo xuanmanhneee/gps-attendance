@@ -13,20 +13,27 @@ export interface AttendanceParticipantResponse {
 
 export type AttendanceReviewDecision = 'approve' | 'reject';
 
-export interface AttendanceReviewRequest {
-  sessionId: number;
-  note?: string;
-}
-
-export interface AttendanceReviewRequestResponse {
+export interface AttendanceReviewCandidateResponse {
   sessionId: number;
   userId: number;
   student: UserResponse;
   reasons: AttendanceValidationReason[];
-  note?: string;
 }
 
 export interface ResolveAttendanceReviewRequest {
   decision: AttendanceReviewDecision;
   reason?: string;
+}
+
+export interface AttendanceReviewHistoryResponse {
+  id: string;
+  session: {
+    id: number;
+    title: string;
+  };
+  student: UserResponse;
+  decision: AttendanceReviewDecision;
+  reasons: AttendanceValidationReason[];
+  reason: string | null;
+  resolvedAt: string;
 }

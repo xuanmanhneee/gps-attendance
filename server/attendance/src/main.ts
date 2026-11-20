@@ -56,7 +56,21 @@ async function bootstrap() {
   SwaggerModule.setup('api-docs', app, document);
 
   const port = process.env.PORT ?? 3000;
-  await app.listen(port, '0.0.0.0');
+  // Node mặc định backlog 511: khi cả lớp check-in cùng lúc, SYN vượt hàng
+  // đợi bị kernel bỏ và client phải gửi lại sau ~1s. Giá trị thực tế còn bị
+  // giới hạn bởi net.core.somaxconn của máy/container.
+  const backlog = Number(process.env.HTTP_BACKLOG ?? 4096);
+  if (!Number.isSafeInteger(backlog) || backlog < 1) {
+    throw new Error('HTTP_BACKLOG must be a positive integer');
+  }
+  // Nest truyền nguyên tham số xuống http.Server.listen(port, host, backlog)
+  // nhưng type của listen() chưa khai báo backlog.
+  await (
+    app.listen as (
+      port: number | string,
+      ...args: unknown[]
+    ) => Promise<unknown>
+  ).call(app, port, '0.0.0.0', backlog);
 
   const url = await app.getUrl();
   printBanner(url, `${url}/api-docs`);

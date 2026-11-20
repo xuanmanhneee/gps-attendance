@@ -1,5 +1,5 @@
 // src/redis/redis.module.ts
-import { Global, Module } from '@nestjs/common';
+import { Global, Logger, Module } from '@nestjs/common';
 import Redis from 'ioredis';
 import { RedisService } from './redis.service';
 
@@ -8,11 +8,20 @@ import { RedisService } from './redis.service';
   providers: [
     {
       provide: 'REDIS',
-      useFactory: () =>
-        new Redis({
-          host: process.env.REDIS_HOST ?? 'localhost',
-          port: Number(process.env.REDIS_PORT ?? 6370),
-        }),
+      useFactory: () => {
+        const host = process.env.REDIS_HOST ?? 'localhost';
+        const port = Number(process.env.REDIS_PORT ?? 6370);
+        const redis = new Redis({ host, port });
+        const logger = new Logger('Redis');
+
+        // ioredis tự reconnect; chỉ cần log lỗi thay vì để sự kiện 'error'
+        // không có listener làm tràn log khi Redis tạm thời mất kết nối.
+        redis.on('error', (error) => {
+          logger.warn(`Redis unavailable at ${host}:${port}: ${error.message}`);
+        });
+
+        return redis;
+      },
     },
     RedisService,
   ],

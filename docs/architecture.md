@@ -19,6 +19,7 @@ Là **pnpm workspace monorepo** — dùng chung 1 `pnpm-lock.yaml` ở root.
 | Admin      | `client/admin-dashboard` | React + Vite + TS                      | Giảng viên/quản trị tạo phiên, xem kết quả |
 | Mobile     | `client/mobile-client`   | Expo SDK 54 (React Native 0.81)        | Sinh viên điểm danh                        |
 | Shared     | `packages/shared`        | TypeScript thuần                       | Type/DTO + HTTP client dùng chung          |
+| Attendance client | `packages/attendance-client` | TypeScript thuần              | Client tái sử dụng cho luồng điểm danh mobile |
 
 Luồng nghiệp vụ: giảng viên tạo **phiên điểm danh** (thời gian, toạ độ tâm,
 bán kính) → sinh viên mở app trong khung thời gian, app lấy GPS → server kiểm
@@ -38,6 +39,10 @@ admin đọc trực tiếp file `.ts` nguồn (bundler); server đọc bản bui
   - Timeout 30s, parse response theo `ApiResponse<T>` (discriminated union).
   - Lỗi nghiệp vụ ném `ApiError { code, message, status }`; 401 gọi
     `onUnauthorized`.
+  - Timeout, lỗi mạng và response không phải JSON (ví dụ 502/504 của nginx)
+    cũng ném `ApiError` (`REQUEST_TIMEOUT`, `NETWORK_ERROR`, `UNKNOWN_ERROR`).
+    `isRetryableApiError()` cho UI biết nên nhắc người dùng thử lại thay vì
+    báo lỗi nghiệp vụ.
 - `src/api/response/codes/` — error code namespaced theo domain
   (`AuthErrorCode`, `AttendanceSessionErrorCode`, `CommonErrorCode`...).
 
@@ -62,13 +67,11 @@ src/
 │   ├── http.ts                 # httpClient (base URL từ EXPO_PUBLIC_API_URL)
 │   ├── auth.api.ts             # login / logout / refreshToken
 │   ├── user.api.ts             # getProfile
-│   ├── attendance-sessions.api.ts  # getSessions
-│   ├── attendance-check-in.api.ts  # checkIn
+│   ├── attendance.api.ts       # bind package điểm danh với httpClient
 │   └── index.ts                # barrel
 ├── context/
 │   └── auth-context.tsx        # AuthProvider + useAuth (user, token, login, logout)
 ├── services/                   # Logic thiết bị/vị trí (không phụ thuộc React)
-│   ├── attendance.ts           # collectCheckInContext / buildCheckInPayload / checkIn
 │   ├── dev-mode.ts             # cờ "Chế độ dev" + ép mock location
 │   ├── device-id.ts            # deviceId ổn định (AndroidId / iOS vendorId / UUID)
 │   ├── device-info.ts          # buildDeviceInfo -> Device
@@ -96,15 +99,29 @@ Screen (app/**)
   → Components (ui/, feature)
   → Context (useAuth) / Hooks (use-check-in-context)
   → services/* (location, device, integrity)
-  → api/*  (httpClient)
+  → api/attendance.api.ts (platform adapter + httpClient)
+  → @gps-attendance/attendance-client
   → @gps-attendance/shared (type + FetchHttpClient)
   → Backend (/v0/...)
 ```
 
 - **Auth**: `AuthProvider` khôi phục token từ secure storage lúc khởi động,
-  gọi `GET /v0/users/me` để lấy profile; `isSignedIn = !!user`.
-- **Check-in**: `services/attendance.ts` gom song song location + device +
-  integrity (`Promise.all`) → build `CheckInRequest` → `POST /v0/attendance/check-in`.
+  gọi `GET /v0/users/me` để lấy profile; `isSignedIn = !!user`. Chỉ lỗi xác
+  thực (401 sau khi refresh thất bại) mới xoá token. Lỗi tạm thời
+  (`isRetryableApiError`: timeout, mất mạng, 429/502/503/504) được thử lại
+  tối đa 3 lần với backoff luỹ thừa + jitter (500 ms × 2^n × 0.5–1.5); nếu
+  vẫn lỗi hoặc gặp lỗi khác thì giữ token, đặt `profileUnavailable = true` và
+  `app/index.tsx` hiện màn hình "Thử lại" (`retryProfile()`) thay vì đẩy về
+  `/login`.
+- **Refresh token**: `api/http.ts` bọc mọi request đã đăng nhập bằng
+  `requestWithRefresh`. Gặp 401 thì gọi `/v0/user/auth/refresh` một lần (các
+  request đồng thời dùng chung một lần refresh) rồi thử lại; refresh thất bại
+  thì xoá token, nhưng chỉ khi refresh bị từ chối bằng 401 (hoặc không còn
+  refresh token); lỗi mạng/5xx/timeout khi refresh giữ nguyên token.
+- **Check-in**: package `attendance-client` điều phối location + device, gọi
+  adapter integrity → build `CheckInRequest` → `POST /v0/attendance/check-in`.
+  Package sở hữu API contract và attendance types; app chỉ cung cấp HTTP,
+  location, device và integrity adapter theo nền tảng.
 
 ### 3.3 API contract mobile đang dùng
 
@@ -115,11 +132,10 @@ Screen (app/**)
 | 3   | GET    | `/v0/users/me`                   | JWT                               | `UserProfileResponse`           |
 | 4   | GET    | `/v0/attendance-sessions/me`     | JWT                               | `MyAttendanceSessionResponse[]` |
 | 5   | POST   | `/v0/attendance/check-in`        | JWT                               | `CheckInResponse`               |
-| 6   | POST   | `/v0/attendance/review-requests` | JWT, `participant`                | Không có data                   |
 
 `CheckInResponse` là discriminated union: `{ status: 'VALID' }` hoặc
-`{ status: 'REVIEW' | 'REJECTED', reasons: [...] }`. Khi nhận `REVIEW`, mobile
-có thể gọi endpoint gửi yêu cầu xác nhận; client không gửi reasons.
+`{ status: 'REVIEW' | 'REJECTED', reasons: [...] }`. Khi nhận `REVIEW`, server
+tự động tạo candidate để organizer xử lý; mobile không cần gửi thêm request.
 
 Danh sách đầy đủ endpoint, payload, quyền và error code nằm tại
 [`docs/api.md`](api.md). `userId` trong JWT là `User.id`, không phải
@@ -133,9 +149,12 @@ Danh sách đầy đủ endpoint, payload, quyền và error code nằm tại
 - `GET /v0/attendance-sessions/me` → render danh sách phiên + trạng thái
   (`getStudentSessionStatus`: pending/absent/present/late/excused/closed/cancelled
   — nhánh `cancelled` xét TRƯỚC để không bị tính đè thành `absent`).
+- Lỗi tạm thời (timeout, mất mạng, server quá tải) ở màn đăng nhập, tải danh
+  sách phiên và điểm danh hiển thị lời nhắc thử lại, không báo nhầm thành
+  "sai mật khẩu" hay "điểm danh thất bại".
 - Nút điểm danh chỉ enable khi `status === 'absent'`; nhãn nút đổi theo trạng thái
   (`getCheckInButtonLabel`) nên phiên `closed`/`cancelled`/`pending` không còn hiện
-  "Điểm danh ngay"; gọi `checkIn(sessionId)` (`services/attendance`) →
+  "Điểm danh ngay"; gọi `attendanceApi.checkIn(sessionId)` →
   GPS/device/integrity thật.
 - Kết quả: `VALID` → set `present` + alert thành công; `REVIEW`/`REJECTED` →
   alert `getCheckInFailureMessage(reasons)`; `LocationPermissionError` → alert
@@ -154,8 +173,14 @@ Chưa xong:
 | #   | Mức | Mô tả                                                              | Vị trí                      |
 | --- | --- | ------------------------------------------------------------------ | --------------------------- |
 | 1   | 🟡  | `integrity.ts` trả `null` (chưa có Play Integrity/App Attest thật) | `src/services/integrity.ts` |
-| 2   | 🟡  | Chưa auto refresh token khi 401                                    | `src/api/http.ts`           |
 | 3   | 🟢  | Chưa có tab Lịch sử điểm danh                                      | `src/app/(tabs)/`           |
+
+Auto refresh token khi 401 đã có (xem mục 3.2).
+
+Đã xử lý (15/11/2026): `restoreAuth` không còn xoá token với mọi lỗi. Lỗi tạm
+thời được thử lại có backoff + jitter, sau đó hiện màn hình thử lại; chỉ 401
+sau refresh mới đăng xuất (mục 3.2). `refreshSession` cũng chỉ xoá token khi
+bị 401. Chưa có cache profile cục bộ nên mất mạng thì chưa vào được app.
 
 Đã xử lý ở B1–B3: payload điểm danh thật; xoá `attendance-modal.tsx` /
 `gps-status-card.tsx` / `attendance-session-card.tsx` (dead + stale); xoá starter
@@ -172,8 +197,8 @@ bằng dữ liệu thật → nhận kết quả → cập nhật trạng thái.
 
 ### B1 — Wire dữ liệu thật vào điểm danh ✅
 
-- `home.tsx` gọi `checkIn(sessionId)` từ `services/attendance` (GPS + device +
-  integrity gom trong service), không còn payload stub.
+- `home.tsx` gọi `attendanceApi.checkIn(sessionId)`; package gom GPS + device +
+  integrity qua platform adapter, không còn payload stub.
 - Bắt `LocationPermissionError` (alert xin quyền vị trí) và lỗi API chung.
 - `VALID` → set `present` + alert thành công; `REVIEW`/`REJECTED` → alert
   `getCheckInFailureMessage(reasons)`.
@@ -200,7 +225,6 @@ bằng dữ liệu thật → nhận kết quả → cập nhật trạng thái.
 - Play Integrity (Android) / App Attest (iOS) thật trong `integrity.ts`.
 - Tab Lịch sử điểm danh.
 - GPS "follow" liên tục / cập nhật khoảng cách realtime.
-- Auto refresh token khi 401.
 
 ## 7. Cách chạy & kiểm thử
 
@@ -215,3 +239,39 @@ pnpm dev:mobile     # quét QR bằng Expo Go (dùng thiết bị thật cho GPS
   (mẫu: `.env.example`).
 - GPS/anti-spoofing cần thiết bị thật để kiểm thử chính xác.
 - Lint mobile: `pnpm --filter @gps-attendance/mobile-client lint`.
+
+## 8. Server: đường nóng và chịu tải
+
+Dữ liệu điểm danh của phiên đang mở nằm trong Redis, chỉ xuống PostgreSQL khi
+phiên đóng. Các key chính:
+
+| Key | Kiểu | Nội dung |
+| --- | --- | --- |
+| `attendance:buffer:{sessionId}` | Hash `userId → record JSON` | Roster của phiên; check-in cập nhật tại đây |
+| `attendance:open-buffers` | Set | Id các phiên đang có buffer, dùng cho `GET /me` |
+| `attendance:device:{sessionId}:{deviceId}` | String, có TTL | Thiết bị đã dùng trong phiên (chống trùng thiết bị) |
+| `attendance:buffer-flushing:{sessionId}` | String | Khoá chặn ghi mới khi đang flush |
+
+- **Khởi tạo roster**: ghi cả roster bằng script Lua `HSETNX`, 500 record mỗi
+  lần gọi, kèm `SADD` vào `attendance:open-buffers`. Không ghi đè record đã có,
+  nên chạy lại không làm mất check-in.
+- **Check-in**: một script Lua kiểm tra khoá flush, record và thiết bị rồi ghi
+  `present` và giữ thiết bị trong cùng thao tác nguyên tử.
+- **Flush** (job `attendance:flush` sau khi phiên đóng): đặt khoá và lấy
+  snapshot nguyên tử, ghi xuống PostgreSQL, rồi mới xoá buffer và `SREM` khỏi
+  tập chỉ mục. PostgreSQL lỗi thì buffer còn nguyên để job thử lại.
+- **`GET /me`** (`findByUser`): đọc `attendance:open-buffers` rồi lấy record
+  của sinh viên ở mọi buffer bằng một script Lua, gộp với các phiên đã flush
+  trong PostgreSQL. Khi khởi động, server quét buffer có sẵn để nạp lại tập
+  chỉ mục (phòng buffer do phiên bản cũ tạo).
+- **Cache phiên**: phiên điểm danh được cache trong Redis (read-through,
+  write-through, TTL 1 giờ).
+- **Kết nối**: pool PostgreSQL mỗi instance giới hạn bởi `DB_POOL_MAX` (mặc
+  định 15); HTTP backlog `HTTP_BACKLOG` (mặc định 4096).
+- **Health**: `GET /health` kiểm tra PostgreSQL và Redis (xem `docs/api.md`).
+
+Stack đo tải tách riêng (`docker-compose.perf.yml`, hướng dẫn tại
+`server/attendance/perf/README.md`): nginx cân bằng tải trước
+`PERF_API_REPLICAS` instance API, k6 cho check-in (`check-in.js`), tranh chấp
+(`check-in-race.js`) và API đọc (`read-api.js`), script đo khởi tạo roster
+(`roster`). Kết quả đo lưu tại `server/attendance/perf/RESULTS-<ngày>.md`.

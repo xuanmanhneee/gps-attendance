@@ -27,8 +27,7 @@ client/mobile-client/
 │   │   ├── 📄 http.ts                 # httpClient (baseUrl từ EXPO_PUBLIC_API_URL)
 │   │   ├── 📄 auth.api.ts             # login / logout / refreshToken
 │   │   ├── 📄 user.api.ts             # getProfile
-│   │   ├── 📄 attendance-sessions.api.ts   # getSessions
-│   │   ├── 📄 attendance-check-in.api.ts   # checkIn
+│   │   ├── 📄 attendance.api.ts       # bind package điểm danh với httpClient
 │   │   └── 📄 index.ts                # Export barrel
 │   │
 │   ├── 📁 components/                 # UI Components
@@ -45,8 +44,6 @@ client/mobile-client/
 │   │   └── 📄 use-now.ts              # "now" tự cập nhật tại mốc openAt/closeAt + foreground
 │   │
 │   ├── 📁 services/                   # Logic thiết bị/vị trí + cấu hình (không phụ thuộc React)
-│   │   ├── 📄 attendance.ts           # collectCheckInContext / buildCheckInPayload / checkIn
-│   │   │                              #   (áp override mock location của dev mode)
 │   │   ├── 📄 dev-mode.ts             # cờ "Chế độ dev" + ép mock location (trang Dev)
 │   │   ├── 📄 device-id.ts            # deviceId ổn định (AndroidId / iOS vendorId / UUID)
 │   │   ├── 📄 device-info.ts          # buildDeviceInfo → Device
@@ -72,7 +69,8 @@ Screen (app/**)
   → Components (components/ui, feature)
   → Context (useAuth) / Hooks (use-check-in-context, use-now)
   → services/* (location, device, integrity)
-  → api/* (httpClient)
+  → api/attendance.api.ts (platform adapter + httpClient)
+  → @gps-attendance/attendance-client (orchestration điểm danh)
   → @gps-attendance/shared (type + FetchHttpClient)
   → Backend Server (/v0/...)
 ```
@@ -89,8 +87,8 @@ Screen (app/**)
 - **http.ts**: `httpClient` tạo từ `createHttpClient()` của shared, inject `Authorization: Bearer`
 - **auth.api.ts**: login / logout / refreshToken
 - **user.api.ts**: getProfile
-- **attendance-sessions.api.ts**: getSessions
-- **attendance-check-in.api.ts**: checkIn
+- **attendance.api.ts**: bind package điểm danh với httpClient và adapter
+  GPS/device/integrity của Expo
 
 ### Screens
 
@@ -120,7 +118,8 @@ Screen (app/**)
   xuống card qua prop `context` (card chỉ hiển thị, không tự gọi hook)
 - Nhóm "Tuỳ chỉnh":
   - Công tắc "Giả lập mock location" → ép `isMockLocation = true` trong payload
-    điểm danh (`services/attendance.ts`); server trả `REJECTED / MOCK_LOCATION`.
+    điểm danh (platform adapter trong `api/attendance.api.ts`); server trả
+    `REJECTED / MOCK_LOCATION`.
     Tắt "Chế độ dev" ở Profile sẽ xoá luôn cờ này
   - "Đổi deviceId mới" → `resetDeviceId()` sinh `debug-<uuid>` rồi đọc lại
   - "Làm mới dữ liệu thiết bị" → đọc lại GPS/device/integrity

@@ -63,16 +63,7 @@ export class AttendanceRecordsService {
       return;
     }
 
-    // Các field review chỉ sống trong Redis; tạo object mới để không thể lọt vào Prisma.
-    const persistentRecords = records.map(
-      ({
-        reasons: _reasons,
-        reviewRequested: _reviewRequested,
-        note: _note,
-        ...record
-      }) => record,
-    );
-    await this.attendanceRecordRepository.bulkUpsert(persistentRecords);
+    await this.attendanceRecordRepository.bulkUpsert(records);
     await this.attendanceRecordBuffer.completeSessionFlush(sessionId);
 
     this.logger.log(
@@ -99,22 +90,22 @@ export class AttendanceRecordsService {
     sessionId: number,
     userIds: number[],
   ): Promise<void> {
-    for (const userId of userIds) {
-      await this.attendanceRecordBuffer.insertRecordIfAbsent({
+    await this.attendanceRecordBuffer.insertRecordsIfAbsent(
+      userIds.map((userId) => ({
         sessionId,
         userId,
-        status: 'absent',
+        status: 'absent' as const,
         checkedInAt: null,
         latitude: null,
         longitude: null,
         accuracy: null,
         updateBy: null,
-      });
+      })),
+    );
 
-      this.logger.log(
-        `Attendance record ensured: sessionId=${sessionId}, userId=${userId}, status=absent`,
-      );
-    }
+    this.logger.log(
+      `Attendance records ensured: sessionId=${sessionId}, users=${userIds.length}, status=absent`,
+    );
   }
 
   async markPresent(
@@ -129,30 +120,19 @@ export class AttendanceRecordsService {
     );
   }
 
-  requestReview(sessionId: number, userId: number, note?: string) {
-    return this.attendanceRecordBuffer.requestReview(sessionId, userId, note);
-  }
-
-  resolveReview(
+  resolveReviewRecord(
     sessionId: number,
     userId: number,
     decision: 'approve' | 'reject',
     resolverId: number,
+    candidateCreatedAt: Date,
   ) {
-    return this.attendanceRecordBuffer.resolveReview(
+    return this.attendanceRecordBuffer.resolveReviewRecord(
       sessionId,
       userId,
       decision,
       resolverId,
-    );
-  }
-
-  async findReviewRequestsBySession(
-    sessionId: number,
-  ): Promise<AttendanceRecord[]> {
-    const records = await this.attendanceRecordBuffer.findBySession(sessionId);
-    return records.filter(
-      (record) => record.reviewRequested === true && record.updateBy === null,
+      candidateCreatedAt,
     );
   }
 

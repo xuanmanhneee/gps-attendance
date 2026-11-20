@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '#prisma/generated/client';
 import { PrismaService } from '#prisma/prisma.service';
-import type { AuditEntry } from '../audit-log.model';
+import type {
+  AuditEntry,
+  AuditLogQuery,
+  AuditLogRecord,
+} from '../audit-log.model';
 import type { IAuditLogRepository } from '../audit-log.repository';
 
 @Injectable()
@@ -21,5 +25,29 @@ export class PrismaAuditLogRepository implements IAuditLogRepository {
         metadata: entry.metadata as Prisma.InputJsonValue | undefined,
       },
     });
+  }
+
+  async find(query: AuditLogQuery): Promise<AuditLogRecord[]> {
+    const rows = await this.prisma.auditLog.findMany({
+      where: {
+        actorId: query.actorId,
+        entityType: query.entityType,
+        action: query.action,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return rows.map((row) => ({
+      id: row.id.toString(),
+      entityType: row.entityType,
+      entityId: row.entityId,
+      action: row.action,
+      actorId: row.actorId,
+      reason: row.reason ?? undefined,
+      oldValue: row.oldValue,
+      newValue: row.newValue,
+      metadata: row.metadata,
+      createdAt: row.createdAt,
+    }));
   }
 }

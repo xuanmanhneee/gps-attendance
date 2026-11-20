@@ -25,6 +25,7 @@ gps-attendance/
 │   ├── admin-dashboard/           # Web dashboard cho giảng viên/quản trị (React + Vite)
 │   └── mobile-client/             # Ứng dụng di động cho sinh viên (Expo / React Native)
 └── packages/
+    ├── attendance-client/         # Client framework-agnostic cho luồng điểm danh mobile
     └── shared/                    # Type/DTO dùng chung giữa server, admin, mobile — @gps-attendance/shared
 ```
 

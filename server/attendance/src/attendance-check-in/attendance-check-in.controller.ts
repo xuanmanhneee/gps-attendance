@@ -16,11 +16,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import {
-  AttendanceReviewRequestDto,
-  ResolveAttendanceReviewDto,
-} from './attendance-review.dto';
-import type { AttendanceReviewRequestResponse } from '@gps-attendance/shared';
+import { ResolveAttendanceReviewDto } from './attendance-review.dto';
+import type {
+  AttendanceReviewCandidateResponse,
+  AttendanceReviewHistoryResponse,
+} from '@gps-attendance/shared';
 
 @ApiTags('attendance')
 @Controller('v0/attendance')
@@ -33,7 +33,7 @@ export class AttendanceCheckInController {
   @ApiOperation({
     summary: 'Điểm danh bằng vị trí và thiết bị hiện tại',
     description:
-      'VALID ghi nhận present; REVIEW giữ absent và trả reasons để người tham gia có thể gửi yêu cầu xác nhận; REJECTED không ghi buffer.',
+      'VALID ghi nhận present; REVIEW tạo candidate riêng, giữ record absent và trả reasons; REJECTED không ghi nhận điểm danh.',
   })
   @UseGuards(JwtAuthGuard)
   @Post('check-in')
@@ -46,36 +46,30 @@ export class AttendanceCheckInController {
 
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Gửi yêu cầu xác nhận điểm danh (participant)',
-    description:
-      'Chỉ hợp lệ sau khi check-in trả REVIEW. reasons do server giữ trong buffer, client chỉ được gửi note tùy chọn.',
+    summary:
+      'Liá»‡t kÃª lá»‹ch sá»­ review do organizer hiá»‡n táº¡i Ä‘Ã£ xá»­ lÃ½',
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('participant')
-  @Post('review-requests')
-  async requestReview(
-    @Body() dto: AttendanceReviewRequestDto,
+  @Roles('organizer')
+  @Get('reviews/history')
+  async listMyReviewHistory(
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<void> {
-    return this.attendanceCheckInService.requestReview(
-      dto.sessionId,
-      user.userId,
-      dto.note,
-    );
+  ): Promise<AttendanceReviewHistoryResponse[]> {
+    return this.attendanceCheckInService.listReviewHistory(user.userId);
   }
 
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Liệt kê yêu cầu review của phiên (organizer tạo phiên)',
+    summary: 'Liệt kê review candidate của phiên (organizer tạo phiên)',
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('organizer')
-  @Get('sessions/:sessionId/review-requests')
-  async listReviewRequests(
+  @Get('sessions/:sessionId/reviews')
+  async listReviewCandidates(
     @Param('sessionId', ParseIntPipe) sessionId: number,
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<AttendanceReviewRequestResponse[]> {
-    return this.attendanceCheckInService.listReviewRequests(
+  ): Promise<AttendanceReviewCandidateResponse[]> {
+    return this.attendanceCheckInService.listReviewCandidates(
       sessionId,
       user.userId,
     );
@@ -83,13 +77,13 @@ export class AttendanceCheckInController {
 
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Duyệt hoặc từ chối yêu cầu review (organizer tạo phiên)',
+    summary: 'Duyệt hoặc từ chối review candidate (organizer tạo phiên)',
     description:
       'Chỉ xử lý từ openAt đến closeAt cộng cửa sổ chốt 10 phút. Quyết định khóa record và được ghi audit log.',
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('organizer')
-  @Patch('sessions/:sessionId/review-requests/:userId')
+  @Patch('sessions/:sessionId/reviews/:userId')
   async resolveReview(
     @Param('sessionId', ParseIntPipe) sessionId: number,
     @Param('userId', ParseIntPipe) userId: number,

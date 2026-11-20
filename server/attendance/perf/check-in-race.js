@@ -71,6 +71,6 @@ export default function () {
   const userOutcomes = sameUser.map(outcome).sort();
   check(userOutcomes, {
     'one check-in per student': (values) =>
-      JSON.stringify(values) === JSON.stringify(['ALREADY_CHECKED_IN', 'VALID']),
+      JSON.stringify(values) === JSON.stringify(['ATTENDANCE_REVIEW_ALREADY_CHECKED_IN', 'VALID']),
   });
 }

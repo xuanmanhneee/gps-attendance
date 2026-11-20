@@ -1,21 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
-import type {
-  AttendanceReviewRequest,
-  ResolveAttendanceReviewRequest,
-} from '@gps-attendance/shared';
-
-export class AttendanceReviewRequestDto implements AttendanceReviewRequest {
-  @ApiProperty({ example: 1 })
-  @IsInt()
-  sessionId!: number;
-
-  @ApiPropertyOptional({ maxLength: 300 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(300)
-  note?: string;
-}
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import type { ResolveAttendanceReviewRequest } from '@gps-attendance/shared';
 
 export class ResolveAttendanceReviewDto implements ResolveAttendanceReviewRequest {
   @ApiProperty({ enum: ['approve', 'reject'] })
