@@ -102,8 +102,8 @@ Screen (app/**)
   → api/attendance.api.ts (platform adapter + httpClient)
   → @gps-attendance/attendance-client
   → @gps-attendance/shared (type + FetchHttpClient)
-  → LMS mobile proxy (/v0/...)
-  → Attendance backend (/v0/...)
+  → LMS identity + integration adapter (/v0/...)
+  → Attendance Integration API (/v1/integration/mobile/...)
 ```
 
 - **Auth**: `AuthProvider` khôi phục token từ secure storage lúc khởi động,

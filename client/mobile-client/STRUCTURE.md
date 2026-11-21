@@ -77,20 +77,20 @@ Screen (app/**)
   → api/attendance.api.ts (platform adapter + httpClient)
   → @gps-attendance/attendance-client (orchestration điểm danh)
   → @gps-attendance/shared (type + FetchHttpClient)
-  → LMS mobile proxy (/v0/...)
-  → Attendance Server (/v0/...)
+  → LMS identity + integration adapter (/v0/...)
+  → Attendance Integration API (/v1/integration/mobile/...)
 ```
 
 ## 🎯 Key Features
 
 ### Authentication (`context/auth-context.tsx`)
 - Manages user login/logout
-- Stores JWT token in secure storage
+- Stores LMS access/refresh tokens in secure storage
 - Persists user session on app restart
 - Provides `useAuth()` hook for access anywhere
 
 ### API Layer (`api/`)
-- **http.ts**: `httpClient` gọi LMS mobile proxy và inject `Authorization: Bearer`
+- **http.ts**: `httpClient` gọi LMS và inject `Authorization: Bearer`
 - **auth.api.ts**: login / logout / refreshToken
 - **user.api.ts**: getProfile
 - **attendance.api.ts**: bind package điểm danh với httpClient và adapter
@@ -219,8 +219,9 @@ eas build --platform android  # Android
 
 ## 🔐 Security Notes
 
-- JWT token lưu bằng `expo-secure-store` (`services/storage.ts`, fallback localStorage trên web)
-- Token được gửi qua LMS mobile proxy tới Attendance trong header Authorization
+- Token LMS lưu bằng `expo-secure-store` (`services/storage.ts`, fallback localStorage trên web)
+- Token chỉ được gửi tới LMS. Module integration gọi Attendance bằng API key và
+  `User.code`; không chuyển token hoặc mật khẩu LMS sang Attendance
 - API timeout: 30 seconds
 - Error handling and user feedback for API failures
 

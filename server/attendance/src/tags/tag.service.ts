@@ -21,6 +21,40 @@ export class TagService {
     return this.tagRepository.create({ name, ownerId });
   }
 
+  async syncExternal(
+    externalCode: string,
+    name: string,
+    ownerId: number,
+  ): Promise<{ tag: Tag; created: boolean; metadataChanged: boolean }> {
+    let tag = await this.tagRepository.findByExternalCode(externalCode);
+    if (!tag) {
+      tag = await this.tagRepository.create({ externalCode, name, ownerId });
+      return { tag, created: true, metadataChanged: true };
+    }
+
+    const metadataChanged = tag.name !== name || tag.ownerId !== ownerId;
+    if (metadataChanged) {
+      tag = await this.tagRepository.update(tag.id, { name, ownerId });
+    }
+    return { tag, created: false, metadataChanged };
+  }
+
+  async replaceUsers(
+    tagId: number,
+    userIds: number[],
+    requesterId: number,
+  ): Promise<boolean> {
+    await this.ensureOwnership(tagId, requesterId);
+    const currentIds = await this.tagRepository.findUserIdsByTag(tagId);
+    const current = new Set(currentIds);
+    const target = new Set(userIds);
+    const added = userIds.filter((userId) => !current.has(userId));
+    const removed = currentIds.filter((userId) => !target.has(userId));
+    const changed = added.length > 0 || removed.length > 0;
+    if (changed) await this.tagRepository.replaceUserIds(tagId, userIds);
+    return changed;
+  }
+
   async delete(id: number, requesterId: number): Promise<void> {
     const tag = await this.ensureOwnership(id, requesterId);
 

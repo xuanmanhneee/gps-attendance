@@ -72,28 +72,34 @@ export class SyncIntegrationUsersDto {
   users!: IntegrationUserDto[];
 }
 
-export class IntegrationCourseDto {
-  @IsString() @IsNotEmpty() @MaxLength(100)
+export class IntegrationTagDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   externalCode!: string;
-  @IsString() @IsNotEmpty() @MaxLength(150)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   name!: string;
-  @IsString() @IsNotEmpty() @MaxLength(50)
-  lecturerCode!: string;
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(5000) @ArrayUnique()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(50)
+  organizerCode!: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(5000)
+  @ArrayUnique()
   @IsString({ each: true })
-  studentCodes!: string[];
+  participantCodes!: string[];
 }
 
-export class SyncIntegrationCoursesDto {
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(2000)
-  @ValidateNested({ each: true }) @Type(() => IntegrationCourseDto)
-  courses!: IntegrationCourseDto[];
-}
-
-export class SyncIntegrationAccountsDto {
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(500)
-  @ValidateNested({ each: true }) @Type(() => IntegrationUserDto)
-  users!: IntegrationUserDto[];
+export class SyncIntegrationTagsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(2000)
+  @ValidateNested({ each: true })
+  @Type(() => IntegrationTagDto)
+  tags!: IntegrationTagDto[];
 }
 
 export class CreateIntegrationSessionDto {
@@ -105,7 +111,7 @@ export class CreateIntegrationSessionDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
-  lecturerCode!: string;
+  organizerCode!: string;
 
   @IsString()
   @IsNotEmpty()
@@ -133,5 +139,5 @@ export class CreateIntegrationSessionDto {
   @ArrayMaxSize(5000)
   @ArrayUnique()
   @IsString({ each: true })
-  studentCodes!: string[];
+  participantCodes!: string[];
 }

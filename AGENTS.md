@@ -13,6 +13,7 @@ không chỉ file này — file này chỉ là mục lục.
 | `docs/conventions/auth-guards.md` | Cách `JwtAuthGuard` hoạt động, `User` vs `Account` id |
 | `docs/conventions/naming.md` | Quy ước đặt tên file/class/const, quy ước branch |
 | `docs/conventions/roles.md` | Role trung tính và ranh giới ánh xạ với hệ thống bên ngoài |
+| `docs/conventions/integration-boundary.md` | Port trung tính của Attendance và adapter phía hệ thống ngoài |
 
 ## Nguyên tắc chung
 

@@ -30,6 +30,6 @@ import { AttendanceReviewModule } from '../attendance-review/attendance-review.m
     },
     AttendanceSessionQueryService,
   ],
-  exports: [AttendanceSessionsService],
+  exports: [AttendanceSessionsService, AttendanceSessionQueryService],
 })
 export class AttendanceSessionsModule {}

@@ -15,8 +15,7 @@ import {
   CreateIntegrationSessionDto,
   SyncIntegrationUnitsDto,
   SyncIntegrationUsersDto,
-  SyncIntegrationCoursesDto,
-  SyncIntegrationAccountsDto,
+  SyncIntegrationTagsDto,
 } from './dto/integration.dto';
 import { IntegrationApiKeyGuard } from './integration-api-key.guard';
 import { IntegrationService } from './integration.service';
@@ -36,14 +35,9 @@ export class IntegrationController {
     return this.integration.syncUsers(dto);
   }
 
-  @Put('courses')
-  syncCourses(@Body() dto: SyncIntegrationCoursesDto) {
-    return this.integration.syncCourses(dto.courses);
-  }
-
-  @Put('accounts')
-  syncAccounts(@Body() dto: SyncIntegrationAccountsDto) {
-    return this.integration.syncAccounts(dto.users);
+  @Put('tags')
+  syncTags(@Body() dto: SyncIntegrationTagsDto) {
+    return this.integration.syncTags(dto.tags);
   }
 
   @Post('sessions')

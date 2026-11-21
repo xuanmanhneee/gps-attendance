@@ -1,5 +1,6 @@
 export interface Tag {
   id: number;
+  externalCode: string | null;
   name: string;
   ownerId: number; // Account.id của user sở hữu tag
   createdAt: Date;
@@ -7,6 +8,7 @@ export interface Tag {
 
 // Input khi tạo mới — không có id, createdAt (DB tự sinh)
 export interface CreateTagRecord {
+  externalCode?: string | null;
   name: string;
   ownerId: number;
 }
@@ -14,6 +16,7 @@ export interface CreateTagRecord {
 // Input khi update — cho phép sửa từng phần
 export interface UpdateTagRecord {
   name?: string;
+  ownerId?: number;
 }
 
 // Domain shape khi cần kèm danh sách user được gắn tag

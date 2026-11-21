@@ -1,5 +1,9 @@
 # LMS demo — Đặc tả hiện trạng
 
+> Kiến trúc LMS production dự kiến dùng Express + PostgreSQL được mô tả tại
+> [`target/README.md`](target/README.md). File này chỉ mô tả bản Deno + SQLite
+> đang chạy và không phải thiết kế đích.
+
 > Tài liệu này mô tả code đang chạy. Kế hoạch mở rộng nằm tại
 > [`plans/lms-01-minimum-demo-handoff.md`](../../../plans/lms-01-minimum-demo-handoff.md).
 
@@ -18,12 +22,12 @@ Prisma client hoặc model nội bộ của nhau.
 
 ## 2. Thành phần triển khai
 
-| Thành phần | Công nghệ | Địa chỉ mặc định |
-|---|---|---|
-| LMS API | Deno 2, TypeScript, `Deno.serve` | `http://localhost:3100` |
-| LMS database | SQLite qua `node:sqlite` | `server/lms/lms.sqlite` |
-| LMS web | React 19, Vite | `http://localhost:5174` |
-| Attendance integration | Mock gateway trong tiến trình LMS | Không mở port riêng |
+| Thành phần             | Công nghệ                         | Địa chỉ mặc định        |
+| ---------------------- | --------------------------------- | ----------------------- |
+| LMS API                | Deno 2, TypeScript, `Deno.serve`  | `http://localhost:3100` |
+| LMS database           | SQLite qua `node:sqlite`          | `server/lms/lms.sqlite` |
+| LMS web                | React 19, Vite                    | `http://localhost:5174` |
+| Attendance integration | Mock gateway trong tiến trình LMS | Không mở port riêng     |
 
 Vite proxy mọi request `/api` sang LMS API tại port `3100`.
 
@@ -32,11 +36,12 @@ Vite proxy mọi request `/api` sang LMS API tại port `3100`.
 ```text
 server/lms/
   src/
-    auth/          # xác thực LMS web và session trong RAM
+    attendance-summary/ # thống kê mock ổn định phục vụ phát triển UI
+    auth/          # xác thực LMS web/mobile và session trong RAM
     courses/       # lớp, roster, tòa nhà và tạo phiên LMS
     database/      # repository contract, SQLite implementation, database factory
     http/          # router HTTP và contract test
-    integration/   # Attendance client, gateway và orchestration
+    integration/   # module adapter duy nhất được phép gọi Attendance
     students/      # unit và user directory
     main.ts        # composition root
   spec/            # tài liệu bàn giao hiện trạng
@@ -71,24 +76,24 @@ tại `main.ts`; service không tự khởi tạo dependency.
 
 SQLite tạo và seed các bảng sau khi server khởi động:
 
-| Bảng | Vai trò |
-|---|---|
-| `units` | Cây trường, khoa và lớp hành chính theo `code` |
-| `users` | Hồ sơ giảng viên/sinh viên và role hệ thống |
-| `accounts` | Tài khoản xác thực LMS |
-| `classes` | Mô hình lớp học phẳng hiện tại |
-| `enrollments` | Quan hệ lớp–sinh viên |
-| `buildings` | Tòa nhà và tọa độ mẫu |
-| `lms_sessions` | Phiên do LMS yêu cầu tạo |
+| Bảng           | Vai trò                                        |
+| -------------- | ---------------------------------------------- |
+| `units`        | Cây trường, khoa và lớp hành chính theo `code` |
+| `users`        | Hồ sơ giảng viên/sinh viên và role hệ thống    |
+| `accounts`     | Tài khoản xác thực LMS                         |
+| `classes`      | Mô hình lớp học phẳng hiện tại                 |
+| `enrollments`  | Quan hệ lớp–sinh viên                          |
+| `buildings`    | Tòa nhà và tọa độ mẫu                          |
+| `lms_sessions` | Phiên do LMS yêu cầu tạo                       |
 
 Quan hệ chính:
 
 ```text
 units.code ← users.unit_code
 users.code ← accounts.user_code
-classes.lecturer_code → users.code (organizer)
+classes.lecturer_code → users.code (lecturer)
 enrollments.class_id → classes.id
-enrollments.student_code → users.code (participant)
+enrollments.student_code → users.code (student)
 lms_sessions.class_id → classes.id
 ```
 
@@ -100,18 +105,25 @@ nguyên schema phẳng và không yêu cầu xóa database.
 
 Role dùng đúng convention của Attendance:
 
-- `organizer`: hiển thị là giảng viên và được đăng nhập LMS web.
-- `participant`: sinh viên, tồn tại trong database/roster/sync nhưng bị chặn
-  đăng nhập LMS web.
+- `admin`: đăng nhập LMS web/API để tạo Unit và tài khoản; không sync sang
+  Attendance.
+- `lecturer`: giảng viên và được đăng nhập LMS web.
+- `student`: sinh viên, đăng nhập mobile bằng tài khoản LMS và bị chặn trên
+  LMS web.
+
+Module integration ánh xạ `lecturer → organizer`, `student → participant` khi
+gọi Attendance; LMS không lưu role Attendance như alias nội bộ.
 
 Tài khoản demo:
 
 ```text
+admin / demo123
 gv001 / demo123
+sv001 / demo123
 ```
 
-`sv001` vẫn tồn tại trong bảng `accounts` để mô phỏng directory đầy đủ nhưng
-`AuthService` không cấp web session cho role `participant`.
+`AuthService` cấp web session cho lecturer và cặp access/refresh token riêng
+cho student mobile. Hai loại session không dùng lẫn nhau.
 
 Web session là UUID lưu trong `Map` của tiến trình Deno. Restart LMS làm mất
 toàn bộ web session. Password demo đang so sánh SHA-256, không dùng cho môi
@@ -125,23 +137,28 @@ Ngoại trừ login và preflight, mọi endpoint yêu cầu header:
 Authorization: Bearer <lms-token>
 ```
 
-| Method | Path | Chức năng |
-|---|---|---|
-| `POST` | `/api/auth/login` | Đăng nhập giảng viên |
-| `GET` | `/api/auth/me` | Đọc web session hiện tại |
-| `POST` | `/api/auth/logout` | Thu hồi web session |
-| `GET` | `/api/classes` | Danh sách lớp |
-| `GET` | `/api/classes/:id` | Chi tiết lớp và roster |
-| `GET` | `/api/buildings` | Danh sách tòa nhà |
-| `POST` | `/api/classes/:id/sessions` | Tạo LMS session và gọi gateway |
-| `POST` | `/api/integration/sync` | Sync unit, user, course và account |
-| `GET` | `/api/integration/report` | Báo cáo từng integration operation |
-| `GET` | `/api/integration/sessions/:externalId` | Trạng thái phiên |
-| `GET` | `/api/integration/sessions/:externalId/records` | Kết quả điểm danh |
-| `POST` | `/api/integration/sessions/:externalId/cancel` | Hủy phiên |
+| Method | Path                                            | Chức năng                                 |
+| ------ | ----------------------------------------------- | ----------------------------------------- |
+| `POST` | `/api/auth/login`                               | Đăng nhập giảng viên                      |
+| `GET`  | `/api/auth/me`                                  | Đọc web session hiện tại                  |
+| `POST` | `/api/auth/logout`                              | Thu hồi web session                       |
+| `POST` | `/api/admin/units`                              | Admin tạo Unit và sync Attendance         |
+| `POST` | `/api/admin/users`                              | Admin tạo User/Account và sync Attendance |
+| `POST` | `/api/admin/classes`                            | Admin tạo lớp kèm roster và sync Tag      |
+| `GET`  | `/api/classes`                                  | Danh sách lớp                             |
+| `GET`  | `/api/classes/:id`                              | Chi tiết lớp và roster                    |
+| `GET`  | `/api/classes/:id/attendance-summary`           | Thống kê điểm danh mock của lớp           |
+| `GET`  | `/api/buildings`                                | Danh sách tòa nhà                         |
+| `POST` | `/api/classes/:id/sessions`                     | Tạo LMS session và gọi gateway            |
+| `POST` | `/api/integration/sync`                         | Sync unit, user và course                 |
+| `GET`  | `/api/integration/report`                       | Báo cáo từng integration operation        |
+| `GET`  | `/api/integration/sessions/:externalId`         | Trạng thái phiên                          |
+| `GET`  | `/api/integration/sessions/:externalId/records` | Kết quả điểm danh                         |
+| `POST` | `/api/integration/sessions/:externalId/cancel`  | Hủy phiên                                 |
 
-Response LMS hiện là JSON trực tiếp, chưa bọc `ApiResponse<T>`. Việc chuẩn hóa
-response và cập nhật API helper phía web đã được giao trong task LMS-01 tối thiểu.
+Các API cũ của LMS hiện vẫn trả JSON trực tiếp. API thống kê mới trả
+`ApiResponse<ClassAttendanceSummary>` để UI có contract phân biệt success/error;
+việc chuẩn hóa toàn bộ API cũ nằm ngoài thay đổi này.
 
 ## 7. Luồng nghiệp vụ giảng viên
 
@@ -165,13 +182,13 @@ tại thời điểm tạo phiên.
 Nguồn sự thật của giao tiếp là
 [`docs/integration/integration-openapi.yaml`](../../../docs/integration/integration-openapi.yaml).
 
-Gateway hiện triển khai tám operation:
+Gateway đồng bộ/điều phối phiên hiện triển khai bảy operation; adapter mobile
+triển khai riêng ba operation identity/check-in:
 
 ```text
 PUT  /units
 PUT  /users
-PUT  /accounts
-PUT  /courses
+PUT  /tags
 POST /sessions
 GET  /sessions/{externalId}
 GET  /sessions/{externalId}/records
@@ -209,7 +226,6 @@ Copy `server/lms/.env.example` thành `.env` nếu chưa có:
 
 ```dotenv
 ATTENDANCE_INTEGRATION_URL=http://localhost:3000/v1/integration
-ATTENDANCE_API_URL=http://localhost:3000
 INTEGRATION_API_KEY=demo-integration-key
 LMS_DATABASE_PATH=./lms.sqlite
 ```
@@ -236,7 +252,7 @@ pnpm build
 
 1. LMS và Attendance không dùng chung database hoặc import code nội bộ.
 2. `code` là khóa nghiệp vụ người dùng; không gửi `User.id` nội bộ.
-3. LMS sở hữu roster; Attendance nhận snapshot `studentCodes` khi tạo phiên.
+3. LMS sở hữu roster; adapter gửi snapshot `participantCodes` khi tạo phiên.
 4. Attendance tự tạo ID session và ánh xạ bằng `externalId`.
 5. Địa điểm được chọn lúc tạo phiên, không gắn cứng vào lớp.
 6. Sinh viên tồn tại để sync/mobile nhưng không đăng nhập LMS web.
@@ -279,17 +295,17 @@ mới yêu cầu mở rộng fake LMS sau khi vertical slice đã được nghi�
 
 ### File nên đọc
 
-| File trong nhánh tham khảo | Giá trị có thể tái sử dụng |
-|---|---|
-| `server/attendance/prisma/schema.prisma` | Quan hệ `AcademicTerm`, `Course`, `CourseSection`, `ClassEnrollment`, `TimetableSlot`, `Room` |
-| `server/attendance/src/attendance-sessions/attendance-session-query.service.ts` | Quy tắc truy vấn lớp theo giảng viên, roster, tạo lớp và kiểm tra enrollment |
-| `server/attendance/src/attendance-sessions/attendance-sessions.service.ts` | Cách resolve section, roster, timetable và building trước khi tạo phiên |
-| `server/attendance/src/attendance-sessions/dto/create-course-section.dto.ts` | Validation đầu vào khi tạo lớp học phần |
-| `server/attendance/src/attendance-sessions/dto/import-section-roster.dto.ts` | Shape và giới hạn import roster |
-| `server/attendance/src/attendance-sessions/dto/create-timetable-slot.dto.ts` | Validation ca học nếu mở rộng timetable sau này |
-| `server/attendance/src/location-registry/location-registry.service.ts` | Quy tắc building/room, tọa độ và trạng thái hiệu chuẩn |
-| `client/admin-dashboard/src/api/course-sections.api.ts` | Hợp đồng UI cho section, roster và timetable |
-| `client/admin-dashboard/src/pages/CourseSectionsPage.tsx` | Luồng thao tác quản lý lớp, import roster và ca học |
+| File trong nhánh tham khảo                                                      | Giá trị có thể tái sử dụng                                                                    |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `server/attendance/prisma/schema.prisma`                                        | Quan hệ `AcademicTerm`, `Course`, `CourseSection`, `ClassEnrollment`, `TimetableSlot`, `Room` |
+| `server/attendance/src/attendance-sessions/attendance-session-query.service.ts` | Quy tắc truy vấn lớp theo giảng viên, roster, tạo lớp và kiểm tra enrollment                  |
+| `server/attendance/src/attendance-sessions/attendance-sessions.service.ts`      | Cách resolve section, roster, timetable và building trước khi tạo phiên                       |
+| `server/attendance/src/attendance-sessions/dto/create-course-section.dto.ts`    | Validation đầu vào khi tạo lớp học phần                                                       |
+| `server/attendance/src/attendance-sessions/dto/import-section-roster.dto.ts`    | Shape và giới hạn import roster                                                               |
+| `server/attendance/src/attendance-sessions/dto/create-timetable-slot.dto.ts`    | Validation ca học nếu mở rộng timetable sau này                                               |
+| `server/attendance/src/location-registry/location-registry.service.ts`          | Quy tắc building/room, tọa độ và trạng thái hiệu chuẩn                                        |
+| `client/admin-dashboard/src/api/course-sections.api.ts`                         | Hợp đồng UI cho section, roster và timetable                                                  |
+| `client/admin-dashboard/src/pages/CourseSectionsPage.tsx`                       | Luồng thao tác quản lý lớp, import roster và ca học                                           |
 
 Có thể đọc file mà không switch branch:
 
@@ -305,12 +321,12 @@ git show origin/2312718_PhamNguyenNgocPhuoc_HopNhatHeThong:client/admin-dashboar
 
 - Mô hình `AcademicTerm`, `Course`, `CourseSection`, `ClassEnrollment`.
 - Unique constraint cho course code, section theo học kỳ và enrollment.
-- Kiểm tra lecturer phải là `organizer`.
-- Kiểm tra roster chỉ gồm `participant` đang active.
+- Kiểm tra lecturer phải có role `lecturer`.
+- Kiểm tra roster chỉ gồm `student` đang active.
 - Luồng danh sách lớp → chi tiết roster → tạo phiên.
 - Validation ngày học kỳ, sức chứa lớp và mã học phần.
-- Building/Room như nguồn resolve tọa độ nếu LMS được chọn làm chủ danh mục
-  địa điểm.
+- Building như nguồn một GPS anchor và bán kính mặc định. Target spec không có
+  entity Room.
 
 Port theo repository/service của Deno LMS. Không copy lệnh Prisma hoặc inject
 `PrismaService` vào project này.
@@ -351,7 +367,7 @@ Course.code                           course external code
 CourseSection.code                    mã lớp học phần nội bộ LMS
 CourseSection.lecturerId              resolve thành lecturerCode
 ClassEnrollment.userId                resolve thành studentCodes[]
-Room → Building coordinates           snapshot latitude/longitude
+Building coordinates/radius           snapshot latitude/longitude/radius
 AttendanceSession.courseSectionId     không gửi sang Attendance
 ```
 

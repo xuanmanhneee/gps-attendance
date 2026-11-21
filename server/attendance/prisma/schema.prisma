@@ -71,10 +71,11 @@ model RefreshSession {
 }
 
 model Tag {
-  id        Int      @id @default(autoincrement()) @map("id")
-  name      String   @map("name") @db.VarChar(100)
-  ownerId   Int      @map("owner_id")
-  createdAt DateTime @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement()) @map("id")
+  externalCode String?  @unique @map("external_code") @db.VarChar(100)
+  name         String   @map("name") @db.VarChar(100)
+  ownerId      Int      @map("owner_id")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   users UserTag[]
 

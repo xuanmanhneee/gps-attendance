@@ -4,3 +4,4 @@ export * from './attendance-session.codes';
 export * from './api-error.codes';
 export * from './units.codes';
 export * from './attendance-review.codes';
+export * from './integration.codes';

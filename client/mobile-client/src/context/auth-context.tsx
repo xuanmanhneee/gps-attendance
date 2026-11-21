@@ -90,8 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
 
-      // TODO(tạm thời): chưa gọi endpoint logout (/v0/user/auth/logout).
-      // Bật lại khi cần: await authApi.logout();
+      await authApi.logout();
 
       setUser(null);
       setToken(null);

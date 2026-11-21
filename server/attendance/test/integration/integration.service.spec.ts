@@ -7,21 +7,23 @@ import { IntegrationService } from '../../src/integration/integration.service';
 
 const dto = {
   externalId: 'LESSON-1',
-  lecturerCode: 'GV001',
+  organizerCode: 'GV001',
   title: 'Demo',
   latitude: 11.94,
   longitude: 108.45,
   radius: 100,
   openAt: '2099-01-01T00:00:00.000Z',
   closeAt: '2099-01-01T00:15:00.000Z',
-  studentCodes: ['SV002', 'SV001'],
+  participantCodes: ['SV002', 'SV001'],
 };
 
 describe('IntegrationService', () => {
   const units = {};
   const records = {};
   const users = {
-    findByCode: jest.fn().mockResolvedValue({ id: 1, code: 'GV001', role: 'organizer' }),
+    findByCode: jest
+      .fn()
+      .mockResolvedValue({ id: 1, code: 'GV001', role: 'organizer' }),
     findByCodes: jest.fn().mockResolvedValue([
       { id: 1, code: 'GV001', role: 'organizer' },
       { id: 2, code: 'SV001', role: 'participant' },
@@ -59,11 +61,9 @@ describe('IntegrationService', () => {
     delete: jest.fn(),
   };
   const tags = {
-    findByOwner: jest.fn().mockResolvedValue([]),
-    create: jest.fn(),
-    assignToUser: jest.fn(),
+    syncExternal: jest.fn(),
+    replaceUsers: jest.fn().mockResolvedValue(false),
   };
-  const accounts = { provisionForUser: jest.fn() };
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -91,7 +91,6 @@ describe('IntegrationService', () => {
       sessions as never,
       records as never,
       tags as never,
-      accounts as never,
       sessionLinks as never,
     );
 
@@ -111,7 +110,6 @@ describe('IntegrationService', () => {
       sessions as never,
       records as never,
       tags as never,
-      accounts as never,
       sessionLinks as never,
     );
 
@@ -130,12 +128,94 @@ describe('IntegrationService', () => {
     expect(sessionLinks.attachSession).toHaveBeenCalledWith(5, 10);
   });
 
-  it('maps an LMS course to an organizer-owned attendance tag', async () => {
-    tags.create.mockResolvedValue({ id: 20, name: 'INT101 · Nhập môn lập trình', ownerId: 1 });
-    const service = new IntegrationService(units as never, users as never, sessions as never, records as never, tags as never, accounts as never, sessionLinks as never);
-    await expect(service.syncCourses([{ externalCode: 'INT101', name: 'Nhập môn lập trình', lecturerCode: 'GV001', studentCodes: ['SV001'] }])).resolves.toMatchObject({ created: 1 });
-    expect(tags.create).toHaveBeenCalledWith('INT101 · Nhập môn lập trình', 1);
-    expect(tags.assignToUser).toHaveBeenCalledWith(20, 2, 1);
+  it('syncs a neutral organizer-owned attendance tag', async () => {
+    tags.syncExternal.mockResolvedValue({
+      tag: { id: 20 },
+      created: true,
+      metadataChanged: true,
+    });
+    const service = new IntegrationService(
+      units as never,
+      users as never,
+      sessions as never,
+      records as never,
+      tags as never,
+      sessionLinks as never,
+    );
+    await expect(
+      service.syncTags([
+        {
+          externalCode: 'INT101',
+          name: 'INT101 · Nhập môn lập trình',
+          organizerCode: 'GV001',
+          participantCodes: ['SV001'],
+        },
+      ]),
+    ).resolves.toMatchObject({ created: 1 });
+    expect(tags.syncExternal).toHaveBeenCalledWith(
+      'INT101',
+      'INT101 · Nhập môn lập trình',
+      1,
+    );
+    expect(tags.replaceUsers).toHaveBeenCalledWith(20, [2], 1);
+  });
+
+  it('updates the mapped tag when its metadata or roster changes', async () => {
+    tags.syncExternal.mockResolvedValueOnce({
+      tag: { id: 20 },
+      created: false,
+      metadataChanged: true,
+    });
+    tags.replaceUsers.mockResolvedValueOnce(true);
+    const service = new IntegrationService(
+      units as never,
+      users as never,
+      sessions as never,
+      records as never,
+      tags as never,
+      sessionLinks as never,
+    );
+
+    await expect(
+      service.syncTags([
+        {
+          externalCode: 'INT101',
+          name: 'Tên mới',
+          organizerCode: 'GV001',
+          participantCodes: ['SV001'],
+        },
+      ]),
+    ).resolves.toMatchObject({ updated: 1, unchanged: 0 });
+  });
+
+  it('rejects an incomplete roster without changing its tag', async () => {
+    users.findByCodes.mockResolvedValueOnce([]);
+    const service = new IntegrationService(
+      units as never,
+      users as never,
+      sessions as never,
+      records as never,
+      tags as never,
+      sessionLinks as never,
+    );
+
+    await expect(
+      service.syncTags([
+        {
+          externalCode: 'INT101',
+          name: 'Nhập môn lập trình',
+          organizerCode: 'GV001',
+          participantCodes: ['SV404'],
+        },
+      ]),
+    ).resolves.toMatchObject({
+      created: 0,
+      updated: 0,
+      failed: [
+        expect.objectContaining({ code: 'INTEGRATION_PARTICIPANT_NOT_FOUND' }),
+      ],
+    });
+    expect(tags.syncExternal).not.toHaveBeenCalled();
   });
 
   it('rejects the whole request when any code is unknown', async () => {
@@ -149,7 +229,6 @@ describe('IntegrationService', () => {
       sessions as never,
       records as never,
       tags as never,
-      accounts as never,
       sessionLinks as never,
     );
 
@@ -171,12 +250,51 @@ describe('IntegrationService', () => {
       sessions as never,
       records as never,
       tags as never,
-      accounts as never,
       sessionLinks as never,
     );
 
     await expect(service.createSession(dto)).rejects.toBeInstanceOf(
       ConflictException,
     );
+  });
+
+  it('returns an already cancelled integration session without cancelling again', async () => {
+    const cancelledSession = {
+      id: 10,
+      title: 'Demo',
+      status: 'cancelled',
+      createdBy: 1,
+      openAt: new Date(dto.openAt),
+      closeAt: new Date(dto.closeAt),
+      finalizedAt: null,
+    };
+    const cancelledSessions = {
+      findById: jest.fn().mockResolvedValue(cancelledSession),
+      getPendingCriteria: jest.fn().mockResolvedValue({
+        codeFilter: { include: ['SV001', 'SV002'] },
+      }),
+      cancel: jest.fn(),
+    };
+    const linkedSessions = {
+      findByExternalId: jest.fn().mockResolvedValue({
+        externalId: dto.externalId,
+        attendanceSessionId: cancelledSession.id,
+      }),
+    };
+    const service = new IntegrationService(
+      units as never,
+      users as never,
+      cancelledSessions as never,
+      records as never,
+      tags as never,
+      linkedSessions as never,
+    );
+
+    await expect(service.cancelSession(dto.externalId)).resolves.toMatchObject({
+      externalId: dto.externalId,
+      status: 'cancelled',
+      participantCount: 2,
+    });
+    expect(cancelledSessions.cancel).not.toHaveBeenCalled();
   });
 });
