@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { LoginRequest } from '@gps-attendance/shared';
 
@@ -6,11 +6,13 @@ import { LoginRequest } from '@gps-attendance/shared';
 export class LoginDto implements LoginRequest {
   @ApiProperty({ example: 'admin' })
   @IsString()
+  @MaxLength(64)
   @IsNotEmpty()
   username!: string;
 
   @ApiProperty({ example: 'admin' })
   @IsString()
+  @MaxLength(128)
   @IsNotEmpty()
   password!: string;
 }

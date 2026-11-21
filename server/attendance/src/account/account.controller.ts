@@ -54,6 +54,9 @@ export class AccountController {
   }
 
   @Get(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async findById(@Param('id', ParseIntPipe) id: number) {
     const account = await this.accountService.findById(id);
     if (!account) {

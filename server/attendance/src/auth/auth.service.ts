@@ -15,8 +15,31 @@ import { REFRESH_SESSION_REPOSITORY } from './refresh-session.repository.token';
 import type { IRefreshSessionRepository } from './refresh-session.repository';
 import { UNIT_OF_WORK } from '#common/unit-of-work/unit-of-work.token';
 import type { IUnitOfWork } from '#common/unit-of-work/unit-of-work.interface';
+import { ConcurrencyGate } from '../common/concurrency/concurrency-gate';
 
 const REFRESH_TOKEN_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+
+const intFromEnv = (name: string, fallback: number): number => {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+};
+
+// bcrypt chạy trên thread pool libuv, dùng chung với DNS/fs. Chỉ cho chạy
+// (thread pool - 1) lần băm cùng lúc để luôn còn một thread cho việc mở kết
+// nối PostgreSQL mới; phần dư xếp hàng trong bộ nhớ và bị từ chối 503 khi hàng
+// vượt BCRYPT_MAX_QUEUE. Xem ConcurrencyGate.
+const passwordGate = new ConcurrencyGate(
+  intFromEnv(
+    'BCRYPT_CONCURRENCY',
+    Math.max(1, intFromEnv('UV_THREADPOOL_SIZE', 4) - 1),
+  ),
+  intFromEnv('BCRYPT_MAX_QUEUE', 500),
+);
+
+// Hash giả (cùng cost với AccountService) để username không tồn tại vẫn tốn
+// đúng một lần bcrypt.compare — nếu bỏ qua, thời gian phản hồi (~16 ms so với
+// ~60 ms) cho phép dò xem username nào có thật.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('dummy-password-for-timing', 10);
 
 function hashRefreshToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -44,10 +67,11 @@ export class AuthService {
   ): Promise<AuthenticatedUser> {
     const account = await this.accountService.findByUsername(username);
 
-    const isPasswordValid =
-      account && (await bcrypt.compare(password, account.passwordHash));
+    const passwordMatches = await passwordGate.run(() =>
+      bcrypt.compare(password, account?.passwordHash ?? DUMMY_PASSWORD_HASH),
+    );
 
-    if (!isPasswordValid || account.status !== 'active') {
+    if (!account || !passwordMatches || account.status !== 'active') {
       throw new UnauthorizedException('Sai tài khoản hoặc mật khẩu');
     }
 
@@ -90,6 +114,11 @@ export class AuthService {
       new Date(Date.now() + REFRESH_TOKEN_LIFETIME_MS),
     );
     return { accessToken: this.createAccessToken(user), refreshToken };
+  }
+
+  /** Thu hồi refresh token; idempotent, token không tồn tại cũng không lỗi. */
+  async logout(refreshToken: string): Promise<void> {
+    await this.refreshSessions.revoke(hashRefreshToken(refreshToken));
   }
 
   async refresh(

@@ -14,6 +14,7 @@ import type { LoginResponse } from '@gps-attendance/shared';
 import { AuthService } from '../auth.service';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
+import { ClientRateLimitGuard } from '../guards/client-rate-limit.guard';
 import type { AuthenticatedUser } from '../types/authenticated-user.type';
 import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
@@ -27,7 +28,7 @@ export class AdminAuthController {
     summary: 'Admin hoặc organizer đăng nhập, trả về access và refresh token',
   })
   @Post('login')
-  @UseGuards(LocalAuthGuard)
+  @UseGuards(ClientRateLimitGuard, LocalAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: LoginDto })
   async login(@CurrentUser() user: AuthenticatedUser): Promise<LoginResponse> {
@@ -43,6 +44,7 @@ export class AdminAuthController {
 
   @ApiOperation({ summary: 'Làm mới phiên đăng nhập admin hoặc organizer' })
   @Post('refresh')
+  @UseGuards(ClientRateLimitGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBody({ type: RefreshTokenDto })
   refresh(@Body() request: RefreshTokenDto): Promise<LoginResponse> {
@@ -50,5 +52,15 @@ export class AdminAuthController {
       'admin',
       'organizer',
     ]);
+  }
+
+  @ApiOperation({ summary: 'Đăng xuất: thu hồi refresh token hiện tại' })
+  @Post('logout')
+  @UseGuards(ClientRateLimitGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBody({ type: RefreshTokenDto })
+  async logout(@Body() request: RefreshTokenDto): Promise<null> {
+    await this.authService.logout(request.refreshToken);
+    return null;
   }
 }

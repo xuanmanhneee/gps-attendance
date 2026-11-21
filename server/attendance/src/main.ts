@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -30,13 +31,64 @@ function printBanner(url: string, docsUrl: string) {
   console.log(cyan(bottom));
 }
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Secret yếu cho phép giả mạo JWT của bất kỳ role nào, nên production phải
+// từ chối khởi động thay vì chạy với secret rỗng/ngắn.
+function assertJwtSecret() {
+  const secret = process.env.JWT_SECRET ?? '';
+  if (secret.length >= 32) return;
+  const message = 'JWT_SECRET phải dài tối thiểu 32 ký tự';
+  if (isProduction) throw new Error(message);
+  console.warn(`[security] ${message} (bỏ qua vì không phải production)`);
+}
+
+// TRUST_PROXY: số hop (vd "1" khi sau một nginx), "true", hoặc danh sách
+// IP/CIDR của Express. Cần để `req.ip` là IP client thật khi chạy sau proxy.
+function readTrustProxy(): boolean | number | string | undefined {
+  const raw = process.env.TRUST_PROXY;
+  if (!raw) return undefined;
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return /^\d+$/.test(raw) ? Number(raw) : raw;
+}
+
+// CORS_ORIGINS: danh sách origin được phép, ngăn cách bằng dấu phẩy. Để trống:
+// dev cho phép mọi origin; production tắt CORS (app mobile không cần CORS,
+// dashboard phải khai báo origin của nó).
+function corsOptions() {
+  const origins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  if (origins.length > 0) return { origin: origins };
+  return isProduction ? null : { origin: true };
+}
+
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  assertJwtSecret();
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: new AppBootstrapLogger(),
   });
 
+  app.disable('x-powered-by');
+  const trustProxy = readTrustProxy();
+  if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
+  app.use(
+    (
+      _req: unknown,
+      res: { setHeader: (name: string, value: string) => void },
+      next: () => void,
+    ) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      next();
+    },
+  );
+
   app.useGlobalInterceptors(new ResponseInterceptor());
-  app.enableCors();
+  const cors = corsOptions();
+  if (cors) app.enableCors(cors);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -52,8 +104,12 @@ async function bootstrap() {
     .addBearerAuth()
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api-docs', app, document);
+  // Tài liệu API lộ toàn bộ route và DTO nên production mặc định tắt.
+  const swaggerEnabled = !isProduction || process.env.ENABLE_SWAGGER === 'true';
+  if (swaggerEnabled) {
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api-docs', app, document);
+  }
 
   const port = process.env.PORT ?? 3000;
   // Node mặc định backlog 511: khi cả lớp check-in cùng lúc, SYN vượt hàng
@@ -73,6 +129,6 @@ async function bootstrap() {
   ).call(app, port, '0.0.0.0', backlog);
 
   const url = await app.getUrl();
-  printBanner(url, `${url}/api-docs`);
+  printBanner(url, swaggerEnabled ? `${url}/api-docs` : '(tắt)');
 }
-bootstrap();
+void bootstrap();

@@ -90,7 +90,8 @@ export class AttendanceSessionsController {
   // nó sẽ "nuốt" mọi route tĩnh phía sau (vd: me -> id = "me").
 
   @ApiOperation({ summary: 'Danh sách toàn bộ session' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'organizer')
   @Get()
   async findAll(): Promise<AttendanceSessionResponse[]> {
     const sessions = await this.attendanceSessionsService.findAll();

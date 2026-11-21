@@ -56,8 +56,11 @@ export class TagController {
    */
   @Get(':id')
   @ApiOperation({ summary: 'Get tag by ID' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.tagService.findById(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.tagService.getOwned(id, user.userId);
   }
 
   /**
@@ -77,8 +80,11 @@ export class TagController {
    */
   @Get('users/:userId/tags')
   @ApiOperation({ summary: 'Get tags assigned to a user' })
-  findTagsByUser(@Param('userId', ParseIntPipe) userId: number) {
-    return this.tagService.findTagsByUser(userId);
+  findTagsByUser(
+    @Param('userId', ParseIntPipe) userId: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.tagService.findTagsByUserOwnedBy(userId, user.userId);
   }
 
   /**

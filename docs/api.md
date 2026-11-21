@@ -39,6 +39,27 @@ Các endpoint trả `void` hiện chỉ có field `success` sau khi serialize.
 | `POST` | `/v0/user/auth/refresh`  | Public                                            | `{ refreshToken }`       | `{ accessToken, refreshToken }` |
 | `POST` | `/v0/admin/auth/login`   | Public; chỉ `admin` hoặc `organizer`              | `{ username, password }` | `{ accessToken, refreshToken }` |
 | `POST` | `/v0/admin/auth/refresh` | Public; token phải thuộc `admin` hoặc `organizer` | `{ refreshToken }`       | `{ accessToken, refreshToken }` |
+| `POST` | `/v0/user/auth/logout`   | Public; refresh token là credential               | `{ refreshToken }`       | `null`                          |
+| `POST` | `/v0/admin/auth/logout`  | Public; refresh token là credential               | `{ refreshToken }`       | `null`                          |
+
+`logout` thu hồi refresh token được gửi lên (idempotent, token không tồn tại
+vẫn trả thành công). Access token đã cấp vẫn dùng được đến khi hết hạn (15
+phút) vì JWT không được kiểm tra lại với DB ở mỗi request.
+
+### Giới hạn tốc độ
+
+Login, refresh và logout trả `429` với code `TOO_MANY_REQUESTS` khi vượt:
+
+- **Theo username**: tối đa `LOGIN_MAX_FAILURES` (mặc định 10) lần đăng nhập
+  trong `LOGIN_FAILURE_WINDOW_SEC` (mặc định 300 giây). Mỗi lần thử được tính
+  trước khi xác thực và bộ đếm được xoá khi đăng nhập đúng. Kẻ xấu có thể cố ý
+  khoá tạm một username; đổi lại không thể dò mật khẩu.
+- **Theo IP**: `AUTH_IP_LIMIT_PER_MIN` (mặc định 1000) yêu cầu/phút. Mức này đủ
+  cho cả một giảng đường dùng chung NAT đăng nhập cùng lúc. Khi chạy sau proxy
+  phải đặt `TRUST_PROXY`, nếu không mọi client dùng chung bộ đếm của proxy.
+
+Bộ đếm nằm trong Redis nên dùng chung giữa các instance. Nếu Redis lỗi, giới
+hạn bị bỏ qua (fail-open) để không chặn đăng nhập.
 
 ## Attendance sessions
 
@@ -47,7 +68,7 @@ Các endpoint trả `void` hiện chỉ có field `success` sau khi serialize.
 | `POST`  | `/v0/attendance-sessions`                       | JWT, `organizer`              | `CreateAttendanceSessionRequest` | `AttendanceSessionResponse`                |
 | `PATCH` | `/v0/attendance-sessions/:id`                   | JWT, organizer tạo phiên      | `UpdateAttendanceSessionRequest` | `AttendanceSessionResponse`                |
 | `PATCH` | `/v0/attendance-sessions/:id/cancel`            | JWT, organizer tạo phiên      | Không có                         | `AttendanceSessionResponse`                |
-| `GET`   | `/v0/attendance-sessions`                       | JWT                           | Không có                         | `AttendanceSessionResponse[]`              |
+| `GET`   | `/v0/attendance-sessions`                       | JWT, `admin` hoặc `organizer` | Không có                         | `AttendanceSessionResponse[]`              |
 | `GET`   | `/v0/attendance-sessions/created-by-me`         | JWT, `organizer`              | Không có                         | `AttendanceSessionResponse[]`              |
 | `GET`   | `/v0/attendance-sessions/created-by?userId=:id` | JWT, `admin`                  | Query `userId`                   | `AttendanceSessionResponse[]`              |
 | `GET`   | `/v0/attendance-sessions/me`                    | JWT                           | Không có                         | `MyAttendanceSessionResponse[]`            |
@@ -178,7 +199,7 @@ audit thất bại, quyết định Redis không bị hoàn tác và lỗi đư�
 | Method | Path               | Quyền hiện tại | Body                                                   | Data trả về                                  |
 | ------ | ------------------ | -------------- | ------------------------------------------------------ | -------------------------------------------- |
 | `POST` | `/v0/accounts`     | JWT, `admin`   | `{ code, fullname, role, unitId, username, password }` | `{ user, account }` không chứa password hash |
-| `GET`  | `/v0/accounts/:id` | Public         | Không có                                               | Account không chứa password hash             |
+| `GET`  | `/v0/accounts/:id` | JWT, `admin`   | Không có                                               | Account không chứa password hash             |
 
 `role` khi tạo account chỉ nhận `organizer` hoặc `participant`.
 
@@ -186,10 +207,10 @@ audit thất bại, quyết định Redis không bị hoàn tác và lỗi đư�
 
 | Method | Path                    | Quyền hiện tại | Body                 | Data trả về           |
 | ------ | ----------------------- | -------------- | -------------------- | --------------------- |
-| `GET`  | `/v0/users`             | Public         | Không có             | `User[]`              |
+| `GET`  | `/v0/users`             | JWT, `admin` hoặc `organizer` | Không có     | `User[]`              |
 | `GET`  | `/v0/users/me`          | JWT            | Không có             | `UserProfileResponse` |
-| `GET`  | `/v0/users/:id`         | Public         | Không có             | `User \| undefined`   |
-| `POST` | `/v0/users/test-filter` | Public         | `UserFilterCriteria` | `number[]` user ID    |
+| `GET`  | `/v0/users/:id`         | JWT, `admin` hoặc `organizer` | Không có     | `User \| undefined`   |
+| `POST` | `/v0/users/test-filter` | JWT, `admin` hoặc `organizer` | `UserFilterCriteria` | `number[]` user ID    |
 
 ## Tags
 
@@ -199,24 +220,25 @@ Tất cả endpoint tag yêu cầu JWT. Base path hiện tại là `/tags`, chư
 | -------- | ---------------------------- | ------------------------------- |
 | `POST`   | `/tags`                      | Tạo tag thuộc user hiện tại     |
 | `GET`    | `/tags`                      | Lấy tag do user hiện tại sở hữu |
-| `GET`    | `/tags/:id`                  | Lấy tag theo ID                 |
+| `GET`    | `/tags/:id`                  | Lấy tag do user hiện tại sở hữu (403 nếu của người khác) |
 | `DELETE` | `/tags/:id`                  | Xóa tag do user hiện tại sở hữu |
 | `GET`    | `/tags/:tagId/users`         | Lấy user ID được gắn tag        |
-| `GET`    | `/tags/users/:userId/tags`   | Lấy tag của một user            |
+| `GET`    | `/tags/users/:userId/tags`   | Lấy tag của một user, chỉ gồm tag do user hiện tại sở hữu |
 | `POST`   | `/tags/:tagId/users/:userId` | Gắn tag vào user                |
 | `DELETE` | `/tags/:tagId/users/:userId` | Gỡ tag khỏi user                |
 
 ## Units
 
-Các endpoint unit hiện là public và base path là `/units`.
+Base path là `/units`. Đọc yêu cầu JWT `admin` hoặc `organizer`; tạo/sửa chỉ
+`admin`. Body được kiểm tra bằng `CreateUnitDto`/`UpdateUnitDto`.
 
-| Method  | Path          | Body                   | Data trả về          |
-| ------- | ------------- | ---------------------- | -------------------- |
-| `GET`   | `/units`      | Không có               | `Unit[]`             |
-| `GET`   | `/units/tree` | Không có               | `UnitTreeResponse[]` |
-| `GET`   | `/units/:id`  | Không có               | `Unit \| null`       |
-| `POST`  | `/units`      | `{ name, parentId? }`  | `Unit`               |
-| `PATCH` | `/units/:id`  | `{ name?, parentId? }` | `Unit`               |
+| Method  | Path          | Quyền                         | Body                   | Data trả về          |
+| ------- | ------------- | ----------------------------- | ---------------------- | -------------------- |
+| `GET`   | `/units`      | JWT, `admin` hoặc `organizer` | Không có               | `Unit[]`             |
+| `GET`   | `/units/tree` | JWT, `admin` hoặc `organizer` | Không có               | `UnitTreeResponse[]` |
+| `GET`   | `/units/:id`  | JWT, `admin` hoặc `organizer` | Không có               | `Unit \| null`       |
+| `POST`  | `/units`      | JWT, `admin`                  | `{ name, parentId? }`  | `Unit`               |
+| `PATCH` | `/units/:id`  | JWT, `admin`                  | `{ name?, parentId? }` | `Unit`               |
 
 ## Health
 

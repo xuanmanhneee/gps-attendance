@@ -7,6 +7,9 @@ import { AuthService } from './auth.service';
 import { UsersModule } from '../users/users.module';
 import { AccountModule } from '../account/account.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { RateLimitModule } from '../common/rate-limit/rate-limit.module';
+import { LoginAttemptLimiter } from './login-attempt.limiter';
+import { ClientRateLimitGuard } from './guards/client-rate-limit.guard';
 import { LocalStrategy } from './strategies/local.strategy';
 import { REFRESH_SESSION_REPOSITORY } from './refresh-session.repository.token';
 import { PrismaRefreshSessionRepository } from './infra/prisma/prisma-refresh-session.repository';
@@ -15,6 +18,7 @@ import { PrismaRefreshSessionRepository } from './infra/prisma/prisma-refresh-se
   imports: [
     UsersModule,
     AccountModule,
+    RateLimitModule,
 
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -32,6 +36,8 @@ import { PrismaRefreshSessionRepository } from './infra/prisma/prisma-refresh-se
     AuthService,
     JwtStrategy,
     LocalStrategy,
+    LoginAttemptLimiter,
+    ClientRateLimitGuard,
     {
       provide: REFRESH_SESSION_REPOSITORY,
       useClass: PrismaRefreshSessionRepository,

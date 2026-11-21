@@ -31,6 +31,11 @@ export class TagService {
     return this.tagRepository.findById(id);
   }
 
+  /** Lấy tag nếu requester là chủ sở hữu; ném 404/403 nếu không. */
+  getOwned(id: number, requesterId: number): Promise<Tag> {
+    return this.ensureOwnership(id, requesterId);
+  }
+
   findByOwner(ownerId: number): Promise<Tag[]> {
     return this.tagRepository.findByOwner(ownerId);
   }
@@ -71,6 +76,18 @@ export class TagService {
 
   findTagsByUser(userId: number): Promise<Tag[]> {
     return this.tagRepository.findTagsByUser(userId);
+  }
+
+  /**
+   * Tag của `userId` nhưng chỉ những tag do requester sở hữu — tag của người
+   * khác là dữ liệu riêng của họ, không lộ qua id của user.
+   */
+  async findTagsByUserOwnedBy(
+    userId: number,
+    requesterId: number,
+  ): Promise<Tag[]> {
+    const tags = await this.tagRepository.findTagsByUser(userId);
+    return tags.filter((tag) => tag.ownerId === requesterId);
   }
 
   private async ensureOwnership(

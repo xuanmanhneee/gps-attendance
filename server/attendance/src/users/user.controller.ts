@@ -11,7 +11,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import {
   UserFilterCriteria,
   UserProfileResponse,
@@ -28,6 +30,8 @@ export class UserController {
     private readonly userFilterService: UserFilterService,
   ) {}
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'organizer')
   @Get()
   async findAll() {
     return this.usersService.findAll();
@@ -49,12 +53,17 @@ export class UserController {
     };
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'organizer')
   @Get(':id')
   async findById(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findById(id);
   }
 
-  @Post('test-filter') async testFilter(@Body() criteria: UserFilterDto) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'organizer')
+  @Post('test-filter')
+  async testFilter(@Body() criteria: UserFilterDto) {
     return this.userFilterService.resolveUserIds(criteria);
   }
 }
