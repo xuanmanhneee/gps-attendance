@@ -55,8 +55,14 @@ services:
       DATABASE_URL: postgresql://perf:perf@postgres:5432/perf
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-      JWT_SECRET: "${PERF_JWT_SECRET:-local-performance-test-secret}"
+      # Image perf chạy NODE_ENV=production nên JWT_SECRET phải >= 32 ký tự.
+      JWT_SECRET: "${PERF_JWT_SECRET:-local-performance-test-secret-0123456789}"
       PORT: "3000"
+      # API đứng sau nginx: tin 1 hop để req.ip là IP client thật (rate limit).
+      TRUST_PROXY: "1"
+      # Số thread libuv cho bcrypt; mặc định Node là 4. Nên xấp xỉ số CPU của
+      # container (PERF_API_CPUS), lớn hơn nữa không tăng thông lượng.
+      UV_THREADPOOL_SIZE: "${PERF_UV_THREADPOOL_SIZE:-4}"
       DB_POOL_MAX: "${PERF_DB_POOL_MAX:-15}"
     scale: ${PERF_API_REPLICAS:-1}
     cpus: "${PERF_API_CPUS:-2.0}"
@@ -111,6 +117,7 @@ services:
     environment:
       <<: *api_environment
       LOAD_USERS: "${LOAD_USERS:-1000}"
+      LOAD_BCRYPT_COST: "${LOAD_BCRYPT_COST:-4}"
       LOAD_SESSION_MINUTES: "${LOAD_SESSION_MINUTES:-10}"
       LOAD_DATA_PATH: /perf-data/load-data.json
     volumes:
@@ -156,6 +163,26 @@ services:
       LOAD_VUS: "${LOAD_VUS:-100}"
       LOAD_MODE: "${LOAD_MODE:-rate}"
       P95_MS: "${PERF_P95_MS:-1000}"
+    volumes:
+      - perf_data:/data:ro
+      - ./server/attendance/perf:/scripts:ro
+    depends_on:
+      load-balancer:
+        condition: service_healthy
+
+  # Đo đăng nhập đồng loạt (cả lớp mở app cùng lúc). Cần `prepare` với
+  # LOAD_BCRYPT_COST=10 để chi phí băm giống production.
+  login:
+    image: grafana/k6:latest
+    profiles: ["load"]
+    entrypoint: ["k6", "run", "/scripts/login.js"]
+    environment:
+      API_URL: http://load-balancer
+      LOGIN_MODE: "${LOGIN_MODE:-burst}"
+      LOGIN_FLOOD: "${LOGIN_FLOOD:-0}"
+      # Mốc nền đo được: 300 đăng nhập đồng thời trên API 2 CPU có p95 ~6,6 s
+      # (RESULTS-2026-11-22.md); ngưỡng này bắt hồi quy, không phải mục tiêu.
+      P95_MS: "${PERF_LOGIN_P95_MS:-10000}"
     volumes:
       - perf_data:/data:ro
       - ./server/attendance/perf:/scripts:ro

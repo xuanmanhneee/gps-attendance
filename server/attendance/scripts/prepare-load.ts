@@ -84,7 +84,11 @@ async function main(): Promise<void> {
     throw new Error(`Expected ${count} students, found ${students.length}`);
   }
 
-  const passwordHash = await bcrypt.hash('performance-test-only', 4);
+  // Cost 4 giữ cho bước chuẩn bị và các bài đo check-in nhanh. Bài đo đăng nhập
+  // (perf/login.js) phải đặt LOAD_BCRYPT_COST=10 để khớp production, nếu không
+  // chi phí băm thấp hơn ~16 lần và kết quả đăng nhập bị đẹp giả tạo.
+  const bcryptCost = Number(process.env.LOAD_BCRYPT_COST ?? 4);
+  const passwordHash = await bcrypt.hash('performance-test-only', bcryptCost);
   for (let start = 0; start < count; start += 250) {
     await prisma.account.createMany({
       data: students.slice(start, start + 250).map((student, offset) => ({
@@ -93,6 +97,18 @@ async function main(): Promise<void> {
         userId: student.id,
       })),
       skipDuplicates: true,
+    });
+    // createMany bỏ qua tài khoản đã có nên hash cũ (có thể cost khác) vẫn còn;
+    // ghi đè để LOAD_BCRYPT_COST luôn có hiệu lực ở những lần chạy lại.
+    await prisma.account.updateMany({
+      where: {
+        username: {
+          in: students
+            .slice(start, start + 250)
+            .map((_, offset) => usernameFor(start + offset + 1)),
+        },
+      },
+      data: { passwordHash },
     });
   }
 
