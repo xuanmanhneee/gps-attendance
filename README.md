@@ -27,6 +27,7 @@ gps-attendance/
 │   ├── mobile-client/             # Ứng dụng di động cho sinh viên (Expo / React Native)
 │   └── lms-web/                   # Web client của LMS demo (React + Vite)
 └── packages/
+    ├── attendance-client/         # Client framework-agnostic cho luồng điểm danh mobile
     └── shared/                    # Type/DTO dùng chung giữa server, admin, mobile — @gps-attendance/shared
 ```
 
@@ -112,6 +113,33 @@ pnpm --filter @gps-attendance/attendance prisma studio
 
 ## Chạy project
 
+### Chạy hai backend bằng Docker
+
+Lệnh sau build và chạy PostgreSQL, Redis, Attendance và LMS; migration
+Attendance được áp dụng tự động khi container khởi động:
+
+```bash
+docker compose up --build -d
+docker compose ps
+```
+
+- Attendance API: `http://localhost:3000`
+- Swagger: `http://localhost:3000/api-docs`
+- LMS API: `http://localhost:3100`
+
+Hai backend mặc định dùng chung integration key `demo-integration-key`. Có thể
+đặt `INTEGRATION_API_KEY` và `JWT_SECRET` trong môi trường trước khi chạy
+Compose. Dữ liệu PostgreSQL, Redis và SQLite LMS nằm trong named volume nên vẫn
+còn sau `docker compose down`.
+
+```bash
+docker compose logs -f attendance lms
+docker compose down
+```
+
+Attendance seed không chạy tự động vì seed hiện không idempotent. LMS tự seed
+SQLite khi khởi động và có thể sync sang Attendance qua hostname `attendance`.
+
 Sau khi cài xong (và đã setup Database ở trên với `server/attendance`), chạy từng project bằng script ở root:
 
 ### 1. Server (NestJS)
@@ -132,6 +160,8 @@ Mặc định chạy tại `http://localhost:5173`.
 
 ### 3. Mobile Client (Expo)
 
+Khởi động Attendance và LMS trước; mobile gọi API qua LMS tại cổng `3100`.
+
 ```bash
 pnpm dev:mobile
 ```
@@ -142,7 +172,7 @@ Quét mã QR hiện trên terminal bằng app **Expo Go** để chạy thử tr�
 
 ### 4. LMS demo (integration)
 
-Sau khi cấu hình cùng `INTEGRATION_API_KEY` cho attendance server và fake LMS:
+Sau khi cấu hình cùng `INTEGRATION_API_KEY` cho attendance server và LMS:
 
 ```bash
 pnpm dev:lms

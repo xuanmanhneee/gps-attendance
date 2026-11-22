@@ -12,6 +12,7 @@ export class PrismaTagRepository implements ITagRepository {
   async create(input: CreateTagRecord): Promise<Tag> {
     const record = await this.prisma.tag.create({
       data: {
+        externalCode: input.externalCode,
         name: input.name,
         ownerId: input.ownerId,
       },
@@ -24,6 +25,7 @@ export class PrismaTagRepository implements ITagRepository {
       where: { id },
       data: {
         ...(input.name !== undefined && { name: input.name }),
+        ...(input.ownerId !== undefined && { ownerId: input.ownerId }),
       },
     });
     return this.toDomain(record);
@@ -35,6 +37,13 @@ export class PrismaTagRepository implements ITagRepository {
 
   async findById(id: number): Promise<Tag | null> {
     const record = await this.prisma.tag.findUnique({ where: { id } });
+    return record ? this.toDomain(record) : null;
+  }
+
+  async findByExternalCode(externalCode: string): Promise<Tag | null> {
+    const record = await this.prisma.tag.findUnique({
+      where: { externalCode },
+    });
     return record ? this.toDomain(record) : null;
   }
 
@@ -59,6 +68,18 @@ export class PrismaTagRepository implements ITagRepository {
     });
   }
 
+  async replaceUserIds(tagId: number, userIds: number[]): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.userTag.deleteMany({
+        where: { tagId, userId: { notIn: userIds } },
+      }),
+      this.prisma.userTag.createMany({
+        data: userIds.map((userId) => ({ tagId, userId })),
+        skipDuplicates: true,
+      }),
+    ]);
+  }
+
   async findUserIdsByTag(tagId: number): Promise<number[]> {
     const rows = await this.prisma.userTag.findMany({
       where: { tagId },
@@ -79,6 +100,7 @@ export class PrismaTagRepository implements ITagRepository {
   private toDomain(record: PrismaTag): Tag {
     return {
       id: record.id,
+      externalCode: record.externalCode,
       name: record.name,
       ownerId: record.ownerId,
       createdAt: record.createdAt,

@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
 
 import { AttendanceRecordModule } from '#attendance-record/attendance-record.module';
+import { AttendanceCheckInModule } from '#attendance-check-in/attendance-check-in.module';
 import { AttendanceSessionsModule } from '#attendance-sessions/attendance-sessions.module';
 import { UnitModule } from '#units/units.module';
 import { UsersModule } from '#user/users.module';
 import { TagModule } from '../tags/tag.module';
-import { AccountModule } from '../account/account.module';
 
 import { IntegrationApiKeyGuard } from './integration-api-key.guard';
 import { IntegrationController } from './integration.controller';
+import { IntegrationMobileController } from './integration-mobile.controller';
 import { PrismaIntegrationSessionLinkRepository } from './infra/prisma/prisma-integration-session-link.repository';
 import { INTEGRATION_SESSION_LINK_REPOSITORY } from './integration-session-link.token';
 import { IntegrationService } from './integration.service';
@@ -19,10 +20,10 @@ import { IntegrationService } from './integration.service';
     UsersModule,
     AttendanceSessionsModule,
     AttendanceRecordModule,
+    AttendanceCheckInModule,
     TagModule,
-    AccountModule,
   ],
-  controllers: [IntegrationController],
+  controllers: [IntegrationController, IntegrationMobileController],
   providers: [
     IntegrationService,
     IntegrationApiKeyGuard,

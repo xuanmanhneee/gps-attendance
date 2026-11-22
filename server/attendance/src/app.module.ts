@@ -18,6 +18,7 @@ import { UnitOfWorkModule } from '#common/unit-of-work/unit-of-work.module';
 import { UnitModule } from '#units/units.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { IntegrationModule } from './integration/integration.module';
+import { JobSchedulerModule } from './job-scheduler/job-scheduler.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { IntegrationModule } from './integration/integration.module';
     UnitModule,
     AuditLogModule,
     IntegrationModule,
+    JobSchedulerModule,
   ],
   controllers: [AppController],
   providers: [

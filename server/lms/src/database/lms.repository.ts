@@ -7,7 +7,7 @@ export interface LmsUnit {
 export interface LmsUser {
   code: string;
   fullname: string;
-  role: "organizer" | "participant";
+  role: "admin" | "lecturer" | "student";
   unitCode: string;
 }
 export interface LmsAccount {
@@ -22,6 +22,12 @@ export interface LmsClass {
   name: string;
   lecturerCode: string;
 }
+export interface CreateLmsClassInput {
+  code: string;
+  name: string;
+  lecturerCode: string;
+  studentCodes: string[];
+}
 export interface LmsBuilding {
   id: number;
   code: string;
@@ -31,7 +37,7 @@ export interface LmsBuilding {
 }
 
 export interface CreateLmsSessionInput {
-  classId: number;
+  classId: number | null;
   title: string;
   latitude: number;
   longitude: number;
@@ -51,13 +57,18 @@ export interface ILmsRepository {
   seed(): void;
   listClasses(): LmsClass[];
   findClass(id: number): LmsClass | null;
+  findClassByCode(code: string): LmsClass | null;
+  createClassWithEnrollments(input: CreateLmsClassInput): LmsClass;
   listStudentCodes(classId: number): string[];
   listStudents(classId: number): LmsUser[];
   createSession(input: CreateLmsSessionInput): LmsSession;
   listUnits(): LmsUnit[];
+  findUnit(code: string): LmsUnit | null;
+  createUnit(unit: LmsUnit): void;
   listUsers(): LmsUser[];
   listBuildings(): LmsBuilding[];
   findBuilding(id: number): LmsBuilding | null;
   findAccount(username: string): LmsAccount | null;
   findUser(code: string): LmsUser | null;
+  createUserWithAccount(user: LmsUser, account: LmsAccount): void;
 }

@@ -1,10 +1,12 @@
-import { attendanceRequest } from "./attendance-client.ts";
-import type {
-  LmsClass,
-  LmsSession,
-  LmsUnit,
-  LmsUser,
-} from "../database/lms.repository.ts";
+import {
+  AttendanceApiError,
+  AttendanceHttpClient,
+  createAttendanceHttpClientFromEnv,
+} from "./attendance-client.ts";
+import type { AttendanceUser } from "./lms-role.mapper.ts";
+import type { AttendanceUnit } from "./lms-unit.mapper.ts";
+import type { AttendanceTag } from "./lms-course.mapper.ts";
+import type { AttendanceSessionInput } from "./lms-session.mapper.ts";
 
 export interface IntegrationCallReport {
   endpoint: string;
@@ -14,24 +16,53 @@ export interface IntegrationCallReport {
   at: string;
 }
 
+export interface AttendanceSyncResult {
+  created: number;
+  updated: number;
+  unchanged: number;
+  failed: Array<{ key: string; code: string; message: string }>;
+}
+
+export interface AttendanceSessionView {
+  externalId: string;
+  title?: string;
+  status: "pending" | "open" | "closed" | "cancelled";
+  openAt?: string;
+  closeAt?: string;
+  participantCount: number;
+  finalized: boolean;
+}
+
+export interface AttendanceRecordsView {
+  externalId: string;
+  finalized: boolean;
+  records: Array<{
+    code: string;
+    fullname: string;
+    status: "absent" | "present" | "late" | "excused";
+    checkedInAt: string | null;
+  }>;
+}
+
 export interface AttendanceGateway {
-  syncUnits(units: LmsUnit[]): Promise<unknown>;
-  syncUsers(users: LmsUser[]): Promise<unknown>;
-  syncCourses(courses: unknown[]): Promise<unknown>;
-  syncAccounts(users: LmsUser[]): Promise<unknown>;
-  createSession(
-    session: LmsSession,
-    course: LmsClass,
-    studentCodes: string[],
-  ): Promise<unknown>;
-  getSession(externalId: string): Promise<unknown>;
-  getRecords(externalId: string): Promise<unknown>;
-  cancelSession(externalId: string): Promise<unknown>;
+  syncUnits(units: AttendanceUnit[]): Promise<AttendanceSyncResult>;
+  syncUsers(users: AttendanceUser[]): Promise<AttendanceSyncResult>;
+  syncTags(tags: AttendanceTag[]): Promise<AttendanceSyncResult>;
+  createSession(input: AttendanceSessionInput): Promise<AttendanceSessionView>;
+  getSession(externalId: string): Promise<AttendanceSessionView>;
+  getRecords(externalId: string): Promise<AttendanceRecordsView>;
+  cancelSession(externalId: string): Promise<AttendanceSessionView>;
   report(): IntegrationCallReport[];
 }
 
 export class RealAttendanceGateway implements AttendanceGateway {
   private readonly calls: IntegrationCallReport[] = [];
+
+  constructor(
+    private readonly client: AttendanceHttpClient =
+      createAttendanceHttpClientFromEnv(),
+  ) {}
+
   private async call<T>(
     endpoint: string,
     path: string,
@@ -39,88 +70,82 @@ export class RealAttendanceGateway implements AttendanceGateway {
   ): Promise<T> {
     const at = new Date().toISOString();
     try {
-      const value = await attendanceRequest<T>(path, options);
-      this.calls.push({ endpoint, source: "attendance", ok: true, at });
+      const value = await this.client.request<T>(path, options);
+      this.record({ endpoint, source: "attendance", ok: true, at });
       return value;
     } catch (error) {
-      this.calls.push({
+      this.record({
         endpoint,
         source: "attendance",
         ok: false,
         at,
-        message: error instanceof Error ? error.message : "Attendance error",
+        message: error instanceof AttendanceApiError
+          ? error.code
+          : "INTEGRATION_REQUEST_FAILED",
       });
       throw error;
     }
   }
-  syncUnits(units: LmsUnit[]) {
-    return this.call("PUT /units", "/units", {
+  syncUnits(units: AttendanceUnit[]) {
+    return this.call<AttendanceSyncResult>("PUT /units", "/units", {
       method: "PUT",
       body: JSON.stringify({ units }),
     });
   }
-  syncUsers(users: LmsUser[]) {
-    return this.call("PUT /users", "/users", {
+  syncUsers(users: AttendanceUser[]) {
+    return this.call<AttendanceSyncResult>("PUT /users", "/users", {
       method: "PUT",
       body: JSON.stringify({ users }),
     });
   }
-  syncCourses(courses: unknown[]) {
-    return this.call("PUT /courses", "/courses", {
+  syncTags(tags: AttendanceTag[]) {
+    return this.call<AttendanceSyncResult>("PUT /tags", "/tags", {
       method: "PUT",
-      body: JSON.stringify({ courses }),
+      body: JSON.stringify({ tags }),
     });
   }
-  syncAccounts(users: LmsUser[]) {
-    return this.call("PUT /accounts", "/accounts", {
-      method: "PUT",
-      body: JSON.stringify({ users }),
-    });
-  }
-  createSession(session: LmsSession, course: LmsClass, studentCodes: string[]) {
-    return this.call("POST /sessions", "/sessions", {
+  createSession(input: AttendanceSessionInput) {
+    return this.call<AttendanceSessionView>("POST /sessions", "/sessions", {
       method: "POST",
-      body: JSON.stringify({
-        externalId: session.externalId,
-        title: session.title,
-        latitude: session.latitude,
-        longitude: session.longitude,
-        radius: session.radius,
-        openAt: session.openAt,
-        closeAt: session.closeAt,
-        lecturerCode: course.lecturerCode,
-        studentCodes,
-      }),
+      body: JSON.stringify(input),
     });
   }
   getSession(externalId: string) {
-    return this.call(
+    return this.call<AttendanceSessionView>(
       "GET /sessions/{externalId}",
       `/sessions/${encodeURIComponent(externalId)}`,
     );
   }
   getRecords(externalId: string) {
-    return this.call(
+    return this.call<AttendanceRecordsView>(
       "GET /sessions/{externalId}/records",
       `/sessions/${encodeURIComponent(externalId)}/records`,
     );
   }
   cancelSession(externalId: string) {
-    return this.call(
+    return this.call<AttendanceSessionView>(
       "POST /sessions/{externalId}/cancel",
       `/sessions/${encodeURIComponent(externalId)}/cancel`,
       { method: "POST" },
     );
   }
   report() {
-    return this.calls;
+    return [...this.calls];
+  }
+  private record(call: IntegrationCallReport) {
+    this.calls.push(call);
+    if (this.calls.length > 200) this.calls.shift();
   }
 }
 
 export class MockAttendanceGateway implements AttendanceGateway {
   private readonly sessions = new Map<
     string,
-    { status: string; participantCount: number; finalized: boolean }
+    {
+      status: AttendanceSessionView["status"];
+      participantCount: number;
+      finalized: boolean;
+    }
   >();
   private readonly calls: IntegrationCallReport[] = [];
   private record(endpoint: string) {
@@ -129,10 +154,11 @@ export class MockAttendanceGateway implements AttendanceGateway {
       source: "mock",
       ok: true,
       at: new Date().toISOString(),
-      message: "Attendance unavailable; mock fallback used",
+      message: "Mock Attendance gateway used",
     });
+    if (this.calls.length > 200) this.calls.shift();
   }
-  syncUnits(units: LmsUnit[]) {
+  syncUnits(units: AttendanceUnit[]) {
     this.record("PUT /units");
     return Promise.resolve({
       created: units.length,
@@ -141,7 +167,7 @@ export class MockAttendanceGateway implements AttendanceGateway {
       failed: [],
     });
   }
-  syncUsers(users: LmsUser[]) {
+  syncUsers(users: AttendanceUser[]) {
     this.record("PUT /users");
     return Promise.resolve({
       created: users.length,
@@ -150,36 +176,23 @@ export class MockAttendanceGateway implements AttendanceGateway {
       failed: [],
     });
   }
-  syncCourses(courses: unknown[]) {
-    this.record("PUT /courses");
+  syncTags(tags: AttendanceTag[]) {
+    this.record("PUT /tags");
     return Promise.resolve({
-      created: courses.length,
+      created: tags.length,
       updated: 0,
       unchanged: 0,
       failed: [],
     });
   }
-  syncAccounts(users: LmsUser[]) {
-    this.record("PUT /accounts");
-    return Promise.resolve({
-      created: users.length,
-      updated: 0,
-      unchanged: 0,
-      failed: [],
-    });
-  }
-  createSession(
-    session: LmsSession,
-    _course: LmsClass,
-    studentCodes: string[],
-  ) {
+  createSession(input: AttendanceSessionInput) {
     this.record("POST /sessions");
-    this.sessions.set(session.externalId, {
+    this.sessions.set(input.externalId, {
       status: "pending",
-      participantCount: studentCodes.length,
+      participantCount: input.participantCodes.length,
       finalized: false,
     });
-    return Promise.resolve(this.get(session.externalId));
+    return Promise.resolve(this.get(input.externalId));
   }
   getSession(externalId: string) {
     this.record("GET /sessions/{externalId}");
@@ -200,78 +213,13 @@ export class MockAttendanceGateway implements AttendanceGateway {
     return Promise.resolve(this.get(externalId));
   }
   report() {
-    return this.calls;
+    return [...this.calls];
   }
-  private get(externalId: string) {
+  private get(externalId: string): AttendanceSessionView {
     return {
       externalId,
       ...(this.sessions.get(externalId) ??
         { status: "pending", participantCount: 0, finalized: false }),
     };
-  }
-}
-
-export class HybridAttendanceGateway implements AttendanceGateway {
-  constructor(
-    private readonly real: RealAttendanceGateway,
-    private readonly mock: MockAttendanceGateway,
-  ) {}
-  private async fallback<T>(fn: () => Promise<T>, mockFn: () => Promise<T>) {
-    try {
-      return await fn();
-    } catch {
-      return mockFn();
-    }
-  }
-  syncUnits(v: LmsUnit[]) {
-    return this.fallback(
-      () => this.real.syncUnits(v),
-      () => this.mock.syncUnits(v),
-    );
-  }
-  syncUsers(v: LmsUser[]) {
-    return this.fallback(
-      () => this.real.syncUsers(v),
-      () => this.mock.syncUsers(v),
-    );
-  }
-  syncCourses(v: unknown[]) {
-    return this.fallback(
-      () => this.real.syncCourses(v),
-      () => this.mock.syncCourses(v),
-    );
-  }
-  syncAccounts(v: LmsUser[]) {
-    return this.fallback(
-      () => this.real.syncAccounts(v),
-      () => this.mock.syncAccounts(v),
-    );
-  }
-  createSession(s: LmsSession, c: LmsClass, u: string[]) {
-    return this.fallback(
-      () => this.real.createSession(s, c, u),
-      () => this.mock.createSession(s, c, u),
-    );
-  }
-  getSession(id: string) {
-    return this.fallback(
-      () => this.real.getSession(id),
-      () => this.mock.getSession(id),
-    );
-  }
-  getRecords(id: string) {
-    return this.fallback(
-      () => this.real.getRecords(id),
-      () => this.mock.getRecords(id),
-    );
-  }
-  cancelSession(id: string) {
-    return this.fallback(
-      () => this.real.cancelSession(id),
-      () => this.mock.cancelSession(id),
-    );
-  }
-  report() {
-    return [...this.real.report(), ...this.mock.report()];
   }
 }

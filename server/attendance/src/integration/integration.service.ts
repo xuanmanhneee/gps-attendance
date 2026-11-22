@@ -16,7 +16,7 @@ import type { AttendanceSession } from '#attendance-sessions/attendance-session.
 
 import type {
   CreateIntegrationSessionDto,
-  IntegrationCourseDto,
+  IntegrationTagDto,
   IntegrationUserDto,
   IntegrationUnitDto,
   SyncIntegrationUsersDto,
@@ -25,7 +25,6 @@ import type { IIntegrationSessionLinkRepository } from './integration-session-li
 import { INTEGRATION_SESSION_LINK_REPOSITORY } from './integration-session-link.token';
 import type { IntegrationSessionLink } from './integration-session-link.model';
 import { TagService } from '../tags/tag.service';
-import { AccountService } from '../account/account.service';
 
 export interface SyncResult {
   created: number;
@@ -42,7 +41,6 @@ export class IntegrationService {
     private readonly sessions: AttendanceSessionsService,
     private readonly records: AttendanceRecordsService,
     private readonly tags: TagService,
-    private readonly accounts: AccountService,
     @Inject(INTEGRATION_SESSION_LINK_REPOSITORY)
     private readonly sessionLinks: IIntegrationSessionLinkRepository,
   ) {}
@@ -126,40 +124,58 @@ export class IntegrationService {
     return result;
   }
 
-  async syncCourses(courses: IntegrationCourseDto[]): Promise<SyncResult> {
+  async syncTags(tags: IntegrationTagDto[]): Promise<SyncResult> {
     const result = this.emptyResult();
-    for (const course of courses) {
-      const lecturer = await this.users.findByCode(course.lecturerCode.trim());
-      if (!lecturer || lecturer.role !== 'organizer') {
-        result.failed.push({ key: course.externalCode, code: 'INTEGRATION_LECTURER_NOT_FOUND', message: 'Không tìm thấy lecturer organizer' });
+    for (const input of tags) {
+      const externalCode = input.externalCode.trim();
+      const organizer = await this.users.findByCode(input.organizerCode.trim());
+      if (!organizer || organizer.role !== 'organizer') {
+        result.failed.push({
+          key: externalCode,
+          code: 'INTEGRATION_ORGANIZER_NOT_FOUND',
+          message: 'Không tìm thấy organizer',
+        });
         continue;
       }
-      const tagName = `${course.externalCode.trim()} · ${course.name.trim()}`;
-      const tags = await this.tags.findByOwner(lecturer.id);
-      let tag = tags.find((candidate) => candidate.name === tagName);
-      if (!tag) {
-        tag = await this.tags.create(tagName, lecturer.id);
-        result.created++;
-      }
-      const students = await this.users.findByCodes(course.studentCodes.map((code) => code.trim()));
-      for (const student of students) {
-        if (student.role === 'participant') await this.tags.assignToUser(tag.id, student.id, lecturer.id);
-      }
-      if (tag && tags.some((candidate) => candidate.id === tag?.id)) result.unchanged++;
-    }
-    return result;
-  }
 
-  async syncAccounts(users: IntegrationUserDto[]): Promise<SyncResult> {
-    const result = this.emptyResult();
-    for (const input of users) {
-      const user = await this.users.findByCode(input.code.trim());
-      if (!user) {
-        result.failed.push({ key: input.code, code: 'INTEGRATION_USER_NOT_FOUND', message: 'User phải được sync trước khi provision Account' });
+      const participantCodes = input.participantCodes.map((code) =>
+        code.trim(),
+      );
+      const users = await this.users.findByCodes(participantCodes);
+      const participants = new Map(
+        users
+          .filter((user) => user.role === 'participant')
+          .map((user) => [user.code, user]),
+      );
+      const invalidCodes = participantCodes.filter(
+        (code) => !participants.has(code),
+      );
+      if (!externalCode || invalidCodes.length > 0) {
+        result.failed.push({
+          key: externalCode || input.externalCode,
+          code: 'INTEGRATION_PARTICIPANT_NOT_FOUND',
+          message: `Tag chứa participant không hợp lệ: ${invalidCodes.join(', ')}`,
+        });
         continue;
       }
-      const outcome = await this.accounts.provisionForUser(user.id, input.code.trim().toLowerCase());
-      result[outcome.created ? 'created' : 'unchanged']++;
+
+      const synced = await this.tags.syncExternal(
+        externalCode,
+        input.name.trim(),
+        organizer.id,
+      );
+      const rosterChanged = await this.tags.replaceUsers(
+        synced.tag.id,
+        participantCodes.map((code) => participants.get(code)!.id),
+        organizer.id,
+      );
+      if (synced.created) {
+        result.created++;
+      } else if (synced.metadataChanged || rosterChanged) {
+        result.updated++;
+      } else {
+        result.unchanged++;
+      }
     }
     return result;
   }
@@ -170,9 +186,10 @@ export class IntegrationService {
     const normalized = this.normalizeSession(dto);
     if (
       !normalized.externalId ||
-      !normalized.lecturerCode ||
-      normalized.studentCodes.some((code) => !code) ||
-      new Set(normalized.studentCodes).size !== normalized.studentCodes.length
+      !normalized.organizerCode ||
+      normalized.participantCodes.some((code) => !code) ||
+      new Set(normalized.participantCodes).size !==
+        normalized.participantCodes.length
     ) {
       throw new UnprocessableEntityException({
         code: 'INTEGRATION_VALIDATION_FAILED',
@@ -188,23 +205,23 @@ export class IntegrationService {
     );
     if (existing) return this.resolveExistingLink(existing, fingerprint);
 
-    const codes = [normalized.lecturerCode, ...normalized.studentCodes];
+    const codes = [normalized.organizerCode, ...normalized.participantCodes];
     const users = await this.users.findByCodes(codes);
     const byCode = new Map(users.map((user) => [user.code, user]));
     const unknownCodes = codes.filter((code) => !byCode.has(code));
-    const lecturer = byCode.get(normalized.lecturerCode);
-    const invalidParticipants = normalized.studentCodes.filter(
+    const organizer = byCode.get(normalized.organizerCode);
+    const invalidParticipants = normalized.participantCodes.filter(
       (code) => byCode.get(code)?.role !== 'participant',
     );
 
     if (
       unknownCodes.length > 0 ||
-      lecturer?.role !== 'organizer' ||
+      organizer?.role !== 'organizer' ||
       invalidParticipants.length > 0
     ) {
       throw new UnprocessableEntityException({
         code: 'INTEGRATION_UNKNOWN_CODES',
-        message: 'Lecturer hoặc danh sách participant không hợp lệ',
+        message: 'Organizer hoặc danh sách participant không hợp lệ',
         unknownCodes,
       });
     }
@@ -234,10 +251,10 @@ export class IntegrationService {
           openAt: normalized.openAt,
           closeAt: normalized.closeAt,
           participantCriteria: {
-            codeFilter: { include: normalized.studentCodes, exclude: [] },
+            codeFilter: { include: normalized.participantCodes, exclude: [] },
           },
         },
-        lecturer.id,
+        organizer.id,
       );
       await this.sessionLinks.attachSession(link.id, session.id);
       return { created: true, externalId: normalized.externalId };
@@ -282,6 +299,7 @@ export class IntegrationService {
   async cancelSession(externalId: string) {
     const session = await this.requireSession(externalId);
     const current = await this.getSession(externalId);
+    if (current.status === 'cancelled') return current;
     const cancelled = await this.sessions.cancel(session.id, session.createdBy);
     return this.toSession(externalId, cancelled, current.participantCount);
   }
@@ -359,14 +377,16 @@ export class IntegrationService {
   private normalizeSession(dto: CreateIntegrationSessionDto) {
     return {
       externalId: dto.externalId.trim(),
-      lecturerCode: dto.lecturerCode.trim(),
+      organizerCode: dto.organizerCode.trim(),
       title: dto.title.trim(),
       latitude: dto.latitude,
       longitude: dto.longitude,
       radius: dto.radius,
       openAt: new Date(dto.openAt).toISOString(),
       closeAt: new Date(dto.closeAt).toISOString(),
-      studentCodes: [...dto.studentCodes.map((code) => code.trim())].sort(),
+      participantCodes: [
+        ...dto.participantCodes.map((code) => code.trim()),
+      ].sort(),
     };
   }
 

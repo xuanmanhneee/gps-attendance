@@ -27,8 +27,7 @@ client/mobile-client/
 │   │   ├── 📄 http.ts                 # httpClient (baseUrl từ EXPO_PUBLIC_API_URL)
 │   │   ├── 📄 auth.api.ts             # login / logout / refreshToken
 │   │   ├── 📄 user.api.ts             # getProfile
-│   │   ├── 📄 attendance-sessions.api.ts   # getSessions
-│   │   ├── 📄 attendance-check-in.api.ts   # checkIn
+│   │   ├── 📄 attendance.api.ts       # bind package điểm danh với httpClient
 │   │   └── 📄 index.ts                # Export barrel
 │   │
 │   ├── 📁 components/                 # UI Components
@@ -45,8 +44,6 @@ client/mobile-client/
 │   │   └── 📄 use-now.ts              # "now" tự cập nhật tại mốc openAt/closeAt + foreground
 │   │
 │   ├── 📁 services/                   # Logic thiết bị/vị trí + cấu hình (không phụ thuộc React)
-│   │   ├── 📄 attendance.ts           # collectCheckInContext / buildCheckInPayload / checkIn
-│   │   │                              #   (áp override mock location của dev mode)
 │   │   ├── 📄 dev-mode.ts             # cờ "Chế độ dev" + ép mock location (trang Dev)
 │   │   ├── 📄 device-id.ts            # deviceId ổn định (AndroidId / iOS vendorId / UUID)
 │   │   ├── 📄 device-info.ts          # buildDeviceInfo → Device
@@ -54,11 +51,11 @@ client/mobile-client/
 │   │   ├── 📄 storage.ts              # SecureStore (web → localStorage)
 │   │   └── 📄 token.ts                # lưu/khôi phục/xoá JWT
 │   │
-│   ├── 📁 modules/integrity/          # Boundary có thể tách package sau
-│   │   ├── 📄 integrity-provider.ts   # Contract chung cho platform adapter
-│   │   ├── 📄 android-integrity.provider.ts # Play Integrity Standard
-│   │   ├── 📄 unsupported-integrity.provider.ts # iOS/web fallback
-│   │   └── 📄 index.ts                # Public API duy nhất của module
+│   ├── 📁 modules/integrity/          # Play Integrity adapter theo platform
+│   │   ├── 📄 integrity-provider.ts
+│   │   ├── 📄 android-integrity.provider.ts
+│   │   ├── 📄 unsupported-integrity.provider.ts
+│   │   └── 📄 index.ts
 │   │
 │   └── 📄 global.css                  # Global styles
 │
@@ -76,26 +73,28 @@ client/mobile-client/
 Screen (app/**)
   → Components (components/ui, feature)
   → Context (useAuth) / Hooks (use-check-in-context, use-now)
-  → services/* (attendance, location, device) / modules/integrity
-  → api/* (httpClient)
+  → services/* (location, device) / modules/integrity
+  → api/attendance.api.ts (platform adapter + httpClient)
+  → @gps-attendance/attendance-client (orchestration điểm danh)
   → @gps-attendance/shared (type + FetchHttpClient)
-  → Backend Server (/v0/...)
+  → LMS identity + integration adapter (/v0/...)
+  → Attendance Integration API (/v1/integration/mobile/...)
 ```
 
 ## 🎯 Key Features
 
 ### Authentication (`context/auth-context.tsx`)
 - Manages user login/logout
-- Stores JWT token in secure storage
+- Stores LMS access/refresh tokens in secure storage
 - Persists user session on app restart
 - Provides `useAuth()` hook for access anywhere
 
 ### API Layer (`api/`)
-- **http.ts**: `httpClient` tạo từ `createHttpClient()` của shared, inject `Authorization: Bearer`
+- **http.ts**: `httpClient` gọi LMS và inject `Authorization: Bearer`
 - **auth.api.ts**: login / logout / refreshToken
 - **user.api.ts**: getProfile
-- **attendance-sessions.api.ts**: getSessions
-- **attendance-check-in.api.ts**: checkIn
+- **attendance.api.ts**: bind package điểm danh với httpClient và adapter
+  GPS/device/integrity của Expo
 
 ### Screens
 
@@ -120,16 +119,16 @@ Screen (app/**)
 
 #### Dev (`app/dev.tsx`)
 - Trang ẩn, chỉ vào được khi bật "Chế độ dev" ở Profile
-- Card `DebugDeviceCard`: GPS, độ chính xác, deviceId, model, mock location.
-  Integrity token chỉ được tạo khi có `sessionId`, nên trang dev không tạo token
-  không gắn với một lần điểm danh thật. Dữ liệu lấy từ `useCheckInContext` rồi truyền
+- Card `DebugDeviceCard`: GPS, độ chính xác, deviceId, model, mock location,
+  integrity token — dữ liệu lấy từ `useCheckInContext` ở màn hình rồi truyền
   xuống card qua prop `context` (card chỉ hiển thị, không tự gọi hook)
 - Nhóm "Tuỳ chỉnh":
   - Công tắc "Giả lập mock location" → ép `isMockLocation = true` trong payload
-    điểm danh (`services/attendance.ts`); server trả `REJECTED / MOCK_LOCATION`.
+    điểm danh (platform adapter trong `api/attendance.api.ts`); server trả
+    `REJECTED / MOCK_LOCATION`.
     Tắt "Chế độ dev" ở Profile sẽ xoá luôn cờ này
   - "Đổi deviceId mới" → `resetDeviceId()` sinh `debug-<uuid>` rồi đọc lại
-  - "Làm mới dữ liệu thiết bị" → đọc lại GPS/device
+  - "Làm mới dữ liệu thiết bị" → đọc lại GPS/device/integrity
 
 ### Components
 
@@ -220,8 +219,9 @@ eas build --platform android  # Android
 
 ## 🔐 Security Notes
 
-- JWT token lưu bằng `expo-secure-store` (`services/storage.ts`, fallback localStorage trên web)
-- Token sent in Authorization header for authenticated requests
+- Token LMS lưu bằng `expo-secure-store` (`services/storage.ts`, fallback localStorage trên web)
+- Token chỉ được gửi tới LMS. Module integration gọi Attendance bằng API key và
+  `User.code`; không chuyển token hoặc mật khẩu LMS sang Attendance
 - API timeout: 30 seconds
 - Error handling and user feedback for API failures
 

@@ -34,5 +34,6 @@ import { AttendanceReviewModule } from '../attendance-review/attendance-review.m
   ],
 
   controllers: [AttendanceCheckInController],
+  exports: [AttendanceCheckInService],
 })
 export class AttendanceCheckInModule {}
