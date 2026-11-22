@@ -778,3 +778,47 @@ button {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+.export-action {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+.export-action button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.export-action small {
+  color: #728078;
+  font-size: 12px;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #728078;
+}
+.pager button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.token-form {
+  display: flex;
+  gap: 8px;
+}
+.token-form input {
+  flex: 1;
+}
+.notice-block {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+.session-panel textarea {
+  width: 100%;
+  font: inherit;
+}

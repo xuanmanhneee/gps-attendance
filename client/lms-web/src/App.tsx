@@ -1,5 +1,8 @@
 import { FormEvent, useEffect, useState } from 'react';
 import logoUrl from '../../mobile-client/assets/images/logo-dlu.png';
+import SessionReport from './session-report/SessionReport.tsx';
+import UserList from './users/UserList.tsx';
+import ReviewsPage from './reviews/ReviewsPage.tsx';
 
 type Course = { id: number; code: string; name: string; lecturerCode: string };
 type Building = {
@@ -30,7 +33,14 @@ type CallReport = {
   at: string;
 };
 type Page =
-  'dashboard' | 'courses' | 'course-detail' | 'attendance' | 'integration';
+  | 'dashboard'
+  | 'courses'
+  | 'course-detail'
+  | 'attendance'
+  | 'session-report'
+  | 'users'
+  | 'reviews'
+  | 'integration';
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const token = sessionStorage.getItem('lms-token');
@@ -245,6 +255,8 @@ export default function App() {
     { id: 'dashboard', label: 'Bảng điều khiển', icon: '⌂' },
     { id: 'courses', label: 'Khóa học của tôi', icon: '▤' },
     { id: 'attendance', label: 'Điểm danh', icon: '✓' },
+    { id: 'reviews', label: 'Duyệt review', icon: '✎' },
+    { id: 'users', label: 'Người dùng', icon: '☰' },
     { id: 'integration', label: 'Tích hợp', icon: '↻' },
   ];
   const selectedBuilding = buildings.find(
@@ -262,6 +274,7 @@ export default function App() {
             <button
               className={
                 page === item.id ||
+                (page === 'session-report' && item.id === 'attendance') ||
                 (page === 'course-detail' && item.id === 'courses')
                   ? 'active'
                   : ''
@@ -498,6 +511,9 @@ export default function App() {
                     <button onClick={() => void inspectSession()}>
                       Xem records
                     </button>
+                    <button onClick={() => setPage('session-report')}>
+                      Báo cáo &amp; CSV
+                    </button>
                     <button
                       className="danger"
                       onClick={() => void cancelSession()}
@@ -510,6 +526,15 @@ export default function App() {
               )}
             </>
           )}
+          {page === 'session-report' && result && (
+            <SessionReport
+              externalId={result.externalId}
+              load={api}
+              onBack={() => setPage('attendance')}
+            />
+          )}
+          {page === 'users' && <UserList />}
+          {page === 'reviews' && <ReviewsPage />}
           {page === 'integration' && (
             <>
               <div className="page-header">
